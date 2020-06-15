@@ -44,8 +44,8 @@ app.post('/twilio-sms', (req, res) => {
       redisClient.saddAsync(req.body.From);
 
       SlackApiUtil.sendMessage({
-        channel: "#north-carolina",
-        text:  `New voter with questions on North Carolina! (id: ${req.body.From})`,
+        channel: "#general",
+        text:  `Incoming voter! (phone number: ${req.body.From}). Determining U.S. state.`,
       }).then(response => {
           // Add key/value such that given a user phone number we can get the
           // Slack thread associated with that user.
@@ -137,6 +137,16 @@ app.post('/slack', upload.array(), (req, res) => {
   }
   res.sendStatus(200);
 });
+
+// Authenticate Slack connection to Heroku.
+// app.post('/slack', upload.array(), (req, res) => {
+//   res.type('application/json');
+//   if (SlackApiUtil.authenticateConnectionToSlack(req.body.token)) {
+//     res.status(200).json({ challenge: req.body.challenge });
+//   }
+//
+//   res.sendStatus(200);
+// });
 
 http.listen(process.env.PORT || 8080, function() {
   console.log('listening on *:8080');
