@@ -1,8 +1,6 @@
 const express = require('express');
 const app = express();
 const http = require('http').createServer(app);;
-const path = require('path');
-// var io = require('socket.io')(http);
 const redis = require('redis');
 const bluebird = require('bluebird');
 const SlackApiUtil = require('./slack_api_util')
@@ -27,9 +25,6 @@ app.use(bodyParser.json({
 bluebird.promisifyAll(redis);
 var redisClient = redis.createClient(process.env.REDISCLOUD_URL);
 
-// Serves the front-end
-app.use(express.static(path.join(__dirname, 'build')));
-
 app.post('/twilio-sms', (req, res) => {
   const twiml = new MessagingResponse();
   console.log('receiving twilio message');
@@ -46,18 +41,7 @@ app.post('/twilio-sms', (req, res) => {
         channel: userInfo.channel,
       });
     } else {
-      // var redisSubClient = redis.createClient(process.env.REDISCLOUD_URL);
       redisClient.saddAsync(req.body.From);
-      // redisSubClient.subscribe(req.body.From);
-
-      // redisSubClient.on('message', function(channel, message) {
-      //   console.log('incoming message from Slack', message);
-        // twilioClient.messages
-        //       .create({body: message,
-        //                from: process.env.TWILIO_PHONE_NUMBER,
-        //                to: req.body.From})
-        //       .then(message => console.log(message.sid));
-      // });
 
       SlackApiUtil.sendMessage({
         channel: "#north-carolina",
@@ -92,20 +76,9 @@ app.post('/twilio-sms', (req, res) => {
                          from: process.env.TWILIO_PHONE_NUMBER,
                          to: req.body.From})
                 .then(message => console.log(message.sid));
-          // redisClient.publish(req.body.From, "Welcome! We're activating a North Carolina volunteer. How can we help?");
       });
     }
   });
-
-  // if (req.body.Body == 'hello') {
-  //   twiml.message('Hi!');
-  // } else if (req.body.Body == 'bye') {
-  //   twiml.message('Goodbye');
-  // } else {
-  //   twiml.message(
-  //     'No Body param match, Twilio sends this in the request to your server.'
-  //   );
-  // }
 
   res.writeHead(200, {'Content-Type': 'text/xml'});
   res.end(twiml.toString());
@@ -152,136 +125,18 @@ app.post('/slack', upload.array(), (req, res) => {
     // Pass Slack message to front-end
     redisClient.getAsync(`${reqBody.event.channel}:${reqBody.event.thread_ts}`).then(value => {
       userInfo = JSON.parse(value);
-      console.log(userInfo);
-      // channel = null;
-      // if (userInfo.socketId) {
-      //   console.log('userInfo.socketId');
-      //   console.log(userInfo.socketId);
-      //   channel = userInfo.socketId;
-      // } else
       if (userInfo.userPhoneNumber) {
-        console.log('userInfo.userPhoneNumber');
-        console.log(userInfo.userPhoneNumber);
-        // channel = userInfo.userPhoneNumber;
         twilioClient.messages
               .create({body: reqBody.event.text,
                        from: process.env.TWILIO_PHONE_NUMBER,
                        to: userInfo.userPhoneNumber})
               .then(message => console.log(message.sid));
       }
-      console.log('channel');
-      console.log(channel);
-      console.log('reqBody.event.text');
-      console.log(reqBody.event.text);
-      // redisClient.pubsubAsync('NUMSUB', channel).then(numsub => {
-      //   console.log('numsub');
-      //   console.log(numsub[1]);
-      //   if (numsub[1] == 0) {
-      //     var redisSubClient = redis.createClient(process.env.REDISCLOUD_URL);
-      //     redisClient.saddAsync(channel);
-      //     redisSubClient.subscribe(channel);
-      //
-      //     redisSubClient.on('message', function(channel, message) {
-      //       console.log('incoming message from Slack', message);
-      //       twilioClient.messages
-      //             .create({body: message,
-      //                      from: process.env.TWILIO_PHONE_NUMBER,
-      //                      to: channel})
-      //             .then(message => console.log(message.sid));
-      //     });
-      //   }
         redisClient.publish(channel, reqBody.event.text);
-      // });
     });
   }
   res.sendStatus(200);
 });
-
-// Event listener for when a browser client connects to this server
-// Use an `async` function, so we can use `await` below.
-// io.on('connection', async function(socket) {
-//   console.log("New connection");
-//
-//   SlackApiUtil.sendMessage({
-//     channel: "#general",
-//     text:  `Incoming voter! Determining which U.S. State... (id: ${socket.id})`,
-//   });
-//
-//   // Event listener for when a browser client sends a message to this server
-//   socket.on('message', function(message){
-//     redisClient.getAsync(socket.id).then(value => {
-//       if (value) {
-//         userInfo = JSON.parse(value);
-//         SlackApiUtil.sendMessage({
-//           text: `${socket.id}: ${message}`,
-//           parentMessageTs: userInfo.parentMessageTs,
-//           channel: userInfo.channel,
-//         });
-//       } else if (message.match(/north carolina|nc/gi)) {
-//         var redisSubClient = redis.createClient(process.env.REDISCLOUD_URL);
-//         redisClient.saddAsync(socket.id);
-//         redisSubClient.subscribe(socket.id);
-//
-//         redisSubClient.on('message', function(channel, message) {
-//           console.log('incoming message from Slack', message);
-//           socket.send(message);
-//         });
-//
-//         SlackApiUtil.sendMessage({
-//           channel: "#north-carolina",
-//           text:  `New voter with questions on North Carolina! (id: ${socket.id})`,
-//         }).then(response => {
-//             redisClient.setAsync(socket.id,
-//                                 JSON.stringify({
-//                                     parentMessageTs: response.data.ts,
-//                                     channel: '#north-carolina',
-//                                   }));
-//             redisClient.setAsync(`${response.data.channel}:${response.data.ts}`,
-//                                 JSON.stringify({
-//                                     socketId: socket.id,
-//                                   }));
-//             console.log("publishing response");
-//             redisClient.publish(socket.id, "Great! We're activating a North Carolina volunteer. How can we help?");
-//         });
-//       } else if (message.match(/wisconsin|wi/gi)) {
-//         var redisSubClient = redis.createClient(process.env.REDISCLOUD_URL);
-//         redisClient.saddAsync(socket.id);
-//         redisSubClient.subscribe(socket.id);
-//
-//         redisSubClient.on('message', function(channel, message) {
-//           console.log('incoming message from Slack', message);
-//           socket.send(message);
-//         });
-//
-//         SlackApiUtil.sendMessage({
-//           channel: "#wisconsin",
-//           text:  `New voter with questions on Wisconsin! (id: ${socket.id})`,
-//         }).then(response => {
-//             redisClient.setAsync(socket.id,
-//                                 JSON.stringify({
-//                                     parentMessageTs: response.data.ts,
-//                                     channel: '#wisconsin',
-//                                   }));
-//             redisClient.setAsync(`${response.data.channel}:${response.data.ts}`,
-//                                 JSON.stringify({
-//                                     socketId: socket.id,
-//                                   }));
-//             redisClient.publish(socket.id, "Great! We're activating a Wisconsin volunteer. How can we help?");
-//         });
-//       }
-//     });
-//   });
-// });
-
-// Authenticate Slack connection to Heroku.
-// app.post('/slack', upload.array(), (req, res) => {
-//   res.type('application/json');
-//   if (SlackApiUtil.authenticateConnectionToSlack(req.body.token)) {
-//     res.status(200).json({ challenge: req.body.challenge });
-//   }
-//
-//   res.sendStatus(200);
-// });
 
 http.listen(process.env.PORT || 8080, function() {
   console.log('listening on *:8080');
