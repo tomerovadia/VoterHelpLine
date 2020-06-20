@@ -1,27 +1,40 @@
 const axios = require('axios');
 const Hashes = require('jshashes') // v1.0.5
+const Promise = require('bluebird');
 
-exports.sendMessage = (options) => {
+const sendMessage = (message, options) => {
   return axios.post('https://slack.com/api/chat.postMessage', {
     'Content-Type': 'application/json',
     'channel': options.channel,
-    'text': options.text,
-    'token': process.env.BOT_ACCESS_TOKEN,
+    'text': message,
+    'token': process.env.SLACK_BOT_ACCESS_TOKEN,
     'thread_ts': options.parentMessageTs,
   },
   {
     'headers': {
-      "Authorization": `Bearer ${process.env.BOT_ACCESS_TOKEN}`,
+      "Authorization": `Bearer ${process.env.SLACK_BOT_ACCESS_TOKEN}`,
     },
   })
   .then(response => {
-    console.log("Successfully sent message.");
-    console.log(response);
+    console.log(`Successfully sent message to Slack: ${message}`);
     return response;
   })
   .catch(error => {
     console.log(error);
     return error;
+  });
+}
+
+exports.sendMessage = sendMessage;
+
+exports.sendMessages = (messages, options) => {
+  parentMessageTs = options.parentMessageTs;
+  channel = options.channel;
+
+  messagePromises = messages.map(message => Promise.resolve(message));
+
+  Promise.mapSeries(messagePromises, (message, index, arrayLength) => {
+    return sendMessage(message, {parentMessageTs, channel});
   });
 }
 
