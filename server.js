@@ -77,43 +77,43 @@ const passesAuth = (req) => {
   return true;
 }
 
-// app.post('/slack', upload.array(), (req, res) => {
-//   res.type('application/json');
-//
-//   const reqBody = req.body;
-//   if(!passesAuth(req)) {
-//     console.log('doesnt pass auth');
-//     res.sendStatus(401);
-//     return;
-//   }
-//   console.log('Passes Slack auth');
-//
-//   if (reqBody.event.type === "message" && reqBody.event.user != "U014LM9RXHU") {
-//     console.log(`Received message from Slack: ${reqBody.event.text}`);
-//
-//     // Pass Slack message to Twilio
-//     redisClient.getAsync(`${reqBody.event.channel}:${reqBody.event.thread_ts}`).then(value => {
-//       if (value) {
-//         userInfo = JSON.parse(value);
-//         if (userInfo.userPhoneNumber) {
-//           TwilioApiUtil.sendMessage(reqBody.event.text,
-//                                     {userPhoneNumber: userInfo.userPhoneNumber});
-//         }
-//       }
-//     });
-//   }
-//   res.sendStatus(200);
-// });
-
-// Authenticate Slack connection to Heroku.
 app.post('/slack', upload.array(), (req, res) => {
   res.type('application/json');
-  if (SlackApiUtil.authenticateConnectionToSlack(req.body.token)) {
-    res.status(200).json({ challenge: req.body.challenge });
-  }
 
+  const reqBody = req.body;
+  if(!passesAuth(req)) {
+    console.log('doesnt pass auth');
+    res.sendStatus(401);
+    return;
+  }
+  console.log('Passes Slack auth');
+
+  if (reqBody.event.type === "message" && reqBody.event.user != "U014LM9RXHU") {
+    console.log(`Received message from Slack: ${reqBody.event.text}`);
+
+    // Pass Slack message to Twilio
+    redisClient.getAsync(`${reqBody.event.channel}:${reqBody.event.thread_ts}`).then(value => {
+      if (value) {
+        userInfo = JSON.parse(value);
+        if (userInfo.userPhoneNumber) {
+          TwilioApiUtil.sendMessage(reqBody.event.text,
+                                    {userPhoneNumber: userInfo.userPhoneNumber});
+        }
+      }
+    });
+  }
   res.sendStatus(200);
 });
+
+// Authenticate Slack connection to Heroku.
+// app.post('/slack', upload.array(), (req, res) => {
+//   res.type('application/json');
+//   if (SlackApiUtil.authenticateConnectionToSlack(req.body.token)) {
+//     res.status(200).json({ challenge: req.body.challenge });
+//   }
+//
+//   res.sendStatus(200);
+// });
 
 http.listen(process.env.PORT || 8080, function() {
   console.log('listening on *:8080');
