@@ -105,7 +105,7 @@ const passesAuth = (req) => {
 //   res.sendStatus(200);
 // });
 
-Authenticate Slack connection to Heroku.
+// Authenticate Slack connection to Heroku.
 app.post('/slack', upload.array(), (req, res) => {
   res.type('application/json');
   if (SlackApiUtil.authenticateConnectionToSlack(req.body.token)) {
