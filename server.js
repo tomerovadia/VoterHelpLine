@@ -3,14 +3,16 @@ const app = express();
 const http = require('http').createServer(app);;
 const redis = require('redis');
 const bluebird = require('bluebird');
-const SlackApiUtil = require('./slack_api_util')
-const Hashes = require('jshashes') // v1.0.5
+const SlackApiUtil = require('./slack_api_util');
+const TwilioApiUtil = require('./twilio_api_util');
+const MessageConstants = require('./message_constants');
+const RouterUtil = require('./router_util');
+const Hashes = require('jshashes'); // v1.0.5
 const bodyParser = require('body-parser');
 const multer = require('multer'); // v1.0.5
 const crypto = require('crypto');
 const upload = multer(); // for parsing multipart/form-data
 const MessagingResponse = require('twilio').twiml.MessagingResponse;
-const twilioClient = require('twilio')(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
 
 app.use(bodyParser.urlencoded({ extended: false }));
 
@@ -27,56 +29,24 @@ var redisClient = redis.createClient(process.env.REDISCLOUD_URL);
 
 app.post('/twilio-sms', (req, res) => {
   const twiml = new MessagingResponse();
-  console.log('receiving twilio message');
-  console.log(req.body);
-  console.log(req.body.Body);
-  console.log(req.body.From);
+  console.log('receiving Twilio message');
+  userPhoneNumber = req.body.From;
+  userMessage = req.body.Body;
 
-  redisClient.getAsync(req.body.From).then(value => {
-    if (value) {
-      userInfo = JSON.parse(value);
-      SlackApiUtil.sendMessage({
-        text: `${req.body.From}: ${req.body.Body}`,
-        parentMessageTs: userInfo.parentMessageTs,
-        channel: userInfo.channel,
-      });
+  redisClient.getAsync(userPhoneNumber).then(unparsedUserInfo => {
+    // Seen this voter before
+    if (unparsedUserInfo) {
+      userInfo = JSON.parse(unparsedUserInfo);
+      // Voter has a state determined
+      if (userInfo.stateChannel) {
+        RouterUtil.handleKnownStateVoter({userInfo, userPhoneNumber, userMessage}, redisClient);
+      // Voter has no state determined
+      } else {
+        RouterUtil.determineVoterState({userInfo, userPhoneNumber, userMessage}, redisClient);
+      }
+    // Haven't seen this voter before
     } else {
-      redisClient.saddAsync(req.body.From);
-
-      SlackApiUtil.sendMessage({
-        channel: "#general",
-        text:  `Incoming voter! (phone number: ${req.body.From}). Determining U.S. state.`,
-      }).then(response => {
-          // Add key/value such that given a user phone number we can get the
-          // Slack thread associated with that user.
-          redisClient.setAsync(req.body.From,
-                              JSON.stringify({
-                                  parentMessageTs: response.data.ts,
-                                  channel: '#north-carolina',
-                                }));
-          // Add key/value such that given Slack thread data we can get a
-          // user phone number.
-          redisClient.setAsync(`${response.data.channel}:${response.data.ts}`,
-                              JSON.stringify({
-                                  userPhoneNumber: req.body.From,
-                                }));
-          SlackApiUtil.sendMessage({
-            text: `${req.body.From}: ${req.body.Body}`,
-            parentMessageTs: response.data.ts,
-            channel: response.data.channel,
-          });
-          console.log("publishing response");
-          SlackApiUtil.sendMessage({
-            text: "EffingVote: Welcome! We're activating a North Carolina volunteer. How can we help?",
-            parentMessageTs: response.data.ts,
-            channel: response.data.channel,
-          });
-          twilioClient.messages
-                .create({body: "Welcome! We're activating a North Carolina volunteer. How can we help?",
-                         from: process.env.TWILIO_PHONE_NUMBER,
-                         to: req.body.From})
-                .then(message => console.log(message.sid));
-      });
+      RouterUtil.handleNewVoter({userPhoneNumber, userMessage}, redisClient);
     }
   });
 
@@ -107,7 +77,6 @@ const passesAuth = (req) => {
   return true;
 }
 
-// Main Slack code
 app.post('/slack', upload.array(), (req, res) => {
   res.type('application/json');
 
@@ -117,22 +86,20 @@ app.post('/slack', upload.array(), (req, res) => {
     res.sendStatus(401);
     return;
   }
-  console.log('passes auth');
+  console.log('Passes Slack auth');
 
   if (reqBody.event.type === "message" && reqBody.event.user != "U014LM9RXHU") {
-    console.log('received message from slack');
+    console.log(`Received message from Slack: ${reqBody.event.text}`);
 
-    // Pass Slack message to front-end
+    // Pass Slack message to Twilio
     redisClient.getAsync(`${reqBody.event.channel}:${reqBody.event.thread_ts}`).then(value => {
-      userInfo = JSON.parse(value);
-      if (userInfo.userPhoneNumber) {
-        twilioClient.messages
-              .create({body: reqBody.event.text,
-                       from: process.env.TWILIO_PHONE_NUMBER,
-                       to: userInfo.userPhoneNumber})
-              .then(message => console.log(message.sid));
+      if (value) {
+        userInfo = JSON.parse(value);
+        if (userInfo.userPhoneNumber) {
+          TwilioApiUtil.sendMessage(reqBody.event.text,
+                                    {userPhoneNumber: userInfo.userPhoneNumber});
+        }
       }
-        redisClient.publish(channel, reqBody.event.text);
     });
   }
   res.sendStatus(200);
