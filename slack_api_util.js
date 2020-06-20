@@ -8,13 +8,11 @@ const sendMessage = (message, options) => {
     'channel': options.channel,
     'text': message,
     'token': process.env.SLACK_BOT_ACCESS_TOKEN,
-    // 'token': process.env.BOT_ACCESS_TOKEN,
     'thread_ts': options.parentMessageTs,
   },
   {
     'headers': {
       "Authorization": `Bearer ${process.env.SLACK_BOT_ACCESS_TOKEN}`,
-      // "Authorization": `Bearer ${process.env.BOT_ACCESS_TOKEN}`,
     },
   })
   .then(response => {
