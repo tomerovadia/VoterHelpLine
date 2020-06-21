@@ -3,7 +3,7 @@ const SlackApiUtil = require('./slack_api_util');
 const TwilioApiUtil = require('./twilio_api_util');
 const MessageParserUtil = require('./message_parser_util');
 
-const MINS_BEFORE_WELCOME_BACK_MESSAGE = 1;
+const MINS_BEFORE_WELCOME_BACK_MESSAGE = 60;
 
 exports.handleNewVoter = (userOptions, redisClient) => {
   const userPhoneNumber = userOptions.userPhoneNumber;
