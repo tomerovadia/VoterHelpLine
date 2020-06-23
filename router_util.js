@@ -88,7 +88,7 @@ const introduceVoterToStateChannel = (userOptions, redisClient) => {
 
     // Be able to identify phone number using state channel identifying info.
     redisClient.setAsync(`${response.data.channel}:${stateParentMessageTs}`,
-                        JSON.stringify({userPhoneNumber}));
+                        JSON.stringify({userPhoneNumber, twilioPhoneNumber}));
   });
 }
 
