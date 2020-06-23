@@ -98,7 +98,8 @@ app.post('/slack', upload.array(), (req, res) => {
         userInfo = JSON.parse(value);
         if (userInfo.userPhoneNumber) {
           TwilioApiUtil.sendMessage(reqBody.event.text,
-                                    {userPhoneNumber: userInfo.userPhoneNumber});
+                                    {userPhoneNumber: userInfo.userPhoneNumber,
+                                      twilioPhoneNumber: userInfo.twilioPhoneNumber});
         }
       }
     });
