@@ -31,6 +31,7 @@ app.post('/twilio-sms', (req, res) => {
   const twiml = new MessagingResponse();
   console.log('receiving Twilio message');
   userPhoneNumber = req.body.From;
+  twilioPhoneNumber = req.body.To;
   userMessage = req.body.Body;
 
   redisClient.getAsync(userPhoneNumber).then(unparsedUserInfo => {
