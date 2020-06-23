@@ -46,7 +46,7 @@ app.post('/twilio-sms', (req, res) => {
       }
     // Haven't seen this voter before
     } else {
-      RouterUtil.handleNewVoter({userPhoneNumber, userMessage}, redisClient);
+      RouterUtil.handleNewVoter({userPhoneNumber, userMessage}, redisClient, twilioPhoneNumber);
     }
   });
 

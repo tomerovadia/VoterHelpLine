@@ -5,41 +5,50 @@ const MessageParserUtil = require('./message_parser_util');
 
 const MINS_BEFORE_WELCOME_BACK_MESSAGE = 60;
 
-exports.handleNewVoter = (userOptions, redisClient) => {
+exports.handleNewVoter = (userOptions, redisClient, twilioPhoneNumber) => {
   const userPhoneNumber = userOptions.userPhoneNumber;
   const userMessage = userOptions.userMessage;
   const messageHistory = [`${userPhoneNumber}: ${userMessage}`, `EffingVote: ${MessageConstants.WELCOME}`];
 
+  let welcomeMessage = MessageConstants.WELCOME;
+  let entryChannel = "#lobby";
+  let operatorMessage = `Operator: New voter! (${userPhoneNumber}).`;
+  let redisClientChannelKey = "lobby";
+  if (twilioPhoneNumber == process.env.TWILIO_PHONE_NUMBER_NC){
+    welcomeMessage = MessageConstants.NC_WELCOME;
+    entryChannel = "#north-carolina";
+    operatorMessage = `Operator: New direct North Carolina voter! (${userPhoneNumber}).`;
+    redisClientChannelKey = "stateChannel";
+  }
+
   // Welcome the voter
-  TwilioApiUtil.sendMessage(MessageConstants.WELCOME, {userPhoneNumber});
+  TwilioApiUtil.sendMessage(welcomeMessage, {userPhoneNumber});
 
-  const lobbyChannel = "#lobby";
-
-  // In Slack, create lobby entry, followed by voter's message and intro text.
-  SlackApiUtil.sendMessage(`Operator: New voter! (${userPhoneNumber}).`,
+  // In Slack, create entry channel message, followed by voter's message and intro text.
+  SlackApiUtil.sendMessage(operatorMessage,
   {
-    channel: lobbyChannel,
+    channel: entryChannel,
   }).then(response => {
-    const slackLobbyTs = response.data.ts;
+    const parentMessageTs = response.data.ts;
 
     // Pass the voter's message along to the Slack lobby thread,
     // and show in the Slack lobby thread the welcome message the voter received
     // in response.
-    SlackApiUtil.sendMessages([`${userPhoneNumber}: ${userMessage}`, `EffingVote: ${MessageConstants.WELCOME}`],
-                              {parentMessageTs: slackLobbyTs, channel: response.data.channel});
+    SlackApiUtil.sendMessages([`${userPhoneNumber}: ${userMessage}`,
+                                `EffingVote: ${welcomeMessage}`],
+                              {parentMessageTs, channel: response.data.channel});
 
     const secondsSinceEpoch = Math.round(Date.now() / 1000);
     // Add key/value such that given a user phone number we can get the
     // Slack lobby thread associated with that user.
-    redisClient.setAsync(userPhoneNumber,
-                        JSON.stringify({
-                          lobby: {
-                            parentMessageTs: response.data.ts,
-                            channel: response.data.channel,
-                          },
-                          messageHistory,
-                          lastVoterMessageSecsFromEpoch: secondsSinceEpoch,
-                        }));
+    let userInfo = {};
+    userInfo[redisClientChannelKey] = {
+        parentMessageTs: response.data.ts,
+        channel: response.data.channel,
+      };
+    userInfo.messageHistory = messageHistory;
+    userInfo.lastVoterMessageSecsFromEpoch = secondsSinceEpoch;
+    redisClient.setAsync(userPhoneNumber, JSON.stringify(userInfo));
 
     // Add key/value such that given Slack thread data we can get a
     // user phone number.
