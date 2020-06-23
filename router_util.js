@@ -15,14 +15,14 @@ exports.handleNewVoter = (userOptions, redisClient, twilioPhoneNumber) => {
   let operatorMessage = `Operator: New voter! (${userPhoneNumber}).`;
   let redisClientChannelKey = "lobby";
   if (twilioPhoneNumber == process.env.TWILIO_PHONE_NUMBER_NC){
-    welcomeMessage = MessageConstants.NC_WELCOME;
+    welcomeMessage = MessageConstants.WELCOME_NC;
     entryChannel = "#north-carolina";
     operatorMessage = `Operator: New direct North Carolina voter! (${userPhoneNumber}).`;
     redisClientChannelKey = "stateChannel";
   }
 
   // Welcome the voter
-  TwilioApiUtil.sendMessage(welcomeMessage, {userPhoneNumber});
+  TwilioApiUtil.sendMessage(welcomeMessage, {userPhoneNumber, twilioPhoneNumber});
 
   // In Slack, create entry channel message, followed by voter's message and intro text.
   SlackApiUtil.sendMessage(operatorMessage,
@@ -53,7 +53,7 @@ exports.handleNewVoter = (userOptions, redisClient, twilioPhoneNumber) => {
     // Add key/value such that given Slack thread data we can get a
     // user phone number.
     redisClient.setAsync(`${response.data.channel}:${response.data.ts}`,
-                        JSON.stringify({userPhoneNumber}));
+                        JSON.stringify({userPhoneNumber, twilioPhoneNumber}));
   });
 }
 
@@ -92,7 +92,7 @@ const introduceVoterToStateChannel = (userOptions, redisClient) => {
   });
 }
 
-exports.determineVoterState = (userOptions, redisClient) => {
+exports.determineVoterState = (userOptions, redisClient, twilioPhoneNumber) => {
   const messageHistory = userOptions.userInfo.messageHistory;
   const parentMessageTs = userOptions.userInfo.lobby.parentMessageTs;
   const channel = userOptions.userInfo.lobby.channel;
@@ -104,7 +104,7 @@ exports.determineVoterState = (userOptions, redisClient) => {
       const stateName = MessageParserUtil.determineState(userMessage);
       if (stateName == null) {
         console.log("State not determined");
-        TwilioApiUtil.sendMessage(MessageConstants.CLARIFY_STATE, {userPhoneNumber});
+        TwilioApiUtil.sendMessage(MessageConstants.CLARIFY_STATE, {userPhoneNumber, twilioPhoneNumber});
         SlackApiUtil.sendMessage(`EffingVote: ${MessageConstants.CLARIFY_STATE}`, {parentMessageTs, channel});
         messageHistory.push(`EffingVote: ${MessageConstants.CLARIFY_STATE}`);
 
@@ -119,7 +119,7 @@ exports.determineVoterState = (userOptions, redisClient) => {
       } else {
         // Slack channel name must abide by this rule.
         const stateChannel = stateName.toLowerCase().replace(/\s/g, '-');
-        TwilioApiUtil.sendMessage(MessageConstants.STATE_CONFIRMATION(stateName), {userPhoneNumber});
+        TwilioApiUtil.sendMessage(MessageConstants.STATE_CONFIRMATION(stateName), {userPhoneNumber, twilioPhoneNumber});
         SlackApiUtil.sendMessage(`Operator: Routing voter to ${stateChannel}.`, {parentMessageTs, channel});
         messageHistory.push(`EffingVote: ${MessageConstants.STATE_CONFIRMATION(stateName)}`);
         introduceVoterToStateChannel({stateChannel,
@@ -132,7 +132,7 @@ exports.determineVoterState = (userOptions, redisClient) => {
     });
 }
 
-exports.handleKnownStateVoter = (options, redisClient) => {
+exports.handleKnownStateVoter = (options, redisClient, twilioPhoneNumber) => {
   SlackApiUtil.sendMessage(`${options.userPhoneNumber}: ${options.userMessage}`,
     {
       parentMessageTs: options.userInfo.stateChannel.parentMessageTs,
@@ -142,7 +142,7 @@ exports.handleKnownStateVoter = (options, redisClient) => {
       console.log(`Seconds since last message from voter: ${nowSecondsEpoch - options.userInfo.lastVoterMessageSecsFromEpoch}`);
       if (nowSecondsEpoch - options.userInfo.lastVoterMessageSecsFromEpoch > MINS_BEFORE_WELCOME_BACK_MESSAGE * 60) {
         const welcomeBackMessage = MessageConstants.WELCOME_BACK(options.userInfo.stateName);
-        TwilioApiUtil.sendMessage(welcomeBackMessage, {userPhoneNumber: options.userPhoneNumber});
+        TwilioApiUtil.sendMessage(welcomeBackMessage, {userPhoneNumber: options.userPhoneNumber, twilioPhoneNumber});
         SlackApiUtil.sendMessage(`EffingVote: ${welcomeBackMessage}`,
           {
             parentMessageTs: options.userInfo.stateChannel.parentMessageTs,

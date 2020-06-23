@@ -3,8 +3,7 @@ const twilioClient = require('twilio')(process.env.TWILIO_ACCOUNT_SID, process.e
 exports.sendMessage = (message, options) => {
   twilioClient.messages
     .create({body: message,
-       // from: process.env.TWILIO_PHONE_NUMBER,
-       from: process.env.TWILIO_PHONE_NUMBER,
+       from: options.twilioPhoneNumber,
        to: options.userPhoneNumber})
     .then(response => console.log(`Successfully sent Twilio message ${response.sid}: ${message}.`));
 }

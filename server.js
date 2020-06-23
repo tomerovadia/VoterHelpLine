@@ -40,10 +40,10 @@ app.post('/twilio-sms', (req, res) => {
       userInfo = JSON.parse(unparsedUserInfo);
       // Voter has a state determined
       if (userInfo.stateChannel) {
-        RouterUtil.handleKnownStateVoter({userInfo, userPhoneNumber, userMessage}, redisClient);
+        RouterUtil.handleKnownStateVoter({userInfo, userPhoneNumber, userMessage}, redisClient, twilioPhoneNumber);
       // Voter has no state determined
       } else {
-        RouterUtil.determineVoterState({userInfo, userPhoneNumber, userMessage}, redisClient);
+        RouterUtil.determineVoterState({userInfo, userPhoneNumber, userMessage}, redisClient, twilioPhoneNumber);
       }
     // Haven't seen this voter before
     } else {
