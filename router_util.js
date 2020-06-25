@@ -12,7 +12,7 @@ exports.handleNewVoter = (userOptions, redisClient, twilioPhoneNumber) => {
 
   let welcomeMessage = MessageConstants.WELCOME;
   let entryChannel = "#lobby";
-  let operatorMessage = `Operator: New voter! (${userPhoneNumber}).`;
+  let operatorMessage = `<!channel> Operator: New voter! (${userPhoneNumber}).`;
   let redisClientChannelKey = "lobby";
   if (twilioPhoneNumber == process.env.TWILIO_PHONE_NUMBER_NC){
     welcomeMessage = MessageConstants.WELCOME_NC;
