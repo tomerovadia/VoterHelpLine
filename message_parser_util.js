@@ -4,7 +4,7 @@ exports.determineState = (userMessage) => {
   for (key in stateConstants) {
     const abbrev = key;
     const stateName = stateConstants[key];
-    const userMessageNoPunctuation = userMessage.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, '');
+    const userMessageNoPunctuation = userMessage.replace(/[.,?\/#!$%\^&\*;:{}=\-_`~()]/g, '');
 
     const stateWords = stateName.split(" ");
     let nameRegEx = null;
