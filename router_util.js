@@ -8,7 +8,7 @@ const MINS_BEFORE_WELCOME_BACK_MESSAGE = 60;
 exports.handleNewVoter = (userOptions, redisClient, twilioPhoneNumber) => {
   const userPhoneNumber = userOptions.userPhoneNumber;
   const userMessage = userOptions.userMessage;
-  const messageHistory = [`${userPhoneNumber}: ${userMessage}`, `EffingVote: ${MessageConstants.WELCOME}`];
+  const messageHistory = [`${userPhoneNumber}: ${userMessage}`, `Automated Message: ${MessageConstants.WELCOME}`];
 
   let welcomeMessage = MessageConstants.WELCOME;
   let entryChannel = "#lobby";
@@ -35,7 +35,7 @@ exports.handleNewVoter = (userOptions, redisClient, twilioPhoneNumber) => {
     // and show in the Slack lobby thread the welcome message the voter received
     // in response.
     SlackApiUtil.sendMessages([`${userPhoneNumber}: ${userMessage}`,
-                                `EffingVote: ${welcomeMessage}`],
+                                `Automated Message: ${welcomeMessage}`],
                               {parentMessageTs, channel: response.data.channel});
 
     const secondsSinceEpoch = Math.round(Date.now() / 1000);
@@ -105,8 +105,8 @@ exports.determineVoterState = (userOptions, redisClient, twilioPhoneNumber) => {
       if (stateName == null) {
         console.log("State not determined");
         TwilioApiUtil.sendMessage(MessageConstants.CLARIFY_STATE, {userPhoneNumber, twilioPhoneNumber});
-        SlackApiUtil.sendMessage(`EffingVote: ${MessageConstants.CLARIFY_STATE}`, {parentMessageTs, channel});
-        messageHistory.push(`EffingVote: ${MessageConstants.CLARIFY_STATE}`);
+        SlackApiUtil.sendMessage(`Automated Message: ${MessageConstants.CLARIFY_STATE}`, {parentMessageTs, channel});
+        messageHistory.push(`Automated Message: ${MessageConstants.CLARIFY_STATE}`);
 
         const secondsSinceEpoch = Math.round(Date.now() / 1000);
         redisClient.setAsync(userPhoneNumber,
@@ -121,7 +121,7 @@ exports.determineVoterState = (userOptions, redisClient, twilioPhoneNumber) => {
         const stateChannel = stateName.toLowerCase().replace(/\s/g, '-');
         TwilioApiUtil.sendMessage(MessageConstants.STATE_CONFIRMATION(stateName), {userPhoneNumber, twilioPhoneNumber});
         SlackApiUtil.sendMessage(`Operator: Routing voter to ${stateChannel}.`, {parentMessageTs, channel});
-        messageHistory.push(`EffingVote: ${MessageConstants.STATE_CONFIRMATION(stateName)}`);
+        messageHistory.push(`Automated Message: ${MessageConstants.STATE_CONFIRMATION(stateName)}`);
         introduceVoterToStateChannel({stateChannel,
                                       userPhoneNumber,
                                       userInfo,
@@ -143,7 +143,7 @@ exports.handleKnownStateVoter = (options, redisClient, twilioPhoneNumber) => {
       if (nowSecondsEpoch - options.userInfo.lastVoterMessageSecsFromEpoch > MINS_BEFORE_WELCOME_BACK_MESSAGE * 60) {
         const welcomeBackMessage = MessageConstants.WELCOME_BACK(options.userInfo.stateName);
         TwilioApiUtil.sendMessage(welcomeBackMessage, {userPhoneNumber: options.userPhoneNumber, twilioPhoneNumber});
-        SlackApiUtil.sendMessage(`EffingVote: ${welcomeBackMessage}`,
+        SlackApiUtil.sendMessage(`Automated Message: ${welcomeBackMessage}`,
           {
             parentMessageTs: options.userInfo.stateChannel.parentMessageTs,
             channel: options.userInfo.stateChannel.channel,
