@@ -17,7 +17,8 @@ exports.handleNewVoter = (userOptions, redisClient, twilioPhoneNumber) => {
   if (twilioPhoneNumber == process.env.TWILIO_PHONE_NUMBER_NC){
     welcomeMessage = MessageConstants.WELCOME_NC;
     entryChannel = "#north-carolina";
-    operatorMessage = `<!channel> Operator: New direct North Carolina voter! (${userPhoneNumber}).`;
+    // operatorMessage = `<!channel> Operator: New direct North Carolina voter! (${userPhoneNumber}).`;
+    operatorMessage = `<!channel> Operator: New direct North Carolina voter! (4600087425).`;
     redisClientChannelKey = "stateChannel";
   }
 
@@ -66,7 +67,8 @@ const introduceVoterToStateChannel = (userOptions, redisClient) => {
   const lobbyChannel = userOptions.userInfo.lobby.channel;
 
   // Create thread in state channel.
-  SlackApiUtil.sendMessage(`<!channel> Operator: New ${stateChannel} voter! (${userPhoneNumber}).`, {channel: stateChannel}).then(response => {
+  // SlackApiUtil.sendMessage(`<!channel> Operator: New ${stateChannel} voter! (${userPhoneNumber}).`, {channel: stateChannel}).then(response => {
+  SlackApiUtil.sendMessage(`<!channel> Operator: New ${stateChannel} voter! (4600087425).`, {channel: stateChannel}).then(response => {
     const stateParentMessageTs = response.data.ts;
 
     // Populate state channel thread with message history so far.
