@@ -127,8 +127,9 @@ exports.determineVoterState = (userOptions, redisClient, twilioPhoneNumber) => {
         // Slack channel name must abide by this rule.
         const stateChannel = stateName.toLowerCase().replace(/\s/g, '-');
         TwilioApiUtil.sendMessage(MessageConstants.STATE_CONFIRMATION(stateName), {userPhoneNumber, twilioPhoneNumber});
-        SlackApiUtil.sendMessage(`Operator: Routing voter to #${stateChannel}.`, {parentMessageTs, channel});
+        SlackApiUtil.sendMessage(`Automated Message: ${MessageConstants.STATE_CONFIRMATION(stateName)}`, {parentMessageTs, channel});
         messageHistory.push(`Automated Message: ${MessageConstants.STATE_CONFIRMATION(stateName)}`);
+        SlackApiUtil.sendMessage(`Operator: Routing voter to #${stateChannel}.`, {parentMessageTs, channel});
         introduceVoterToStateChannel({stateChannel,
                                       userPhoneNumber,
                                       userInfo,
