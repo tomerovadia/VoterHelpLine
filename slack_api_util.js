@@ -33,7 +33,7 @@ exports.sendMessages = (messages, options) => {
 
   messagePromises = messages.map(message => Promise.resolve(message));
 
-  Promise.mapSeries(messagePromises, (message, index, arrayLength) => {
+  return Promise.mapSeries(messagePromises, (message, index, arrayLength) => {
     return sendMessage(message, {parentMessageTs, channel});
   });
 }

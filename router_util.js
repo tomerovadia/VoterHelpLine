@@ -8,19 +8,16 @@ const MINS_BEFORE_WELCOME_BACK_MESSAGE = 60;
 exports.handleNewVoter = (userOptions, redisClient, twilioPhoneNumber) => {
   const userPhoneNumber = userOptions.userPhoneNumber;
   const userMessage = userOptions.userMessage;
-  const messageHistory = [`Voter 4600087425: ${userMessage}`, `Automated Message: ${MessageConstants.WELCOME}`];
-  // const messageHistory = [`${userPhoneNumber}: ${userMessage}`, `Automated Message: ${MessageConstants.WELCOME}`];
+  const messageHistory = [`${userPhoneNumber}: ${userMessage}`, `Automated Message: ${MessageConstants.WELCOME}`];
 
   let welcomeMessage = MessageConstants.WELCOME;
   let entryChannel = "#lobby";
-  // let operatorMessage = `<!channel> Operator: New voter! (${userPhoneNumber}).`;
-  let operatorMessage = `<!channel> Operator: New voter! (4600087425).`;
+  let operatorMessage = `<!channel> Operator: New voter! (${userPhoneNumber}).`;
   let redisClientChannelKey = "lobby";
-  if (twilioPhoneNumber == process.env.TWILIO_PHONE_NUMBER_NC){
+  if (twilioPhoneNumber == process.env.TWILIO_PHONE_NUMBER_NC) {
     welcomeMessage = MessageConstants.WELCOME_NC;
     entryChannel = "#north-carolina";
-    // operatorMessage = `<!channel> Operator: New direct North Carolina voter! (${userPhoneNumber}).`;
-    operatorMessage = `<!channel> Operator: New direct North Carolina voter! (4600087425).`;
+    operatorMessage = `<!channel> Operator: New direct North Carolina voter! (${userPhoneNumber}).`;
     redisClientChannelKey = "stateChannel";
   }
 
@@ -37,8 +34,7 @@ exports.handleNewVoter = (userOptions, redisClient, twilioPhoneNumber) => {
     // Pass the voter's message along to the Slack lobby thread,
     // and show in the Slack lobby thread the welcome message the voter received
     // in response.
-    SlackApiUtil.sendMessages([`Voter 4600087425: ${userMessage}`,
-    // SlackApiUtil.sendMessages([`${userPhoneNumber}: ${userMessage}`,
+    SlackApiUtil.sendMessages([`${userPhoneNumber}: ${userMessage}`,
                                 `Automated Message: ${welcomeMessage}`],
                               {parentMessageTs, channel: response.data.channel});
 
@@ -70,8 +66,7 @@ const introduceVoterToStateChannel = (userOptions, redisClient) => {
   const lobbyChannel = userOptions.userInfo.lobby.channel;
 
   // Create thread in state channel.
-  // SlackApiUtil.sendMessage(`<!channel> Operator: New ${stateChannel} voter! (${userPhoneNumber}).`, {channel: stateChannel}).then(response => {
-  SlackApiUtil.sendMessage(`<!channel> Operator: New ${stateChannel} voter! (4600087425).`, {channel: stateChannel}).then(response => {
+  SlackApiUtil.sendMessage(`<!channel> Operator: New ${stateChannel} voter! (${userPhoneNumber}).`, {channel: stateChannel}).then(response => {
     const stateParentMessageTs = response.data.ts;
 
     // Populate state channel thread with message history so far.
