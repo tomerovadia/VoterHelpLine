@@ -35,7 +35,7 @@ This app consists of three systems:
 
 ### Voter Experience
 
-![wireframe](images/voter_screenshot.png =150x)
+![wireframe](images/voter_screenshot.png)
 
 The app immediately greets a voter upon initial message and attempts to automatically determine the U.S. state in which a voter is seeking to vote.
 
