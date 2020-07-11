@@ -99,10 +99,8 @@ exports.determineVoterState = (userOptions, redisClient, twilioPhoneNumber) => {
   const userPhoneNumber = userOptions.userPhoneNumber;
   const userMessage = userOptions.userMessage;
 
-  messageHistory.push(`Voter 4600087425: ${userMessage}`);
-  // messageHistory.push(`${userPhoneNumber}: ${userMessage}`);
-  SlackApiUtil.sendMessage(`Voter 4600087425: ${userMessage}`, {parentMessageTs, channel}).then(response => {
-  // SlackApiUtil.sendMessage(`${userPhoneNumber}: ${userMessage}`, {parentMessageTs, channel}).then(response => {
+  messageHistory.push(`${userPhoneNumber}: ${userMessage}`);
+  SlackApiUtil.sendMessage(`${userPhoneNumber}: ${userMessage}`, {parentMessageTs, channel}).then(response => {
       const stateName = MessageParserUtil.determineState(userMessage);
       if (stateName == null) {
         console.log("State not determined");
@@ -136,8 +134,7 @@ exports.determineVoterState = (userOptions, redisClient, twilioPhoneNumber) => {
 }
 
 exports.handleKnownStateVoter = (options, redisClient, twilioPhoneNumber) => {
-  SlackApiUtil.sendMessage(`Voter 4600087425: ${options.userMessage}`,
-  // SlackApiUtil.sendMessage(`${options.userPhoneNumber}: ${options.userMessage}`,
+  SlackApiUtil.sendMessage(`${options.userPhoneNumber}: ${options.userMessage}`,
     {
       parentMessageTs: options.userInfo.stateChannel.parentMessageTs,
       channel: options.userInfo.stateChannel.channel,
