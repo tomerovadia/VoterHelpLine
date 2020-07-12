@@ -8,18 +8,27 @@ const MINS_BEFORE_WELCOME_BACK_MESSAGE = 60;
 exports.handleNewVoter = (userOptions, redisClient, twilioPhoneNumber) => {
   const userPhoneNumber = userOptions.userPhoneNumber;
   const userMessage = userOptions.userMessage;
-  const messageHistory = [`${userPhoneNumber}: ${userMessage}`, `Automated Message: ${MessageConstants.WELCOME}`];
+  const userInfo = {};
+  userInfo.lobby = {};
+  userInfo.messageHistory = [`${userPhoneNumber}: ${userMessage}`, `Automated Message: ${MessageConstants.WELCOME}`];
+  userInfo.isDemo = twilioPhoneNumber == process.env.TWILIO_PHONE_NUMBER_DEMO_LINE;
 
   let welcomeMessage = MessageConstants.WELCOME;
-  let entryChannel = "#lobby";
+  userInfo.lobby.channel = "#lobby";
   let operatorMessage = `<!channel> Operator: New voter! (${userPhoneNumber}).`;
-  let redisClientChannelKey = "lobby";
-  if (twilioPhoneNumber == process.env.TWILIO_PHONE_NUMBER_NC) {
-    welcomeMessage = MessageConstants.WELCOME_NC;
-    entryChannel = "#north-carolina";
-    operatorMessage = `<!channel> Operator: New direct North Carolina voter! (${userPhoneNumber}).`;
-    redisClientChannelKey = "stateChannel";
+
+
+  if (userInfo.isDemo) {
+    userInfo.lobby.channel = "#demo-lobby";
   }
+
+  // if (twilioPhoneNumber == process.env.TWILIO_PHONE_NUMBER_SINGLE_LINE) {
+  //   welcomeMessage = MessageConstants.WELCOME_NC;
+  //   entryChannel = "#north-carolina";
+  //   operatorMessage = `<!channel> Operator: New direct North Carolina voter! (${userPhoneNumber}).`;
+  //   redisClientChannelKey = "stateChannel";
+  //   isDemo = false;
+  // }
 
   // Welcome the voter
   TwilioApiUtil.sendMessage(welcomeMessage, {userPhoneNumber, twilioPhoneNumber});
@@ -27,108 +36,89 @@ exports.handleNewVoter = (userOptions, redisClient, twilioPhoneNumber) => {
   // In Slack, create entry channel message, followed by voter's message and intro text.
   SlackApiUtil.sendMessage(operatorMessage,
   {
-    channel: entryChannel,
+    channel: userInfo.lobby.channel,
   }).then(response => {
-    const parentMessageTs = response.data.ts;
+    // Remember the lobby thread for this user.
+    userInfo.lobby.parentMessageTs = response.data.ts;
 
     // Pass the voter's message along to the Slack lobby thread,
     // and show in the Slack lobby thread the welcome message the voter received
     // in response.
     SlackApiUtil.sendMessages([`${userPhoneNumber}: ${userMessage}`,
                                 `Automated Message: ${welcomeMessage}`],
-                              {parentMessageTs, channel: response.data.channel});
+                              {parentMessageTs: userInfo.lobby.parentMessageTs, channel: userInfo.lobby.channel});
 
-    const secondsSinceEpoch = Math.round(Date.now() / 1000);
+    userInfo.lastVoterMessageSecsFromEpoch = Math.round(Date.now() / 1000);
+
     // Add key/value such that given a user phone number we can get the
     // Slack lobby thread associated with that user.
-    let userInfo = {};
-    userInfo[redisClientChannelKey] = {
-        parentMessageTs: response.data.ts,
-        channel: response.data.channel,
-      };
-    userInfo.messageHistory = messageHistory;
-    userInfo.lastVoterMessageSecsFromEpoch = secondsSinceEpoch;
     redisClient.setAsync(userPhoneNumber, JSON.stringify(userInfo));
 
     // Add key/value such that given Slack thread data we can get a
     // user phone number.
-    redisClient.setAsync(`${response.data.channel}:${response.data.ts}`,
+    redisClient.setAsync(`${response.data.channel}:${userInfo.lobby.parentMessageTs}`,
                         JSON.stringify({userPhoneNumber, twilioPhoneNumber}));
   });
 }
 
 const introduceVoterToStateChannel = (userOptions, redisClient) => {
-  const stateChannel = userOptions.stateChannel;
-  const stateName = userOptions.stateName;
   const userPhoneNumber = userOptions.userPhoneNumber;
-  const messageHistory = userOptions.messageHistory;
-  const lobbyParentMessageTs = userOptions.userInfo.lobby.parentMessageTs;
-  const lobbyChannel = userOptions.userInfo.lobby.channel;
+  let userInfo = userOptions.userInfo;
 
   // Create thread in state channel.
-  SlackApiUtil.sendMessage(`<!channel> Operator: New ${stateChannel} voter! (${userPhoneNumber}).`, {channel: stateChannel}).then(response => {
-    const stateParentMessageTs = response.data.ts;
+  SlackApiUtil.sendMessage(`<!channel> Operator: New ${userInfo.stateName} voter! (${userPhoneNumber}).`, {channel: userInfo.stateChannel.channel}).then(response => {
+    userInfo.stateChannel.parentMessageTs = response.data.ts;
 
     // Populate state channel thread with message history so far.
-    SlackApiUtil.sendMessages(messageHistory, {parentMessageTs: stateParentMessageTs,
-                                               channel: stateChannel});
+    SlackApiUtil.sendMessages(userInfo.messageHistory, {parentMessageTs: userInfo.stateChannel.parentMessageTs,
+                                               channel: userInfo.stateChannel.channel});
 
-    const secondsSinceEpoch = Math.round(Date.now() / 1000);
+    userInfo.lastVoterMessageSecsFromEpoch = Math.round(Date.now() / 1000);
     // Remember state channel thread identifying info.
-    redisClient.setAsync(userPhoneNumber,
-                        JSON.stringify({
-                          lobby: {lobbyParentMessageTs, lobbyChannel},
-                          stateChannel: {
-                            parentMessageTs: stateParentMessageTs,
-                            channel: response.data.channel,
-                          },
-                          lastVoterMessageSecsFromEpoch: secondsSinceEpoch,
-                          stateName,
-                        }));
+    redisClient.setAsync(userPhoneNumber, JSON.stringify(userInfo));
 
     // Be able to identify phone number using state channel identifying info.
-    redisClient.setAsync(`${response.data.channel}:${stateParentMessageTs}`,
+    redisClient.setAsync(`${response.data.channel}:${userInfo.stateChannel.parentMessageTs}`,
                         JSON.stringify({userPhoneNumber, twilioPhoneNumber}));
   });
 }
 
 exports.determineVoterState = (userOptions, redisClient, twilioPhoneNumber) => {
-  const messageHistory = userOptions.userInfo.messageHistory;
-  const parentMessageTs = userOptions.userInfo.lobby.parentMessageTs;
-  const channel = userOptions.userInfo.lobby.channel;
+  const userInfo = userOptions.userInfo;
   const userPhoneNumber = userOptions.userPhoneNumber;
   const userMessage = userOptions.userMessage;
 
-  messageHistory.push(`${userPhoneNumber}: ${userMessage}`);
-  SlackApiUtil.sendMessage(`${userPhoneNumber}: ${userMessage}`, {parentMessageTs, channel}).then(response => {
+  userInfo.messageHistory.push(`${userPhoneNumber}: ${userMessage}`);
+  SlackApiUtil.sendMessage(`${userPhoneNumber}: ${userMessage}`, {
+    parentMessageTs: userInfo.lobby.parentMessageTs,
+    channel: userInfo.lobby.channel}).then(response => {
       const stateName = MessageParserUtil.determineState(userMessage);
       if (stateName == null) {
         console.log("State not determined");
         TwilioApiUtil.sendMessage(MessageConstants.CLARIFY_STATE, {userPhoneNumber, twilioPhoneNumber});
-        SlackApiUtil.sendMessage(`Automated Message: ${MessageConstants.CLARIFY_STATE}`, {parentMessageTs, channel});
-        messageHistory.push(`Automated Message: ${MessageConstants.CLARIFY_STATE}`);
+        SlackApiUtil.sendMessage(`Automated Message: ${MessageConstants.CLARIFY_STATE}`,
+          {parentMessageTs: userInfo.lobby.parentMessageTs, channel: userInfo.lobby.channel});
+        userInfo.messageHistory.push(`Automated Message: ${MessageConstants.CLARIFY_STATE}`);
 
-        const secondsSinceEpoch = Math.round(Date.now() / 1000);
+        userInfo.lastVoterMessageSecsFromEpoch = Math.round(Date.now() / 1000);
         redisClient.setAsync(userPhoneNumber,
-                            JSON.stringify({
-                              lobby: {parentMessageTs,
-                                      channel: response.data.channel},
-                              messageHistory,
-                              lastVoterMessageSecsFromEpoch: secondsSinceEpoch,
-                            }));
+                            JSON.stringify(userInfo));
       } else {
+        userInfo.stateName = stateName;
+
         // Slack channel name must abide by this rule.
-        const stateChannel = stateName.toLowerCase().replace(/\s/g, '-');
+        userInfo.stateChannel = {};
+        userInfo.stateChannel.channel = stateName.toLowerCase().replace(/\s/g, '-');
+        if (userInfo.isDemo) {
+          userInfo.stateChannel.channel = `demo-${userInfo.stateChannel.channel}`;
+        }
         TwilioApiUtil.sendMessage(MessageConstants.STATE_CONFIRMATION(stateName), {userPhoneNumber, twilioPhoneNumber});
-        SlackApiUtil.sendMessage(`Automated Message: ${MessageConstants.STATE_CONFIRMATION(stateName)}`, {parentMessageTs, channel});
-        messageHistory.push(`Automated Message: ${MessageConstants.STATE_CONFIRMATION(stateName)}`);
-        SlackApiUtil.sendMessage(`Operator: Routing voter to #${stateChannel}.`, {parentMessageTs, channel});
-        introduceVoterToStateChannel({stateChannel,
-                                      userPhoneNumber,
-                                      userInfo,
-                                      messageHistory,
-                                      stateName},
-                                      redisClient);
+        SlackApiUtil.sendMessage(`Automated Message: ${MessageConstants.STATE_CONFIRMATION(stateName)}`,
+          {parentMessageTs: userInfo.lobby.parentMessageTs, channel: userInfo.lobby.channel});
+        userInfo.messageHistory.push(`Automated Message: ${MessageConstants.STATE_CONFIRMATION(stateName)}`);
+        SlackApiUtil.sendMessage(`Operator: Routing voter to #${userInfo.stateChannel.channel}.`,
+          {parentMessageTs: userInfo.lobby.parentMessageTs, channel: userInfo.lobby.channel});
+        introduceVoterToStateChannel({userPhoneNumber, userInfo}, redisClient);
       }
     });
 }

@@ -13,11 +13,11 @@ test("Ignores case for exact state abbreviation.", () => {
 });
 
 test("Identifies exact state abbreviation w/periods.", () => {
-  expect(MessageParserUtil.determineState("W.I.")).toBe("Wisconsin");
+  expect(MessageParserUtil.determineState("F.L.")).toBe("Florida");
 });
 
 test("Ignores case for exact state abbreviation w/periods.", () => {
-  expect(MessageParserUtil.determineState("w.I.")).toBe("Wisconsin");
+  expect(MessageParserUtil.determineState("f.L.")).toBe("Florida");
 });
 
 test("Identifies state abbreviation within a sentence.", () => {
@@ -25,11 +25,11 @@ test("Identifies state abbreviation within a sentence.", () => {
 });
 
 test("Identifies state abbreviation within a sentence, ignores case and periods.", () => {
-  expect(MessageParserUtil.determineState("I want to vote in w.I. please")).toBe("Wisconsin");
+  expect(MessageParserUtil.determineState("I want to vote in f.L. please")).toBe("Florida");
 });
 
 test("Identifies state abbreviation at start of a sentence.", () => {
-  expect(MessageParserUtil.determineState("WI please")).toBe("Wisconsin");
+  expect(MessageParserUtil.determineState("FL please")).toBe("Florida");
 });
 
 test("Identifies state abbreviation at start of a sentence, ignores case and spacing.", () => {
@@ -37,7 +37,7 @@ test("Identifies state abbreviation at start of a sentence, ignores case and spa
 });
 
 test("Identifies state abbreviation at end of a sentence.", () => {
-  expect(MessageParserUtil.determineState("I want to vote in WI.")).toBe("Wisconsin");
+  expect(MessageParserUtil.determineState("I want to vote in FL.")).toBe("Florida");
 });
 
 test("Identifies state abbreviation at end of a sentence, ignores case and spacing.", () => {
@@ -57,10 +57,10 @@ test("Does not interpret parts of words as state abbreviation intent.", () => {
 });
 
 test("Filters inconsistent punctuation around state abbreviations.", () => {
-  expect(MessageParserUtil.determineState("wi.")).toBe("Wisconsin");
+  expect(MessageParserUtil.determineState("fl.")).toBe("Florida");
   expect(MessageParserUtil.determineState("Nc.")).toBe("North Carolina");
-  expect(MessageParserUtil.determineState("w.i")).toBe("Wisconsin");
-  expect(MessageParserUtil.determineState("wi..")).toBe("Wisconsin");
+  expect(MessageParserUtil.determineState("f.l")).toBe("Florida");
+  expect(MessageParserUtil.determineState("fl..")).toBe("Florida");
 });
 
 test("Identifies exact state name.", () => {

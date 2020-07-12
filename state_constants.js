@@ -1,6 +1,7 @@
 const stateConstants = {
   "NC": "North Carolina",
-  "WI": "Wisconsin",
+  "FL": "Florida",
+  "OH": "Ohio",
 };
 
 module.exports = stateConstants;
