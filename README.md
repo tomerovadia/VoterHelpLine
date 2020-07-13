@@ -19,9 +19,9 @@ Interested in helping people vote? Please reach out to volunteer@voterhelpline.o
 
 ## Demo
 
-Text **(984) 231-VOTE** to demo the single-state line (currently NC).
+Text **(984) 231-VOTE** to demo the system.
 
-Text **(205) 498-5052** to demo the multi-state line (currently NC and WI).
+Text **(205) 498-5052** for help voting on the live system.
 
 ## Technical Overview
 
