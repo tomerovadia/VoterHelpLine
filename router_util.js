@@ -113,11 +113,11 @@ exports.determineVoterState = (userOptions, redisClient, twilioPhoneNumber) => {
           userInfo.stateChannel.channel = `demo-${userInfo.stateChannel.channel}`;
         }
         TwilioApiUtil.sendMessage(MessageConstants.STATE_CONFIRMATION(stateName), {userPhoneNumber, twilioPhoneNumber});
-        SlackApiUtil.sendMessage(`Automated Message: ${MessageConstants.STATE_CONFIRMATION(stateName)}`,
-          {parentMessageTs: userInfo.lobby.parentMessageTs, channel: userInfo.lobby.channel});
         userInfo.messageHistory.push(`Automated Message: ${MessageConstants.STATE_CONFIRMATION(stateName)}`);
-        SlackApiUtil.sendMessage(`Operator: Routing voter to #${userInfo.stateChannel.channel}.`,
-          {parentMessageTs: userInfo.lobby.parentMessageTs, channel: userInfo.lobby.channel});
+
+        SlackApiUtil.sendMessages([`Automated Message: ${MessageConstants.STATE_CONFIRMATION(stateName)}`,
+                                    `Operator: Routing voter to #${userInfo.stateChannel.channel}.`],
+                                  {parentMessageTs: userInfo.lobby.parentMessageTs, channel: userInfo.lobby.channel});
         introduceVoterToStateChannel({userPhoneNumber, userInfo}, redisClient);
       }
     });
