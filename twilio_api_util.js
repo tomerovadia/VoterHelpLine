@@ -5,5 +5,5 @@ exports.sendMessage = (message, options) => {
     .create({body: message,
        from: options.twilioPhoneNumber,
        to: options.userPhoneNumber})
-    .then(response => console.log(`Successfully sent Twilio message ${response.sid}: ${message}.`));
+    .then(response => console.log(`Successfully sent Twilio message ${response.sid}: ${message}`));
 };

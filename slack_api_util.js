@@ -14,12 +14,10 @@ const sendMessage = (message, options) => {
     'headers': {
       "Authorization": `Bearer ${process.env.SLACK_BOT_ACCESS_TOKEN}`,
     },
-  })
-  .then(response => {
+  }).then(response => {
     console.log(`Successfully sent message to Slack: ${message}`);
     return response;
-  })
-  .catch(error => {
+  }).catch(error => {
     console.log(error);
     return error;
   });
@@ -28,8 +26,8 @@ const sendMessage = (message, options) => {
 exports.sendMessage = sendMessage;
 
 exports.sendMessages = (messages, options) => {
-  parentMessageTs = options.parentMessageTs;
-  channel = options.channel;
+  const parentMessageTs = options.parentMessageTs;
+  const channel = options.channel;
 
   messagePromises = messages.map(message => Promise.resolve(message));
 
