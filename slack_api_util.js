@@ -38,7 +38,7 @@ exports.sendMessages = (messages, options) => {
 
 exports.authenticateConnectionToSlack = (token) => {
   const MD5 = new Hashes.MD5
-  if(MD5.hex(token) == "377f2ae0634f13c578382dd734078c52"){
+  if(MD5.hex(token) == process.env.SLACK_AUTH_TOKEN_HASH){
     console.log("token verified");
     return true;
   } else {
