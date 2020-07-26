@@ -11,7 +11,7 @@ exports.handleNewVoter = (userOptions, redisClient, twilioPhoneNumber) => {
   const userInfo = {};
   userInfo.lobby = {};
   userInfo.messageHistory = [`${userPhoneNumber}: ${userMessage}`, `Automated Message: ${MessageConstants.WELCOME}`];
-  userInfo.isDemo = twilioPhoneNumber == process.env.TWILIO_PHONE_NUMBER_DEMO_LINE;
+  userInfo.isDemo = twilioPhoneNumber == "+19842318683";
   userInfo.confirmedDisclaimer = false;
 
   let welcomeMessage = MessageConstants.WELCOME;
