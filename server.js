@@ -99,6 +99,8 @@ app.post('/slack', upload.array(), (req, res) => {
   }
   console.log('Passes Slack auth');
 
+  console.log("reqBody.event.user");
+  console.log(reqBody.event.user);
   if (reqBody.event.type === "message" && reqBody.event.user != "U014LM9RXHU") {
     console.log(`Received message from Slack: ${reqBody.event.text}`);
 
