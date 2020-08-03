@@ -1,6 +1,7 @@
 const axios = require('axios');
 const Hashes = require('jshashes') // v1.0.5
 const Promise = require('bluebird');
+const SlackApiUtil = require('./slack_api_util');
 
 const sendMessage = (message, options) => {
   return axios.post('https://slack.com/api/chat.postMessage', {
@@ -29,15 +30,15 @@ exports.sendMessages = (messages, options) => {
   const parentMessageTs = options.parentMessageTs;
   const channel = options.channel;
 
-  messagePromises = messages.map(message => Promise.resolve(message));
+  const messagePromises = messages.map(message => Promise.resolve(message));
 
   return Promise.mapSeries(messagePromises, (message, index, arrayLength) => {
-    return sendMessage(message, {parentMessageTs, channel});
+    return SlackApiUtil.sendMessage(message, {parentMessageTs, channel});
   });
 }
 
 exports.authenticateConnectionToSlack = (token) => {
-  const MD5 = new Hashes.MD5
+  const MD5 = new Hashes.MD5;
   if(MD5.hex(token) == process.env.SLACK_AUTH_TOKEN_HASH){
     console.log("token verified");
     return true;
