@@ -95,15 +95,14 @@ app.post('/slack', upload.array(), (req, res) => {
   res.type('application/json');
 
   const reqBody = req.body;
-  // if(!passesAuth(req)) {
-  //   console.log('doesnt pass auth');
-  //   res.sendStatus(401);
-  //   return;
-  // }
+  if(!passesAuth(req)) {
+    console.log('doesnt pass auth');
+    res.sendStatus(401);
+    return;
+  }
   console.log('Passes Slack auth');
 
-  if (reqBody.event.type === "message" && reqBody.event.user != "U017PMHETGD") {
-  // if (reqBody.event.type === "message" && reqBody.event.user != process.env.SLACK_BOT_USER_ID) {
+  if (reqBody.event.type === "message" && reqBody.event.user != process.env.SLACK_BOT_USER_ID) {
     console.log(`Received message from Slack: ${reqBody.event.text}`);
 
     // Pass Slack message to Twilio
