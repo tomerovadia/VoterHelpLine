@@ -13,7 +13,13 @@ exports.handleNewVoter = (userOptions, redisClient, twilioPhoneNumber) => {
   const userInfo = {};
   userInfo.lobby = {};
   userInfo.messageHistory = [`${userId}: ${userMessage}`, `Automated Message: ${MessageConstants.WELCOME_AND_DISCLAIMER}`];
+  // userInfo.isDemo = twilioPhoneNumber == "+19842318683";
   userInfo.isDemo = twilioPhoneNumber == "+19842318683";
+  if (process.env.TESTER_PHONE_NUMBER) {
+    if (userPhoneNumber == process.env.TESTER_PHONE_NUMBER) {
+      userInfo.isDemo = true;
+    }
+  }
   userInfo.confirmedDisclaimer = false;
 
   let welcomeMessage = MessageConstants.WELCOME_AND_DISCLAIMER;
