@@ -128,23 +128,23 @@ app.post('/slack', upload.array(), (req, res) => {
   res.sendStatus(200);
 });
 
-// app.get('/test-db', upload.array(), (req, res) => {
-//   console.log('tesjt-dfg');
-//   const databaseClient = new Client({
-//     connectionString: process.env.DATABASE_URL,
-//   });
-//   databaseClient.connect()
-//     .then(() => {
-//       databaseClient.query("INSERT INTO messages (message, automated) VALUES ($1, $2);", ['test', true], (err, res) => {
-//         if (err) throw err;
-//         console.log("No error from database query");
-//         databaseClient.end();
-//       });
-//     })
-//     .catch(err => console.error('Database connection error', err.stack));
-//
-//     res.sendStatus(200);
-// });
+app.get('/test-db', upload.array(), (req, res) => {
+  console.log('tesjt-dfg');
+  const databaseClient = new Client({
+    connectionString: process.env.DATABASE_URL,
+  });
+  databaseClient.connect()
+    .then(() => {
+      databaseClient.query("INSERT INTO messages (message, automated) VALUES ($1, $2);", ['test', true], (err, res) => {
+        if (err) throw err;
+        console.log("No error from database query");
+        databaseClient.end();
+      });
+    })
+    .catch(err => console.error('Database connection error', err.stack));
+
+  res.sendStatus(200);
+});
 
 // Authenticate Slack connection to Heroku.
 // app.post('/slack', upload.array(), (req, res) => {
