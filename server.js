@@ -170,11 +170,11 @@ const passesAuth = (req) => {
 
 // Authenticate Slack connection to Heroku.
 app.post('/slack', upload.array(), (req, res) => {
-  // if(!passesAuth(req)) {
-  //   console.log('doesnt pass auth');
-  //   res.sendStatus(401);
-  //   return;
-  // }
+  if(!passesAuth(req)) {
+    console.log('doesnt pass auth');
+    res.sendStatus(401);
+    return;
+  }
   res.type('application/json');
   if (SlackApiUtil.authenticateConnectionToSlack(req.body.token)) {
     res.status(200).json({ challenge: req.body.challenge });
