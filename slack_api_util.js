@@ -1,9 +1,16 @@
 const axios = require('axios');
 const Hashes = require('jshashes') // v1.0.5
 const Promise = require('bluebird');
+const DbApiUtil = require('./db_api_util');
 const SlackApiUtil = require('./slack_api_util');
 
-const sendMessage = (message, options) => {
+const sendMessage = (message, options, databaseMessageEntry) => {
+  if (databaseMessageEntry) {
+    databaseMessageEntry.slackChannel = options.channel;
+    databaseMessageEntry.slackParentMessageTs = options.parentMessageTs;
+    databaseMessageEntry.slackSendTimestamp = new Date();
+  }
+
   return axios.post('https://slack.com/api/chat.postMessage', {
     'Content-Type': 'application/json',
     'channel': options.channel,
@@ -16,13 +23,23 @@ const sendMessage = (message, options) => {
       "Authorization": `Bearer ${process.env.SLACK_BOT_ACCESS_TOKEN}`,
     },
   }).then(response => {
-    console.log(`Successfully sent message to Slack: ${message}`);
+    console.log(`\n\nSuccessfully sent message to Slack: ${message}`);
+    if (databaseMessageEntry) {
+      databaseMessageEntry.successfullySent = true;
+      databaseMessageEntry.slackMessageTs = response.data.message.ts;
+      DbApiUtil.logMessageToDb(databaseMessageEntry);
+    }
     return response;
   }).catch(error => {
     console.log(error);
+    if (databaseMessageEntry) {
+      databaseMessageEntry.successfullySent = false;
+      databaseMessageEntry.slackError = error.error;
+      DbApiUtil.logMessageToDb(databaseMessageEntry);
+    }
     return error;
   });
-}
+};
 
 exports.sendMessage = sendMessage;
 
