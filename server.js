@@ -29,24 +29,18 @@ app.use(bodyParser.json({
 bluebird.promisifyAll(redis);
 var redisClient = redis.createClient(process.env.REDISCLOUD_URL);
 
-app.get('/demo-slack', (req, res) => {
-  Demo.demoSlack();
-  res.sendStatus(200);
-});
-
 app.post('/twilio-sms', (req, res) => {
   const twiml = new MessagingResponse();
   console.log('receiving Twilio message');
   const userPhoneNumber = req.body.From;
-  const MD5 = new Hashes.MD5;
-  const userId = MD5.hex(userPhoneNumber);
+  // const MD5 = new Hashes.MD5;
+  // const userId = MD5.hex(userPhoneNumber);
   const twilioPhoneNumber = req.body.To;
   const userMessage = req.body.Body;
 
-  const inboundDbMessageEntry = DbApiUtil.populateIncomingTwilioEntry({
+  const inboundDbMessageEntry = DbApiUtil.populateIncomingDbMessageTwilioEntry({
     userMessage,
     userPhoneNumber,
-    userId,
     twilioPhoneNumber,
     twilioMessageSid: req.body.SmsMessageSid,
   });
@@ -59,17 +53,17 @@ app.post('/twilio-sms', (req, res) => {
       if (userInfo.confirmedDisclaimer) {
         // Voter has a state determined
         if (userInfo.stateChannel) {
-          RouterUtil.handleClearedVoter({userInfo, userPhoneNumber, userId, userMessage}, redisClient, twilioPhoneNumber, inboundDbMessageEntry);
+          RouterUtil.handleClearedVoter({userInfo, userPhoneNumber, userMessage}, redisClient, twilioPhoneNumber, inboundDbMessageEntry);
         // Voter has no state determined
         } else {
-          RouterUtil.determineVoterState({userInfo, userPhoneNumber, userId, userMessage}, redisClient, twilioPhoneNumber, inboundDbMessageEntry);
+          RouterUtil.determineVoterState({userInfo, userPhoneNumber, userMessage}, redisClient, twilioPhoneNumber, inboundDbMessageEntry);
         }
       } else {
-        RouterUtil.handleDisclaimer({userInfo, userPhoneNumber, userId, userMessage}, redisClient, twilioPhoneNumber, inboundDbMessageEntry);
+        RouterUtil.handleDisclaimer({userInfo, userPhoneNumber, userMessage}, redisClient, twilioPhoneNumber, inboundDbMessageEntry);
       }
     // Haven't seen this voter before
     } else {
-      RouterUtil.handleNewVoter({userPhoneNumber, userId, userMessage}, redisClient, twilioPhoneNumber, inboundDbMessageEntry);
+      RouterUtil.handleNewVoter({userPhoneNumber, userMessage}, redisClient, twilioPhoneNumber, inboundDbMessageEntry);
     }
   });
 
@@ -124,7 +118,7 @@ app.post('/slack', upload.array(), (req, res) => {
         if (userPhoneNumber) {
           const MD5 = new Hashes.MD5;
 
-          const outboundDbMessageEntry = DbApiUtil.populateIncomingSlackEntry({
+          const outboundDbMessageEntry = DbApiUtil.populateIncomingDbMessageSlackEntry({
             userId: MD5.hex(userPhoneNumber),
             originatingSlackUserId: reqBody.event.user,
             slackChannel: reqBody.event.channel,
@@ -132,16 +126,19 @@ app.post('/slack', upload.array(), (req, res) => {
             slackMessageTs: reqBody.event.ts,
           });
 
-          TwilioApiUtil.sendMessage(reqBody.event.text,
-                                    {userPhoneNumber,
-                                      twilioPhoneNumber},
-                                      outboundDbMessageEntry);
           redisClient.getAsync(userPhoneNumber).then(unparsedUserInfo => {
             if (unparsedUserInfo) {
               const userInfo = JSON.parse(unparsedUserInfo);
               userInfo.lastVoterMessageSecsFromEpoch = Math.round(Date.now() / 1000);
               redisClient.setAsync(userPhoneNumber, JSON.stringify(userInfo));
+              return userInfo;
             }
+          }).then(userInfo => {
+            DbApiUtil.updateDbMessageEntryWithUserInfo(userInfo, outboundDbMessageEntry);
+            TwilioApiUtil.sendMessage(reqBody.event.text,
+                                      {userPhoneNumber,
+                                        twilioPhoneNumber},
+                                        outboundDbMessageEntry);
           });
         }
       }
@@ -170,11 +167,11 @@ app.post('/slack', upload.array(), (req, res) => {
 
 // Authenticate Slack connection to Heroku.
 // app.post('/slack', upload.array(), (req, res) => {
-//   if(!passesAuth(req)) {
-//     console.log('doesnt pass auth');
-//     res.sendStatus(401);
-//     return;
-//   }
+//   // if(!passesAuth(req)) {
+//   //   console.log('doesnt pass auth');
+//   //   res.sendStatus(401);
+//   //   return;
+//   // }
 //   res.type('application/json');
 //   if (SlackApiUtil.authenticateConnectionToSlack(req.body.token)) {
 //     res.status(200).json({ challenge: req.body.challenge });

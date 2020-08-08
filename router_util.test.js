@@ -3,6 +3,7 @@ const requireModules = () => {
   MessageParserUtil = require('./message_parser_util');
   TwilioApiUtil = require('./twilio_api_util');
   SlackApiUtil = require('./slack_api_util');
+  Hashes = require('jshashes'); // v1.0.5
   redis = require("redis-mock"), redisClient = redis.createClient();
 
   jest.mock('./twilio_api_util');
@@ -72,7 +73,6 @@ describe('handleNewVoter', () => {
 
     return handleNewVoterWrapper({
       userPhoneNumber: "+1234567890",
-      userId: "abcdefghijklmnop",
       userMessage: "can you help me vote",
     }, redisClient, "+12054985052", inboundDbMessageEntry);
   });
@@ -90,15 +90,16 @@ describe('handleNewVoter', () => {
     const inboundDbMessageEntry = {};
     return handleNewVoterWrapper({
       userPhoneNumber: "+1234567890",
-      userId: "abcdefghijklmnop",
       userMessage: "can you help me vote",
-    }, redisClient, "+19842318683", inboundDbMessageEntry).then(() => {
+    }, redisClient, "+15619338683", inboundDbMessageEntry).then(() => {
       expect(SlackApiUtil.sendMessage.mock.calls[0][1].channel).toBe("#demo-lobby");
     });
   });
 
   test("Includes user id in new voter announcement in Slack", () => {
-    expect(SlackApiUtil.sendMessage.mock.calls[0][0]).toContain("abcdefghijklmnop");
+    const MD5 = new Hashes.MD5;
+    const userId = MD5.hex("+1234567890");
+    expect(SlackApiUtil.sendMessage.mock.calls[0][0]).toContain(userId);
   });
 
   test("Relays voter message in subsequent message to Slack", () => {
@@ -113,10 +114,14 @@ describe('handleNewVoter', () => {
     expect(SlackApiUtil.sendMessage.mock.calls[1][2]).toEqual(expect.objectContaining({
       mock: "inboundDbMessageEntryData",
     }));
+    // Ensure userInfo is passed to SlackApiUtil
+    expect(SlackApiUtil.sendMessage.mock.calls[1][3]).toEqual(expect.objectContaining({}));
   });
 
-  test("Includes voter id in relay of voter message", () => {
-    expect(SlackApiUtil.sendMessage.mock.calls[1][0]).toEqual(expect.stringContaining("abcdefghijklmnop"));
+  test("Includes user id in relay of voter message", () => {
+    const MD5 = new Hashes.MD5;
+    const userId = MD5.hex("+1234567890");
+    expect(SlackApiUtil.sendMessage.mock.calls[1][0]).toEqual(expect.stringContaining(userId));
   });
 
   test("Relays automated welcoming of voter to Slack", () => {
@@ -141,6 +146,8 @@ describe('handleNewVoter', () => {
       direction: "OUTBOUND",
       automated: true,
     }));
+    // Ensure userInfo is passed to SlackApiUtil
+    expect(SlackApiUtil.sendMessage.mock.calls[0][3]).toEqual(expect.objectContaining({}));
   });
 
   test("Adds two keys to redisClient", () => {
@@ -179,9 +186,8 @@ describe('handleNewVoter', () => {
     const inboundDbMessageEntry = {};
     return handleNewVoterWrapper({
       userPhoneNumber: "+1234567890",
-      userId: "abcdefghijklmnop",
       userMessage: "can you help me vote",
-    }, redisClient, "+19842318683", inboundDbMessageEntry).then(() => {
+    }, redisClient, "+15619338683", inboundDbMessageEntry).then(() => {
       for (call of redisClient.setAsync.mock.calls) {
         const key = call[0];
         if (key == "+1234567890") {
@@ -293,7 +299,6 @@ describe('determineVoterState', () => {
 
       return determineVoterStateWrapper({
         userPhoneNumber: "+1234567890",
-        userId: "abcdefghijklmnop",
         userMessage: "nonsensical statement",
         userInfo: {
           lobby: {
@@ -306,6 +311,7 @@ describe('determineVoterState', () => {
             "can you help me vote",
             "Welcome to the Voter Help Line!"
           ],
+          userId: "0923e1f4fb612739d9c5918c57656d5f",
         },
       }, redisClient, "+12054985052", inboundDbMessageEntry);
     });
@@ -313,8 +319,10 @@ describe('determineVoterState', () => {
       expect(SlackApiUtil.sendMessage.mock.calls[0][0]).toContain("nonsensical statement");
     });
 
-    test("Includes voter user id in passing voter message to Slack", () => {
-      expect(SlackApiUtil.sendMessage.mock.calls[0][0]).toContain("abcdefghijklmnop");
+    test("Includes user id in passing voter message to Slack", () => {
+      const MD5 = new Hashes.MD5;
+      const userId = MD5.hex("+1234567890");
+      expect(SlackApiUtil.sendMessage.mock.calls[0][0]).toContain(userId);
     });
 
     test("Sends voter message to voter's channel/thread in Slack lobby", () => {
@@ -328,6 +336,8 @@ describe('determineVoterState', () => {
       expect(SlackApiUtil.sendMessage.mock.calls[0][2]).toEqual(expect.objectContaining({
         mock: "inboundDbMessageEntryData",
       }));
+      // Ensure userInfo is passed to SlackApiUtil
+      expect(SlackApiUtil.sendMessage.mock.calls[0][3]).toEqual(expect.objectContaining({}));
     });
   });
 
@@ -347,7 +357,6 @@ describe('determineVoterState', () => {
 
       return determineVoterStateWrapper({
         userPhoneNumber: "+1234567890",
-        userId: "abcdefghijklmnop",
         userMessage: "nonsensical statement",
         userInfo: {
           lobby: {
@@ -360,6 +369,7 @@ describe('determineVoterState', () => {
             "can you help me vote",
             "Welcome to the Voter Help Line! We are finding an available volunteer -- in the meantime, please tell us more about how we can help you vote. Please note that we currently only service North Carolina. (Msg & data rates may apply)."
           ],
+          userId: "0923e1f4fb612739d9c5918c57656d5f",
         },
       }, redisClient, "+12054985052", inboundDbMessageEntry);
     });
@@ -377,6 +387,8 @@ describe('determineVoterState', () => {
         direction: "OUTBOUND",
         automated: true,
       }));
+      // Ensure userInfo is passed to SlackApiUtil
+      expect(SlackApiUtil.sendMessage.mock.calls[0][3]).toEqual(expect.objectContaining({}));
     });
 
     test("Sends copy of message clarifying U.S. state to Slack", () => {
@@ -466,16 +478,17 @@ describe('determineVoterState', () => {
         },
         confirmedDisclaimer: false,
         isDemo: false,
+        userId: "0923e1f4fb612739d9c5918c57656d5f",
         messageHistory: [
-          "abcdefghijklmnop: can you help me vote",
+          "0923e1f4fb612739d9c5918c57656d5f: can you help me vote",
           "Welcome to the Voter Help Line! To match you with the most knowlegeable volunteer, in which U.S. state are you looking to vote? We currently service FL, NC and OH. (Msg & data rates may apply).",
         ],
+        userId: "0923e1f4fb612739d9c5918c57656d5f",
       };
 
       const twilioPhoneNumber = "+12054985052";
       return determineVoterStateWrapper({
         userPhoneNumber: "+1234567890",
-        userId: "abcdefghijklmnop",
         userMessage: "NC",
         userInfo,
       }, redisClient, twilioPhoneNumber, inboundDbMessageEntry);
@@ -494,6 +507,8 @@ describe('determineVoterState', () => {
         direction: "OUTBOUND",
         automated: true,
       }));
+      // Ensure userInfo is passed to SlackApiUtil
+      expect(SlackApiUtil.sendMessage.mock.calls[0][3]).toEqual(expect.objectContaining({}));
     });
 
     test("Relays voter text to Slack lobby", () => {
@@ -509,7 +524,9 @@ describe('determineVoterState', () => {
     });
 
     test("Sends first Slack message to U.S. state channel announcing voter with userId", () => {
-      expectNthSlackMessageToChannel("north-carolina", 0, ["New North Carolina voter", "abcdefghijklmnop"]);
+      const MD5 = new Hashes.MD5;
+      const userId = MD5.hex("+1234567890");
+      expectNthSlackMessageToChannel("north-carolina", 0, ["New North Carolina voter", userId]);
     });
 
     test("Sends old message history to Slack U.S. state channel thread", () => {
@@ -542,10 +559,10 @@ describe('determineVoterState', () => {
             confirmedDisclaimer: false,
             isDemo: false,
             messageHistory: [
-              "abcdefghijklmnop: can you help me vote",
+              "0923e1f4fb612739d9c5918c57656d5f: can you help me vote",
               "Welcome to the Voter Help Line! To match you with the most knowlegeable volunteer, in which U.S. state are you looking to vote? We currently service FL, NC and OH. (Msg & data rates may apply).",
             // Added:
-              "abcdefghijklmnop: NC",
+              "0923e1f4fb612739d9c5918c57656d5f: NC",
               expect.stringMatching(/We try to reply within minutes but may take up to 24 hours./i),
             ],
             stateChannel: {
@@ -604,6 +621,7 @@ describe("handleDisclaimer", () => {
           "can you help me vote",
           'Welcome to the Voter Help Line!',
         ],
+        userId: "0923e1f4fb612739d9c5918c57656d5f",
       };
 
       const inboundDbMessageEntry = {
@@ -613,7 +631,6 @@ describe("handleDisclaimer", () => {
       const twilioPhoneNumber = "+12054985052";
       return handleDisclaimerWrapper({
         userPhoneNumber: "+1234567890",
-        userId: "abcdefghijklmnop",
         userMessage: "response to state question",
         userInfo,
       }, redisClient, twilioPhoneNumber, inboundDbMessageEntry);
@@ -631,6 +648,8 @@ describe("handleDisclaimer", () => {
       expect(SlackApiUtil.sendMessage.mock.calls[0][2]).toEqual(expect.objectContaining({
         mock: "inboundDbMessageEntryData",
       }));
+      // Ensure userInfo is passed to SlackApiUtil
+      expect(SlackApiUtil.sendMessage.mock.calls[0][3]).toEqual(expect.objectContaining({}));
     });
   });
 
@@ -656,7 +675,6 @@ describe("handleDisclaimer", () => {
       const twilioPhoneNumber = "+12054985052";
       return handleDisclaimerWrapper({
         userPhoneNumber: "+1234567890",
-        userId: "abcdefghijklmnop",
         userMessage: "i dont agree",
         userInfo,
       }, redisClient, twilioPhoneNumber, inboundDbMessageEntry)
@@ -675,6 +693,8 @@ describe("handleDisclaimer", () => {
         direction: "OUTBOUND",
         automated: true,
       }));
+      // Ensure userInfo is passed to SlackApiUtil
+      expect(SlackApiUtil.sendMessage.mock.calls[0][3]).toEqual(expect.objectContaining({}));
     });
 
     test("Passes to Slack message asking voter again to agree to ToS disclaimer", () => {
@@ -773,7 +793,6 @@ describe("handleDisclaimer", () => {
       const twilioPhoneNumber = "+12054985052";
       return handleDisclaimerWrapper({
         userPhoneNumber: "+1234567890",
-        userId: "abcdefghijklmnop",
         userMessage: "agree",
         userInfo,
       }, redisClient, twilioPhoneNumber, inboundDbMessageEntry)
@@ -792,6 +811,8 @@ describe("handleDisclaimer", () => {
         direction: "OUTBOUND",
         automated: true,
       }));
+      // Ensure userInfo is passed to SlackApiUtil
+      expect(SlackApiUtil.sendMessage.mock.calls[0][3]).toEqual(expect.objectContaining({}));
     });
 
     test("Passes to Slack message confirming disclaimer agreement and asking for voter U.S. state", () => {
@@ -904,7 +925,6 @@ describe("handleClearedVoter", () => {
     const twilioPhoneNumber = "+12054985052";
     return handleClearedVoterWrapper({
       userPhoneNumber: "+1234567890",
-      userId: "abcdefghijklmnop",
       userMessage: "subsequent message",
       userInfo,
     }, redisClient, twilioPhoneNumber, inboundDbMessageEntry).then(() => {
@@ -930,13 +950,14 @@ describe("handleClearedVoter", () => {
     const twilioPhoneNumber = "+12054985052";
     return handleClearedVoterWrapper({
       userPhoneNumber: "+1234567890",
-      userId: "abcdefghijklmnop",
       userMessage: "subsequent message",
       userInfo,
     }, redisClient, twilioPhoneNumber, inboundDbMessageEntry).then(() => {
       expect(SlackApiUtil.sendMessage.mock.calls[0][2]).toEqual(expect.objectContaining({
         mock: "inboundDbMessageEntryData",
       }));
+      // Ensure userInfo is passed to SlackApiUtil
+      expect(SlackApiUtil.sendMessage.mock.calls[0][3]).toEqual(expect.objectContaining({}));
     });
   });
 
@@ -963,7 +984,6 @@ describe("handleClearedVoter", () => {
     const twilioPhoneNumber = "+12054985052";
     return handleClearedVoterWrapper({
       userPhoneNumber: "+1234567890",
-      userId: "abcdefghijklmnop",
       userMessage: "subsequent message",
       userInfo,
     }, redisClient, twilioPhoneNumber, inboundDbMessageEntry).then(() => {
@@ -998,7 +1018,6 @@ describe("handleClearedVoter", () => {
     const twilioPhoneNumber = "+12054985052";
     return handleClearedVoterWrapper({
       userPhoneNumber: "+1234567890",
-      userId: "abcdefghijklmnop",
       userMessage: "subsequent message",
       userInfo,
     }, redisClient, twilioPhoneNumber, inboundDbMessageEntry).then(() => {

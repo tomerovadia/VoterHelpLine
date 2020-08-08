@@ -4,8 +4,10 @@ const Promise = require('bluebird');
 const DbApiUtil = require('./db_api_util');
 const SlackApiUtil = require('./slack_api_util');
 
-const sendMessage = (message, options, databaseMessageEntry) => {
+const sendMessage = (message, options, databaseMessageEntry = null, userInfo = null) => {
   if (databaseMessageEntry) {
+    // Copies a few fields from userInfo to databaseMessageEntry.
+    DbApiUtil.updateDbMessageEntryWithUserInfo(userInfo, databaseMessageEntry);
     databaseMessageEntry.slackChannel = options.channel;
     databaseMessageEntry.slackParentMessageTs = options.parentMessageTs;
     databaseMessageEntry.slackSendTimestamp = new Date();
@@ -52,7 +54,7 @@ exports.sendMessages = (messages, options) => {
   return Promise.mapSeries(messagePromises, (message, index, arrayLength) => {
     return SlackApiUtil.sendMessage(message, {parentMessageTs, channel});
   });
-}
+};
 
 exports.authenticateConnectionToSlack = (token) => {
   const MD5 = new Hashes.MD5;
@@ -63,8 +65,14 @@ exports.authenticateConnectionToSlack = (token) => {
     console.log("token unauthorized");
     return false;
   }
-}
+};
 
 exports.sendBackChallenge = (req) => {
   res.status(200).json({ challenge: req.body.challenge });
-}
+};
+
+exports.copyUserInfoToDbMessageEntry = (userInfo, dbMessageEntry) => {
+  dbMessageEntry.confirmedDisclaimer = userInfo.confirmedDisclaimer;
+  dbMessageEntry.isDemo = userInfo.isDemo;
+  dbMessageEntry.confirmedDisclaimer = userInfo.lastVoterMessageSecsFromEpoch;
+};
