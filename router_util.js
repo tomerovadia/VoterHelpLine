@@ -54,9 +54,10 @@ exports.handleNewVoter = (userOptions, redisClient, twilioPhoneNumber, inboundDb
     // and show in the Slack lobby thread the welcome message the voter received
     // in response.
     SlackApiUtil.sendMessage(`${userInfo.userId}: ${userMessage}`,
-      {parentMessageTs: userInfo.lobbyParentMessageTs, channel: userInfo.lobbyChannel}, inboundDbMessageEntry, userInfo);
-    SlackApiUtil.sendMessage(`Automated Message: ${welcomeMessage}`,
-      {parentMessageTs: userInfo.lobbyParentMessageTs, channel: userInfo.lobbyChannel});
+      {parentMessageTs: userInfo.lobbyParentMessageTs, channel: userInfo.lobbyChannel}, inboundDbMessageEntry, userInfo).then(() => {
+        SlackApiUtil.sendMessage(`Automated Message: ${welcomeMessage}`,
+          {parentMessageTs: userInfo.lobbyParentMessageTs, channel: userInfo.lobbyChannel});
+      });
 
     // Add key/value such that given a user phone number we can get the
     // Slack lobby thread associated with that user.
