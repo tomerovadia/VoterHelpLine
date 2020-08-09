@@ -18,6 +18,7 @@ exports.handleNewVoter = (userOptions, redisClient, twilioPhoneNumber, inboundDb
   userInfo.userId = MD5.hex(userPhoneNumber);
   userInfo.lobby = {};
   userInfo.messageHistory = [`${userInfo.userId}: ${userMessage}`, `Automated Message: ${MessageConstants.WELCOME_AND_DISCLAIMER}`];
+  userInfo.isDemo = false;
   if (twilioPhoneNumber == "+15619338683" || userPhoneNumber == process.env.TESTER_PHONE_NUMBER) {
     userInfo.isDemo = true;
   }
@@ -182,18 +183,24 @@ exports.handleClearedVoter = (options, redisClient, twilioPhoneNumber, inboundDb
       parentMessageTs: userInfo.stateChannel.parentMessageTs,
       channel: userInfo.stateChannel.channel,
     };
+
+  const nowSecondsEpoch = Math.round(Date.now() / 1000);
+  // Remember the lastVoterMessageSecsFromEpoch, for use in calculation below.
+  const lastVoterMessageSecsFromEpoch = userInfo.lastVoterMessageSecsFromEpoch;
+  // Update the lastVoterMessageSecsFromEpoch, for use in DB write below.
+  userInfo.lastVoterMessageSecsFromEpoch = nowSecondsEpoch;
+
   SlackApiUtil.sendMessage(`${userId}: ${options.userMessage}`,
     slackStateChannelMessageParams,
     inboundDbMessageEntry, userInfo).then(response => {
-      const nowSecondsEpoch = Math.round(Date.now() / 1000);
-      console.log(`Seconds since last message from voter: ${nowSecondsEpoch - userInfo.lastVoterMessageSecsFromEpoch}`);
-      if (nowSecondsEpoch - userInfo.lastVoterMessageSecsFromEpoch > MINS_BEFORE_WELCOME_BACK_MESSAGE * 60) {
+      console.log(`Seconds since last message from voter: ${nowSecondsEpoch - lastVoterMessageSecsFromEpoch}`);
+
+      if (nowSecondsEpoch - lastVoterMessageSecsFromEpoch > MINS_BEFORE_WELCOME_BACK_MESSAGE * 60) {
         const welcomeBackMessage = MessageConstants.WELCOME_BACK(userInfo.stateName);
         TwilioApiUtil.sendMessage(welcomeBackMessage, {userPhoneNumber: options.userPhoneNumber, twilioPhoneNumber});
         SlackApiUtil.sendMessage(`Automated Message: ${welcomeBackMessage}`, slackStateChannelMessageParams);
       }
 
-      userInfo.lastVoterMessageSecsFromEpoch = nowSecondsEpoch;
       redisClient.setAsync(userPhoneNumber, JSON.stringify(userInfo));
     });
 }
