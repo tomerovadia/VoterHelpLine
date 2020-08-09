@@ -18,8 +18,7 @@ exports.handleNewVoter = (userOptions, redisClient, twilioPhoneNumber, inboundDb
   userInfo.userId = MD5.hex(userPhoneNumber);
   userInfo.lobby = {};
   userInfo.messageHistory = [`${userInfo.userId}: ${userMessage}`, `Automated Message: ${MessageConstants.WELCOME_AND_DISCLAIMER}`];
-  userInfo.isDemo = twilioPhoneNumber == "+15619338683";
-  if (userPhoneNumber == process.env.TESTER_PHONE_NUMBER) {
+  if (twilioPhoneNumber == "+15619338683" || userPhoneNumber == process.env.TESTER_PHONE_NUMBER) {
     userInfo.isDemo = true;
   }
   userInfo.confirmedDisclaimer = false;
