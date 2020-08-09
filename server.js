@@ -34,8 +34,6 @@ app.post('/twilio-sms', (req, res) => {
   const twiml = new MessagingResponse();
   console.log('receiving Twilio message');
   const userPhoneNumber = req.body.From;
-  // const MD5 = new Hashes.MD5;
-  // const userId = MD5.hex(userPhoneNumber);
   const twilioPhoneNumber = req.body.To;
   const userMessage = req.body.Body;
 
