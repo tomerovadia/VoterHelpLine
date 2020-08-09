@@ -3,6 +3,7 @@ const requireModules = () => {
   MessageParserUtil = require('./message_parser_util');
   TwilioApiUtil = require('./twilio_api_util');
   SlackApiUtil = require('./slack_api_util');
+  RedisApiUtil = require('./redis_api_util');
   Hashes = require('jshashes'); // v1.0.5
   redis = require("redis-mock"), redisClient = redis.createClient();
 
@@ -10,7 +11,7 @@ const requireModules = () => {
   jest.mock('./message_parser_util');
 
   SlackApiUtil.sendMessage = jest.fn();
-  redisClient.setAsync = jest.fn();
+  RedisApiUtil.setHash = jest.fn();
 };
 
 process.on('unhandledRejection', (reason, p) => {
@@ -162,32 +163,32 @@ describe('handleNewVoter', () => {
     expect(newLastVoterMessageSecsFromEpoch - secsFromEpochNow).toBeLessThan(10);
   });
 
-  test("Adds two keys to redisClient", () => {
-    expect(redisClient.setAsync).toHaveBeenCalledTimes(2);
+  test("Adds two hashes to redisClient", () => {
+    expect(RedisApiUtil.setHash).toHaveBeenCalledTimes(2);
   });
 
-  test("Adds redisClient Twilio-to-Slack lookup", () => {
-    expect(redisClient.setAsync.mock.calls).toEqual(expect.arrayContaining([expect.arrayContaining(["+1234567890"])]));
+  test("Adds redisClient Twilio-to-Slack lookup with userPhoneNumber:TwilioPhoneNumber key", () => {
+    expect(RedisApiUtil.setHash.mock.calls).toEqual(expect.arrayContaining([expect.arrayContaining(["+1234567890:+12054985052"])]));
   });
 
   test("Adds redisClient Twilio-to-Slack lookup with Slack channel", () => {
     expect.assertions(1);
-    for (call of redisClient.setAsync.mock.calls) {
-      const key = call[0];
-      if (key == "+1234567890") {
-        const value = call[1];
-        expect(JSON.parse(value).lobby).toEqual(expect.objectContaining({channel: "#lobby"}));
+    for (call of RedisApiUtil.setHash.mock.calls) {
+      const key = call[1];
+      if (key == "+1234567890:+12054985052") {
+        const value = call[2];
+        expect(value.lobbyChannel).toEqual("#lobby");
       }
     }
   });
 
   test("Adds redisClient Twilio-to-Slack lookup with Slack thread", () => {
     expect.assertions(1);
-    for (call of redisClient.setAsync.mock.calls) {
-      const key = call[0];
-      if (key == "+1234567890") {
-        const value = call[1];
-        expect(JSON.parse(value).lobby).toEqual(expect.objectContaining({parentMessageTs: "293874928374"}));
+    for (call of RedisApiUtil.setHash.mock.calls) {
+      const key = call[1];
+      if (key == "+1234567890:+12054985052") {
+        const value = call[2];
+        expect(value.lobbyParentMessageTs).toEqual("293874928374");
       }
     }
   });
@@ -200,11 +201,11 @@ describe('handleNewVoter', () => {
       userPhoneNumber: "+1234567890",
       userMessage: "can you help me vote",
     }, redisClient, "+15619338683", inboundDbMessageEntry).then(() => {
-      for (call of redisClient.setAsync.mock.calls) {
-        const key = call[0];
-        if (key == "+1234567890") {
-          const value = call[1];
-          expect(JSON.parse(value)).toEqual(expect.objectContaining({isDemo: true}));
+      for (call of RedisApiUtil.setHash.mock.calls) {
+        const key = call[1];
+        if (key == "+1234567890:+15619338683") {
+          const value = call[2];
+          expect(value).toEqual(expect.objectContaining({isDemo: true}));
         }
       }
     });
@@ -212,33 +213,33 @@ describe('handleNewVoter', () => {
 
   test("Adds redisClient Twilio-to-Slack lookup with isDemo:false for non-demo line", () => {
     expect.assertions(1);
-    for (call of redisClient.setAsync.mock.calls) {
-      const key = call[0];
-      if (key == "+1234567890") {
-        const value = call[1];
-        expect(JSON.parse(value)).toEqual(expect.objectContaining({isDemo: false}));
+    for (call of RedisApiUtil.setHash.mock.calls) {
+      const key = call[1];
+      if (key == "+1234567890:+12054985052") {
+        const value = call[2];
+        expect(value).toEqual(expect.objectContaining({isDemo: false}));
       }
     }
   });
 
   test("Adds redisClient Twilio-to-Slack lookup with confirmedDisclaimer:false", () => {
     expect.assertions(1);
-    for (call of redisClient.setAsync.mock.calls) {
-      const key = call[0];
-      if (key == "+1234567890") {
-        const value = call[1];
-        expect(JSON.parse(value)).toEqual(expect.objectContaining({confirmedDisclaimer: false}));
+    for (call of RedisApiUtil.setHash.mock.calls) {
+      const key = call[1];
+      if (key == "+1234567890:+12054985052") {
+        const value = call[2];
+        expect(value).toEqual(expect.objectContaining({confirmedDisclaimer: false}));
       }
     }
   });
 
   test("Adds redisClient Twilio-to-Slack lookup with messageHistory", () => {
     expect.assertions(1);
-    for (call of redisClient.setAsync.mock.calls) {
-      const key = call[0];
-      if (key == "+1234567890") {
-        const value = call[1];
-        expect(JSON.parse(value)).toEqual(expect.objectContaining({messageHistory: expect.arrayContaining([
+    for (call of RedisApiUtil.setHash.mock.calls) {
+      const key = call[1];
+      if (key == "+1234567890:+12054985052") {
+        const value = call[2];
+        expect(value).toEqual(expect.objectContaining({messageHistory: expect.arrayContaining([
           expect.stringContaining("can you help me vote"),
           expect.stringContaining("Welcome"),
         ])}));
@@ -249,37 +250,37 @@ describe('handleNewVoter', () => {
   test("Adds redisClient Twilio-to-Slack lookup with lastVoterMessageSecsFromEpoch", () => {
     expect.assertions(1);
     const secsFromEpochNow = Math.round(Date.now() / 1000);
-    for (call of redisClient.setAsync.mock.calls) {
-      const key = call[0];
-      if (key == "+1234567890") {
-        const value = call[1];
-        const lastVoterMessageSecsFromEpoch = JSON.parse(value).lastVoterMessageSecsFromEpoch;
+    for (call of RedisApiUtil.setHash.mock.calls) {
+      const key = call[1];
+      if (key == "+1234567890:+12054985052") {
+        const value = call[2];
+        const lastVoterMessageSecsFromEpoch = value.lastVoterMessageSecsFromEpoch;
         expect(lastVoterMessageSecsFromEpoch - secsFromEpochNow).toBeLessThan(10);
       }
     }
   });
 
   test("Adds redisClient Slack-to-Twilio lookup", () => {
-      expect(redisClient.setAsync.mock.calls).toEqual(expect.arrayContaining([expect.arrayContaining(["#lobby:293874928374"])]));
+    expect(RedisApiUtil.setHash.mock.calls).toEqual(expect.arrayContaining([expect.arrayContaining(["#lobby:293874928374"])]));
   });
 
   test("Adds redisClient Slack-to-Twilio lookup with user phone number", () => {
     expect.assertions(1);
-      for (call of redisClient.setAsync.mock.calls) {
-        const key = call[0];
-        if (key == "#lobby:293874928374") {
-          const value = call[1];
-          expect(JSON.parse(value)).toEqual(expect.objectContaining({userPhoneNumber: "+1234567890"}));
-        }
+    for (call of RedisApiUtil.setHash.mock.calls) {
+      const key = call[1];
+      if (key == "#lobby:293874928374") {
+        const value = call[2];
+        expect(value).toEqual(expect.objectContaining({userPhoneNumber: "+1234567890"}));
       }
+    }
   });
 
   test("Adds redisClient Slack-to-Twilio lookup with Twilio phone number", () => {
-    for (call of redisClient.setAsync.mock.calls) {
-      const key = call[0];
+    for (call of RedisApiUtil.setHash.mock.calls) {
+      const key = call[1];
       if (key == "#lobby:293874928374") {
-        const value = call[1];
-        expect(JSON.parse(value)).toEqual(expect.objectContaining({twilioPhoneNumber: "+12054985052"}));
+        const value = call[2];
+        expect(value).toEqual(expect.objectContaining({twilioPhoneNumber: "+12054985052"}));
       }
     }
   });
@@ -313,10 +314,8 @@ describe('determineVoterState', () => {
         userPhoneNumber: "+1234567890",
         userMessage: "nonsensical statement",
         userInfo: {
-          lobby: {
-            channel: "#lobby",
-            parentMessageTs: "293874928374",
-          },
+          lobbyChannel: "#lobby",
+          lobbyParentMessageTs: "293874928374",
           confirmedDisclaimer: false,
           isDemo: false,
           messageHistory: [
@@ -378,10 +377,8 @@ describe('determineVoterState', () => {
         userPhoneNumber: "+1234567890",
         userMessage: "nonsensical statement",
         userInfo: {
-          lobby: {
-            channel: "#lobby",
-            parentMessageTs: "293874928374",
-          },
+          lobbyChannel: "#lobby",
+          lobbyParentMessageTs: "293874928374",
           confirmedDisclaimer: false,
           isDemo: false,
           messageHistory: [
@@ -425,11 +422,11 @@ describe('determineVoterState', () => {
 
     test("Updates redisClient Twilio-to-Slack lookup with lastVoterMessageSecsFromEpoch", () => {
       const secsFromEpochNow = Math.round(Date.now() / 1000);
-      for (call of redisClient.setAsync.mock.calls) {
-        const key = call[0];
-        if (key == "+1234567890") {
-          const value = call[1];
-          const lastVoterMessageSecsFromEpoch = JSON.parse(value).lastVoterMessageSecsFromEpoch;
+      for (call of RedisApiUtil.setHash.mock.calls) {
+        const key = call[1];
+        if (key == "+1234567890:+12054985052") {
+          const value = call[2];
+          const lastVoterMessageSecsFromEpoch = value.lastVoterMessageSecsFromEpoch;
           expect(lastVoterMessageSecsFromEpoch - secsFromEpochNow).toBeLessThan(10);
         }
       }
@@ -437,11 +434,11 @@ describe('determineVoterState', () => {
 
     test("Adds new messages to redisClient Twilio-to-Slack lookup messageHistory", () => {
       expect.assertions(1);
-      for (call of redisClient.setAsync.mock.calls) {
-        const key = call[0];
-        if (key == "+1234567890") {
-          const value = call[1];
-          expect(JSON.parse(value)).toEqual(expect.objectContaining({messageHistory: expect.arrayContaining([
+      for (call of RedisApiUtil.setHash.mock.calls) {
+        const key = call[1];
+        if (key == "+1234567890:+12054985052") {
+          const value = call[2];
+          expect(value).toEqual(expect.objectContaining({messageHistory: expect.arrayContaining([
             expect.stringContaining("nonsensical statement"),
             expect.stringContaining("didn't understand"),
           ])}));
@@ -451,11 +448,11 @@ describe('determineVoterState', () => {
 
     test("Keeps old messages in redisClient Twilio-to-Slack lookup messageHistory", () => {
       expect.assertions(1);
-      for (call of redisClient.setAsync.mock.calls) {
-        const key = call[0];
-        if (key == "+1234567890") {
-          const value = call[1];
-          expect(JSON.parse(value)).toEqual(expect.objectContaining({messageHistory: expect.arrayContaining([
+      for (call of RedisApiUtil.setHash.mock.calls) {
+        const key = call[1];
+        if (key == "+1234567890:+12054985052") {
+          const value = call[2];
+          expect(value).toEqual(expect.objectContaining({messageHistory: expect.arrayContaining([
             expect.stringContaining("can you help me vote"),
             expect.stringContaining("Welcome to the Voter Help Line! We are finding an available volunteer -- in the meantime, please tell us more about how we can help you vote. Please note that we currently only service North Carolina. (Msg & data rates may apply)."),
           ])}));
@@ -496,10 +493,8 @@ describe('determineVoterState', () => {
       SlackApiUtil.sendMessage.mockResolvedValueOnce(lobbySlackMessageResponse).mockResolvedValueOnce(stateSlackMessageResponse);
 
       const userInfo = {
-        lobby: {
-          channel: "#lobby",
-          parentMessageTs: "293874928374",
-        },
+        lobbyChannel: "#lobby",
+        lobbyParentMessageTs: "293874928374",
         confirmedDisclaimer: false,
         isDemo: false,
         userId: "0923e1f4fb612739d9c5918c57656d5f",
@@ -575,16 +570,14 @@ describe('determineVoterState', () => {
     test("Updates redisClient Twilio-to-Slack lookup", () => {
       expect.assertions(2);
       const secsFromEpochNow = Math.round(Date.now() / 1000);
-      for (call of redisClient.setAsync.mock.calls) {
-        const key = call[0];
-        if (key == "+1234567890") {
-          const value = call[1];
-          expect(JSON.parse(value)).toEqual(expect.objectContaining({
+      for (call of RedisApiUtil.setHash.mock.calls) {
+        const key = call[1];
+        if (key == "+1234567890:+12054985052") {
+          const value = call[2];
+          expect(value).toEqual(expect.objectContaining({
             // Preserved:
-            lobby: {
-              channel: "#lobby",
-              parentMessageTs: "293874928374",
-            },
+            lobbyChannel: "#lobby",
+            lobbyParentMessageTs: "293874928374",
             confirmedDisclaimer: false,
             isDemo: false,
             messageHistory: [
@@ -594,13 +587,11 @@ describe('determineVoterState', () => {
               "0923e1f4fb612739d9c5918c57656d5f: NC",
               expect.stringMatching(/We try to reply within minutes but may take up to 24 hours./i),
             ],
-            stateChannel: {
-              channel: "north-carolina",
-              parentMessageTs: "823487983742",
-            },
+            stateChannelChannel: "north-carolina",
+            stateChannelParentMessageTs: "823487983742",
             stateName: "North Carolina",
           }));
-          const lastVoterMessageSecsFromEpoch = JSON.parse(value).lastVoterMessageSecsFromEpoch;
+          const lastVoterMessageSecsFromEpoch = value.lastVoterMessageSecsFromEpoch;
           expect(lastVoterMessageSecsFromEpoch - secsFromEpochNow).toBeLessThan(10);
         }
       }
@@ -609,11 +600,15 @@ describe('determineVoterState', () => {
     test("Adds redisClient Slack-to-Twilio lookup for the Slack U.S. state channel and thread", () => {
       expect.assertions(1);
       const secsFromEpochNow = Math.round(Date.now() / 1000);
-      for (call of redisClient.setAsync.mock.calls) {
-        const key = call[0];
+      console.log(RedisApiUtil.setHash.mock.calls)
+      for (call of RedisApiUtil.setHash.mock.calls) {
+        const key = call[1];
         if (key == "north-carolina:823487983742") {
-          const value = call[1];
-          expect(JSON.parse(value)).toEqual(expect.objectContaining({userPhoneNumber: "+1234567890"}));
+          const value = call[2];
+          expect(value).toEqual(expect.objectContaining({
+            userPhoneNumber: "+1234567890",
+            twilioPhoneNumber: "+12054985052",
+          }));
         }
       }
     });
@@ -640,10 +635,8 @@ describe("handleDisclaimer", () => {
   describe("Runs regardless of whether voter is cleared", () => {
     beforeEach(() => {
       const userInfo = {
-        lobby: {
-          channel: "#lobby",
-          parentMessageTs: "293874928374",
-        },
+        lobbyChannel: "#lobby",
+        lobbyParentMessageTs: "293874928374",
         confirmedDisclaimer: false,
         isDemo: false,
         messageHistory: [
@@ -692,10 +685,8 @@ describe("handleDisclaimer", () => {
   describe("Voter is not cleared", () => {
     beforeEach(() => {
       const userInfo = {
-        lobby: {
-          channel: "#lobby",
-          parentMessageTs: "293874928374",
-        },
+        lobbyChannel: "#lobby",
+        lobbyParentMessageTs: "293874928374",
         confirmedDisclaimer: false,
         isDemo: false,
         messageHistory: [
@@ -749,15 +740,13 @@ describe("handleDisclaimer", () => {
     test("Preserves unchanged redisClient Twilio-to-Slack lookup data", () => {
       expect.assertions(1);
       const secsFromEpochNow = Math.round(Date.now() / 1000);
-      for (call of redisClient.setAsync.mock.calls) {
-        const key = call[0];
-        if (key == "+1234567890") {
-          const value = call[1];
-          expect(JSON.parse(value)).toEqual(expect.objectContaining({
-            lobby: {
-              channel: "#lobby",
-              parentMessageTs: "293874928374",
-            },
+      for (call of RedisApiUtil.setHash.mock.calls) {
+        const key = call[1];
+        if (key == "+1234567890:+12054985052") {
+          const value = call[2];
+          expect(value).toEqual(expect.objectContaining({
+            lobbyChannel: "#lobby",
+            lobbyParentMessageTs: "293874928374",
             isDemo: false,
             messageHistory: expect.arrayContaining([
               "can you help me vote",
@@ -770,12 +759,11 @@ describe("handleDisclaimer", () => {
 
     test("Does not update redisClient Twilio-to-Slack lookup for confirmedDisclaimer, keeping it false", () => {
       expect.assertions(1);
-      const secsFromEpochNow = Math.round(Date.now() / 1000);
-      for (call of redisClient.setAsync.mock.calls) {
-        const key = call[0];
-        if (key == "+1234567890") {
-          const value = call[1];
-          expect(JSON.parse(value)).toEqual(expect.objectContaining({
+      for (call of RedisApiUtil.setHash.mock.calls) {
+        const key = call[1];
+        if (key == "+1234567890:+12054985052") {
+          const value = call[2];
+          expect(value).toEqual(expect.objectContaining({
             confirmedDisclaimer: false,
           }));
         }
@@ -785,11 +773,11 @@ describe("handleDisclaimer", () => {
     test("Updates redisClient Twilio-to-Slack lookup with message history including new user message and automated response", () => {
       expect.assertions(1);
       const secsFromEpochNow = Math.round(Date.now() / 1000);
-      for (call of redisClient.setAsync.mock.calls) {
-        const key = call[0];
-        if (key == "+1234567890") {
-          const value = call[1];
-          expect(JSON.parse(value)).toEqual(expect.objectContaining({
+      for (call of RedisApiUtil.setHash.mock.calls) {
+        const key = call[1];
+        if (key == "+1234567890:+12054985052") {
+          const value = call[2];
+          expect(value).toEqual(expect.objectContaining({
             messageHistory: expect.arrayContaining([
               expect.stringMatching(/i dont agree/i),
               expect.stringMatching(/to confirm that you understand/i),
@@ -801,11 +789,11 @@ describe("handleDisclaimer", () => {
 
     test("Updates redisClient Twilio-to-Slack lookup with lastVoterMessageSecsFromEpoch", () => {
       const secsFromEpochNow = Math.round(Date.now() / 1000);
-      for (call of redisClient.setAsync.mock.calls) {
-        const key = call[0];
-        if (key == "+1234567890") {
-          const value = call[1];
-          const lastVoterMessageSecsFromEpoch = JSON.parse(value).lastVoterMessageSecsFromEpoch;
+      for (call of RedisApiUtil.setHash.mock.calls) {
+        const key = call[1];
+        if (key == "+1234567890:+12054985052") {
+          const value = call[2];
+          const lastVoterMessageSecsFromEpoch = value.lastVoterMessageSecsFromEpoch;
           expect(lastVoterMessageSecsFromEpoch - secsFromEpochNow).toBeLessThan(10);
         }
       }
@@ -815,10 +803,8 @@ describe("handleDisclaimer", () => {
   describe("Voter is cleared", () => {
     beforeEach(() => {
       const userInfo = {
-        lobby: {
-          channel: "#lobby",
-          parentMessageTs: "293874928374",
-        },
+        lobbyChannel: "#lobby",
+        lobbyParentMessageTs: "293874928374",
         confirmedDisclaimer: false,
         isDemo: false,
         messageHistory: [
@@ -872,15 +858,13 @@ describe("handleDisclaimer", () => {
     test("Preserves unchanged redisClient Twilio-to-Slack lookup data", () => {
       expect.assertions(1);
       const secsFromEpochNow = Math.round(Date.now() / 1000);
-      for (call of redisClient.setAsync.mock.calls) {
-        const key = call[0];
-        if (key == "+1234567890") {
-          const value = call[1];
-          expect(JSON.parse(value)).toEqual(expect.objectContaining({
-            lobby: {
-              channel: "#lobby",
-              parentMessageTs: "293874928374",
-            },
+      for (call of RedisApiUtil.setHash.mock.calls) {
+        const key = call[1];
+        if (key == "+1234567890:+12054985052") {
+          const value = call[2];
+          expect(value).toEqual(expect.objectContaining({
+            lobbyChannel: "#lobby",
+            lobbyParentMessageTs: "293874928374",
             isDemo: false,
             messageHistory: expect.arrayContaining([
               "can you help me vote",
@@ -894,11 +878,11 @@ describe("handleDisclaimer", () => {
     test("Updates redisClient Twilio-to-Slack lookup with confirmedDisclaimer:true", () => {
       expect.assertions(1);
       const secsFromEpochNow = Math.round(Date.now() / 1000);
-      for (call of redisClient.setAsync.mock.calls) {
-        const key = call[0];
-        if (key == "+1234567890") {
-          const value = call[1];
-          expect(JSON.parse(value)).toEqual(expect.objectContaining({
+      for (call of RedisApiUtil.setHash.mock.calls) {
+        const key = call[1];
+        if (key == "+1234567890:+12054985052") {
+          const value = call[2];
+          expect(value).toEqual(expect.objectContaining({
             confirmedDisclaimer: true,
           }));
         }
@@ -908,11 +892,11 @@ describe("handleDisclaimer", () => {
     test("Updates redisClient Twilio-to-Slack lookup with message history including new user message and automated response", () => {
       expect.assertions(1);
       const secsFromEpochNow = Math.round(Date.now() / 1000);
-      for (call of redisClient.setAsync.mock.calls) {
-        const key = call[0];
-        if (key == "+1234567890") {
-          const value = call[1];
-          expect(JSON.parse(value)).toEqual(expect.objectContaining({
+      for (call of RedisApiUtil.setHash.mock.calls) {
+        const key = call[1];
+        if (key == "+1234567890:+12054985052") {
+          const value = call[2];
+          expect(value).toEqual(expect.objectContaining({
             messageHistory: expect.arrayContaining([
               expect.stringMatching(/agree/i),
               expect.stringMatching(/Great!.*in which U.S. state/i),
@@ -924,11 +908,11 @@ describe("handleDisclaimer", () => {
 
     test("Updates redisClient Twilio-to-Slack lookup with lastVoterMessageSecsFromEpoch", () => {
       const secsFromEpochNow = Math.round(Date.now() / 1000);
-      for (call of redisClient.setAsync.mock.calls) {
-        const key = call[0];
-        if (key == "+1234567890") {
-          const value = call[1];
-          const lastVoterMessageSecsFromEpoch = JSON.parse(value).lastVoterMessageSecsFromEpoch;
+      for (call of RedisApiUtil.setHash.mock.calls) {
+        const key = call[1];
+        if (key == "+1234567890:+12054985052") {
+          const value = call[2];
+          const lastVoterMessageSecsFromEpoch = value.lastVoterMessageSecsFromEpoch;
           expect(lastVoterMessageSecsFromEpoch - secsFromEpochNow).toBeLessThan(10);
         }
       }
@@ -955,10 +939,8 @@ describe("handleClearedVoter", () => {
 
   test("Passes voter message to Slack", () => {
     const userInfo = {
-      stateChannel: {
-        channel: "north-carolina",
-        parentMessageTs: "823487983742",
-      },
+      stateChannelChannel: "north-carolina",
+      stateChannelParentMessageTs: "823487983742",
       confirmedDisclaimer: true,
       isDemo: false,
       messageHistory: [],
@@ -980,10 +962,8 @@ describe("handleClearedVoter", () => {
 
   test("Passes inbound database entry object to SlackApiUtil for logging", () => {
     const userInfo = {
-      stateChannel: {
-        channel: "north-carolina",
-        parentMessageTs: "823487983742",
-      },
+      stateChannelChannel: "north-carolina",
+      stateChannelParentMessageTs: "823487983742",
       confirmedDisclaimer: true,
       isDemo: false,
       messageHistory: [],
@@ -1008,10 +988,8 @@ describe("handleClearedVoter", () => {
 
   test("Includes updated lastVoterMessageSecsFromEpoch in inbound database entry object for logging", () => {
     const userInfo = {
-      stateChannel: {
-        channel: "north-carolina",
-        parentMessageTs: "823487983742",
-      },
+      stateChannelChannel: "north-carolina",
+      stateChannelParentMessageTs: "823487983742",
       confirmedDisclaimer: true,
       isDemo: false,
       messageHistory: [],
@@ -1040,10 +1018,8 @@ describe("handleClearedVoter", () => {
     const oneHourAndOneMinInSecs = (60 * 60) + 60;
     const mockLastVoterMessageSecsFromEpoch = Math.round((Date.now() / 1000) - oneHourAndOneMinInSecs);
     const userInfo = {
-      stateChannel: {
-        channel: "north-carolina",
-        parentMessageTs: "823487983742",
-      },
+      stateChannelChannel: "north-carolina",
+      stateChannelParentMessageTs: "823487983742",
       confirmedDisclaimer: true,
       isDemo: false,
       messageHistory: [],
@@ -1074,10 +1050,8 @@ describe("handleClearedVoter", () => {
     const oneMinShyOfOneHourInSecs = (60 * 60) - 60;
     const mockLastVoterMessageSecsFromEpoch = Math.round((Date.now() / 1000) - oneMinShyOfOneHourInSecs);
     const userInfo = {
-      stateChannel: {
-        channel: "north-carolina",
-        parentMessageTs: "823487983742",
-      },
+      stateChannelChannel: "north-carolina",
+      stateChannelParentMessageTs: "823487983742",
       confirmedDisclaimer: true,
       isDemo: false,
       messageHistory: [],
@@ -1099,14 +1073,34 @@ describe("handleClearedVoter", () => {
   });
 
   test("Updates redisClient Twilio-to-Slack lookup with lastVoterMessageSecsFromEpoch", () => {
-    const secsFromEpochNow = Math.round(Date.now() / 1000);
-    for (call of redisClient.setAsync.mock.calls) {
-      const key = call[0];
-      if (key == "+1234567890") {
-        const value = call[1];
-        const lastVoterMessageSecsFromEpoch = JSON.parse(value).lastVoterMessageSecsFromEpoch;
-        expect(lastVoterMessageSecsFromEpoch - secsFromEpochNow).toBeLessThan(10);
+    expect.assertions(1);
+    const userInfo = {
+      stateChannelChannel: "north-carolina",
+      stateChannelParentMessageTs: "823487983742",
+      confirmedDisclaimer: true,
+      isDemo: false,
+      messageHistory: [],
+    };
+
+    const inboundDbMessageEntry = {
+      mock: "inboundDbMessageEntryData",
+    };
+
+    const twilioPhoneNumber = "+12054985052";
+    return handleClearedVoterWrapper({
+      userPhoneNumber: "+1234567890",
+      userMessage: "subsequent message",
+      userInfo,
+    }, redisClient, twilioPhoneNumber, inboundDbMessageEntry).then(() => {
+      const secsFromEpochNow = Math.round(Date.now() / 1000);
+      for (call of RedisApiUtil.setHash.mock.calls) {
+        const key = call[1];
+        if (key == "+1234567890:+12054985052") {
+          const value = call[2];
+          const lastVoterMessageSecsFromEpoch = value.lastVoterMessageSecsFromEpoch;
+          expect(lastVoterMessageSecsFromEpoch - secsFromEpochNow).toBeLessThan(10);
+        }
       }
-    }
+    });
   });
 });
