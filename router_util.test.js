@@ -115,7 +115,14 @@ describe('handleNewVoter', () => {
       mock: "inboundDbMessageEntryData",
     }));
     // Ensure userInfo is passed to SlackApiUtil
-    expect(SlackApiUtil.sendMessage.mock.calls[1][3]).toEqual(expect.objectContaining({}));
+    expect(SlackApiUtil.sendMessage.mock.calls[1][3]).not.toBeUndefined();
+  });
+
+  test("Includes updated lastVoterMessageSecsFromEpoch in inbound database entry object for logging", () => {
+    const secsFromEpochNow = Math.round(Date.now() / 1000);
+    const userInfo = SlackApiUtil.sendMessage.mock.calls[1][3];
+    const newLastVoterMessageSecsFromEpoch = userInfo.lastVoterMessageSecsFromEpoch;
+    expect(newLastVoterMessageSecsFromEpoch - secsFromEpochNow).toBeLessThan(10);
   });
 
   test("Includes user id in relay of voter message", () => {
@@ -146,8 +153,13 @@ describe('handleNewVoter', () => {
       direction: "OUTBOUND",
       automated: true,
     }));
-    // Ensure userInfo is passed to SlackApiUtil
-    expect(SlackApiUtil.sendMessage.mock.calls[0][3]).toEqual(expect.objectContaining({}));
+  });
+
+  test("Includes updated lastVoterMessageSecsFromEpoch in outbound database entry object for logging", () => {
+    const secsFromEpochNow = Math.round(Date.now() / 1000);
+    const dbMessageEntry = TwilioApiUtil.sendMessage.mock.calls[0][2];
+    const newLastVoterMessageSecsFromEpoch = dbMessageEntry.lastVoterMessageSecsFromEpoch;
+    expect(newLastVoterMessageSecsFromEpoch - secsFromEpochNow).toBeLessThan(10);
   });
 
   test("Adds two keys to redisClient", () => {
@@ -337,7 +349,14 @@ describe('determineVoterState', () => {
         mock: "inboundDbMessageEntryData",
       }));
       // Ensure userInfo is passed to SlackApiUtil
-      expect(SlackApiUtil.sendMessage.mock.calls[0][3]).toEqual(expect.objectContaining({}));
+      expect(SlackApiUtil.sendMessage.mock.calls[0][3]).not.toBeUndefined();
+    });
+
+    test("Includes updated lastVoterMessageSecsFromEpoch in inbound database entry object for logging", () => {
+      const secsFromEpochNow = Math.round(Date.now() / 1000);
+      const userInfo = SlackApiUtil.sendMessage.mock.calls[0][3];
+      const newLastVoterMessageSecsFromEpoch = userInfo.lastVoterMessageSecsFromEpoch;
+      expect(newLastVoterMessageSecsFromEpoch - secsFromEpochNow).toBeLessThan(10);
     });
   });
 
@@ -387,8 +406,13 @@ describe('determineVoterState', () => {
         direction: "OUTBOUND",
         automated: true,
       }));
-      // Ensure userInfo is passed to SlackApiUtil
-      expect(SlackApiUtil.sendMessage.mock.calls[0][3]).toEqual(expect.objectContaining({}));
+    });
+
+    test("Includes updated lastVoterMessageSecsFromEpoch in outbound database entry object for logging", () => {
+      const secsFromEpochNow = Math.round(Date.now() / 1000);
+      const dbMessageEntry = TwilioApiUtil.sendMessage.mock.calls[0][2];
+      const newLastVoterMessageSecsFromEpoch = dbMessageEntry.lastVoterMessageSecsFromEpoch;
+      expect(newLastVoterMessageSecsFromEpoch - secsFromEpochNow).toBeLessThan(10);
     });
 
     test("Sends copy of message clarifying U.S. state to Slack", () => {
@@ -507,8 +531,13 @@ describe('determineVoterState', () => {
         direction: "OUTBOUND",
         automated: true,
       }));
-      // Ensure userInfo is passed to SlackApiUtil
-      expect(SlackApiUtil.sendMessage.mock.calls[0][3]).toEqual(expect.objectContaining({}));
+    });
+
+    test("Includes updated lastVoterMessageSecsFromEpoch in outbound database entry object for logging", () => {
+      const secsFromEpochNow = Math.round(Date.now() / 1000);
+      const dbMessageEntry = TwilioApiUtil.sendMessage.mock.calls[0][2];
+      const newLastVoterMessageSecsFromEpoch = dbMessageEntry.lastVoterMessageSecsFromEpoch;
+      expect(newLastVoterMessageSecsFromEpoch - secsFromEpochNow).toBeLessThan(10);
     });
 
     test("Relays voter text to Slack lobby", () => {
@@ -649,7 +678,14 @@ describe("handleDisclaimer", () => {
         mock: "inboundDbMessageEntryData",
       }));
       // Ensure userInfo is passed to SlackApiUtil
-      expect(SlackApiUtil.sendMessage.mock.calls[0][3]).toEqual(expect.objectContaining({}));
+      expect(SlackApiUtil.sendMessage.mock.calls[0][3]).not.toBeUndefined();
+    });
+
+    test("Includes updated lastVoterMessageSecsFromEpoch in inbound database entry object for logging", () => {
+      const secsFromEpochNow = Math.round(Date.now() / 1000);
+      const userInfo = SlackApiUtil.sendMessage.mock.calls[0][3];
+      const newLastVoterMessageSecsFromEpoch = userInfo.lastVoterMessageSecsFromEpoch;
+      expect(newLastVoterMessageSecsFromEpoch - secsFromEpochNow).toBeLessThan(10);
     });
   });
 
@@ -693,8 +729,13 @@ describe("handleDisclaimer", () => {
         direction: "OUTBOUND",
         automated: true,
       }));
-      // Ensure userInfo is passed to SlackApiUtil
-      expect(SlackApiUtil.sendMessage.mock.calls[0][3]).toEqual(expect.objectContaining({}));
+    });
+
+    test("Includes updated lastVoterMessageSecsFromEpoch in outbound database entry object for logging", () => {
+      const secsFromEpochNow = Math.round(Date.now() / 1000);
+      const dbMessageEntry = TwilioApiUtil.sendMessage.mock.calls[0][2];
+      const newLastVoterMessageSecsFromEpoch = dbMessageEntry.lastVoterMessageSecsFromEpoch;
+      expect(newLastVoterMessageSecsFromEpoch - secsFromEpochNow).toBeLessThan(10);
     });
 
     test("Passes to Slack message asking voter again to agree to ToS disclaimer", () => {
@@ -811,8 +852,13 @@ describe("handleDisclaimer", () => {
         direction: "OUTBOUND",
         automated: true,
       }));
-      // Ensure userInfo is passed to SlackApiUtil
-      expect(SlackApiUtil.sendMessage.mock.calls[0][3]).toEqual(expect.objectContaining({}));
+    });
+
+    test("Includes updated lastVoterMessageSecsFromEpoch in outbound database entry object for logging", () => {
+      const secsFromEpochNow = Math.round(Date.now() / 1000);
+      const dbMessageEntry = TwilioApiUtil.sendMessage.mock.calls[0][2];
+      const newLastVoterMessageSecsFromEpoch = dbMessageEntry.lastVoterMessageSecsFromEpoch;
+      expect(newLastVoterMessageSecsFromEpoch - secsFromEpochNow).toBeLessThan(10);
     });
 
     test("Passes to Slack message confirming disclaimer agreement and asking for voter U.S. state", () => {
@@ -956,8 +1002,35 @@ describe("handleClearedVoter", () => {
       expect(SlackApiUtil.sendMessage.mock.calls[0][2]).toEqual(expect.objectContaining({
         mock: "inboundDbMessageEntryData",
       }));
-      // Ensure userInfo is passed to SlackApiUtil
-      expect(SlackApiUtil.sendMessage.mock.calls[0][3]).toEqual(expect.objectContaining({}));
+      expect(SlackApiUtil.sendMessage.mock.calls[0][3]).not.toBeUndefined();
+    });
+  });
+
+  test("Includes updated lastVoterMessageSecsFromEpoch in inbound database entry object for logging", () => {
+    const userInfo = {
+      stateChannel: {
+        channel: "north-carolina",
+        parentMessageTs: "823487983742",
+      },
+      confirmedDisclaimer: true,
+      isDemo: false,
+      messageHistory: [],
+    };
+
+    const inboundDbMessageEntry = {
+      mock: "inboundDbMessageEntryData",
+    };
+
+    const twilioPhoneNumber = "+12054985052";
+    return handleClearedVoterWrapper({
+      userPhoneNumber: "+1234567890",
+      userMessage: "subsequent message",
+      userInfo,
+    }, redisClient, twilioPhoneNumber, inboundDbMessageEntry).then(() => {
+      const secsFromEpochNow = Math.round(Date.now() / 1000);
+      const userInfo = SlackApiUtil.sendMessage.mock.calls[0][3];
+      const newLastVoterMessageSecsFromEpoch = userInfo.lastVoterMessageSecsFromEpoch;
+      expect(newLastVoterMessageSecsFromEpoch - secsFromEpochNow).toBeLessThan(10);
     });
   });
 
