@@ -15,6 +15,7 @@ const upload = multer(); // for parsing multipart/form-data
 const MessagingResponse = require('twilio').twiml.MessagingResponse;
 const { Client } = require('pg');
 const DbApiUtil = require('./db_api_util');
+const RedisApiUtil = require('./redis_api_util');
 
 app.use(bodyParser.urlencoded({ extended: false }));
 
@@ -45,14 +46,14 @@ app.post('/twilio-sms', (req, res) => {
     twilioMessageSid: req.body.SmsMessageSid,
   });
 
-  redisClient.getAsync(userPhoneNumber).then(unparsedUserInfo => {
-    // Seen this voter before
-    if (unparsedUserInfo) {
-      const userInfo = JSON.parse(unparsedUserInfo);
+  const redisHashKey = `${userPhoneNumber}:${twilioPhoneNumber}`;
 
+  RedisApiUtil.getHash(redisClient, redisHashKey).then(userInfo => {
+    // Seen this voter before
+    if (userInfo != null) {
       if (userInfo.confirmedDisclaimer) {
         // Voter has a state determined
-        if (userInfo.stateChannel) {
+        if (userInfo.stateChannelChannel) {
           RouterUtil.handleClearedVoter({userInfo, userPhoneNumber, userMessage}, redisClient, twilioPhoneNumber, inboundDbMessageEntry);
         // Voter has no state determined
         } else {
@@ -103,18 +104,20 @@ app.post('/slack', upload.array(), (req, res) => {
     res.sendStatus(401);
     return;
   }
+  res.sendStatus(200);
   console.log('Passes Slack auth');
 
   if (reqBody.event.type === "message" && reqBody.event.user != process.env.SLACK_BOT_USER_ID) {
     console.log(`Received message from Slack: ${reqBody.event.text}`);
 
+    const redisHashKey = `${reqBody.event.channel}:${reqBody.event.thread_ts}`;
+
     // Pass Slack message to Twilio
-    redisClient.getAsync(`${reqBody.event.channel}:${reqBody.event.thread_ts}`).then(unparsedPhoneNumberInfo => {
+    RedisApiUtil.getHash(redisClient, redisHashKey).then(redisData => {
       // TODO Handle unexpected case where no record is found for voter
-      if (unparsedPhoneNumberInfo) {
-        const phoneNumberInfo = JSON.parse(unparsedPhoneNumberInfo);
-        const userPhoneNumber = phoneNumberInfo.userPhoneNumber;
-        const twilioPhoneNumber = phoneNumberInfo.twilioPhoneNumber;
+      if (redisData != null) {
+        const userPhoneNumber = redisData.userPhoneNumber;
+        const twilioPhoneNumber = redisData.twilioPhoneNumber;
         if (userPhoneNumber) {
           const MD5 = new Hashes.MD5;
 
@@ -126,44 +129,25 @@ app.post('/slack', upload.array(), (req, res) => {
             slackMessageTs: reqBody.event.ts,
           });
 
-          redisClient.getAsync(userPhoneNumber).then(unparsedUserInfo => {
-            if (unparsedUserInfo) {
-              const userInfo = JSON.parse(unparsedUserInfo);
+          RedisApiUtil.getHash(redisClient, `${userPhoneNumber}:${twilioPhoneNumber}`).then(userInfo => {
+            if (userInfo != null) {
               userInfo.lastVoterMessageSecsFromEpoch = Math.round(Date.now() / 1000);
-              redisClient.setAsync(userPhoneNumber, JSON.stringify(userInfo));
-              return userInfo;
+              RedisApiUtil.setHash(redisClient, `${userPhoneNumber}:${twilioPhoneNumber}`, userInfo);
+              DbApiUtil.updateDbMessageEntryWithUserInfo(userInfo, outboundDbMessageEntry);
+              TwilioApiUtil.sendMessage(reqBody.event.text,
+                                        {userPhoneNumber,
+                                          twilioPhoneNumber},
+                                          outboundDbMessageEntry);
             }
-          }).then(userInfo => {
-            DbApiUtil.updateDbMessageEntryWithUserInfo(userInfo, outboundDbMessageEntry);
-            TwilioApiUtil.sendMessage(reqBody.event.text,
-                                      {userPhoneNumber,
-                                        twilioPhoneNumber},
-                                        outboundDbMessageEntry);
           });
         }
+      // Hash doesn't exist (Slack message sent to non-existent user somehow)
+      } else {
+        console.log("Error: Hash doesn't exist (Slack message sent to non-existent user somehow)")
       }
     });
   }
-  res.sendStatus(200);
 });
-
-// app.get('/test-db', upload.array(), (req, res) => {
-//   console.log('tesjt-dfg');
-//   const databaseClient = new Client({
-//     connectionString: process.env.DATABASE_URL,
-//   });
-//   databaseClient.connect()
-//     .then(() => {
-//       databaseClient.query("INSERT INTO messages (message, automated) VALUES ($1, $2);", ['oh hey', true], (err, res) => {
-//         if (err) throw err;
-//         console.log("No error from database query");
-//         databaseClient.end();
-//       });
-//     })
-//     .catch(err => console.error('Database connection error', err.stack));
-//
-//   res.sendStatus(200);
-// });
 
 // Authenticate Slack connection to Heroku.
 // app.post('/slack', upload.array(), (req, res) => {
