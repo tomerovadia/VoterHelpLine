@@ -56,7 +56,7 @@ const handleNewVoterWrapper = (userOptions, redisClient, twilioPhoneNumber, inbo
   return new Promise((resolve, reject) => {
     resolve(RouterUtil.handleNewVoter(userOptions, redisClient, twilioPhoneNumber, inboundDbMessageEntry));
   });
-}
+};
 
 describe('handleNewVoter', () => {
   beforeEach(() => {
@@ -462,27 +462,31 @@ describe('determineVoterState', () => {
   });
 
   describe("Successfully determined voter U.S. state", () => {
-    beforeEach(() => {
-      MessageParserUtil.determineState.mockReturnValue("North Carolina");
+    // Only declared and not defined here, so that beforeEach can re-initiate
+    // these variables anew for each test.
+    let lobbySlackMessageResponse;
+    let stateSlackMessageResponse;
+    let inboundDbMessageEntry;
+    let userInfo;
+    let twilioPhoneNumber;
 
-      const lobbySlackMessageResponse = {
+    beforeEach(() => {
+      lobbySlackMessageResponse = {
         data: {
           ts: "293874928374",
           channel: "#lobby"
         }
       };
 
-      const stateSlackMessageResponse = {
+      stateSlackMessageResponse = {
         data: {
           ts: "823487983742",
           // In the wild this is actually a channel ID (e.g. C12345678)
-          channel: "north-carolina"
+          channel: "north-carolina-0"
         }
       };
 
-      const inboundDbMessageEntry = {
-        mock: "inboundDbMessageEntryData",
-      };
+      MessageParserUtil.determineState.mockReturnValue("North Carolina");
 
       // This default response will kick in once the mockResolvedValueOnce calls run out.
       SlackApiUtil.sendMessage.mockResolvedValue(lobbySlackMessageResponse);
@@ -492,7 +496,17 @@ describe('determineVoterState', () => {
       // to be to state channel (which sort of makes sense when you think about it).
       SlackApiUtil.sendMessage.mockResolvedValueOnce(lobbySlackMessageResponse).mockResolvedValueOnce(stateSlackMessageResponse);
 
-      const userInfo = {
+      // Mock these functions, as they are called by load balancer.
+      redisClient.setAsync = jest.fn();
+      redisClient.mgetAsync = jest.fn();
+      // Load balancer requires a return value from this function, so mock it.
+      redisClient.mgetAsync.mockResolvedValue(["1", "0"]);
+
+      inboundDbMessageEntry = {
+        mock: "inboundDbMessageEntryData",
+      };
+
+      userInfo = {
         lobbyChannel: "#lobby",
         lobbyParentMessageTs: "293874928374",
         confirmedDisclaimer: false,
@@ -505,112 +519,250 @@ describe('determineVoterState', () => {
         userId: "0923e1f4fb612739d9c5918c57656d5f",
       };
 
-      const twilioPhoneNumber = "+12054985052";
+      twilioPhoneNumber = "+12054985052";
+
+      // Leave the calling of determineVoterStateWrapper to each test so that
+      // the above variables and mocks can be modified if needed (e.g. for
+      // the round robin).
+    });
+
+    test("Texts voter confirming U.S. state and informing of retrieving volunteer", () => {
       return determineVoterStateWrapper({
         userPhoneNumber: "+1234567890",
         userMessage: "NC",
         userInfo,
-      }, redisClient, twilioPhoneNumber, inboundDbMessageEntry);
-    });
-
-    test("Texts voter confirming U.S. state and informing of retrieving volunteer", () => {
-      expect(TwilioApiUtil.sendMessage.mock.calls[0][0]).toEqual(expect.stringMatching(/Great!.*We try to reply within minutes but may take up to 24 hours./i));
-      expect(TwilioApiUtil.sendMessage.mock.calls[0][1]).toEqual(expect.objectContaining({
-        userPhoneNumber: "+1234567890",
-        twilioPhoneNumber: "+12054985052",
-      }));
+      }, redisClient, twilioPhoneNumber, inboundDbMessageEntry).then(() => {
+        expect(TwilioApiUtil.sendMessage.mock.calls[0][0]).toEqual(expect.stringMatching(/Great!.*We try to reply within minutes but may take up to 24 hours./i));
+        expect(TwilioApiUtil.sendMessage.mock.calls[0][1]).toEqual(expect.objectContaining({
+          userPhoneNumber: "+1234567890",
+          twilioPhoneNumber: "+12054985052",
+        }));
+      });
     });
 
     test("Creates outbound database entry and passes to TwilioApiUtil for logging", () => {
-      expect(TwilioApiUtil.sendMessage.mock.calls[0][2]).toEqual(expect.objectContaining({
-        direction: "OUTBOUND",
-        automated: true,
-      }));
+      return determineVoterStateWrapper({
+        userPhoneNumber: "+1234567890",
+        userMessage: "NC",
+        userInfo,
+      }, redisClient, twilioPhoneNumber, inboundDbMessageEntry).then(() => {
+        expect(TwilioApiUtil.sendMessage.mock.calls[0][2]).toEqual(expect.objectContaining({
+          direction: "OUTBOUND",
+          automated: true,
+        }));
+      });
     });
 
     test("Includes updated lastVoterMessageSecsFromEpoch in outbound database entry object for logging", () => {
-      const secsFromEpochNow = Math.round(Date.now() / 1000);
-      const dbMessageEntry = TwilioApiUtil.sendMessage.mock.calls[0][2];
-      const newLastVoterMessageSecsFromEpoch = dbMessageEntry.lastVoterMessageSecsFromEpoch;
-      expect(newLastVoterMessageSecsFromEpoch - secsFromEpochNow).toBeLessThan(10);
+      return determineVoterStateWrapper({
+        userPhoneNumber: "+1234567890",
+        userMessage: "NC",
+        userInfo,
+      }, redisClient, twilioPhoneNumber, inboundDbMessageEntry).then(() => {
+        const secsFromEpochNow = Math.round(Date.now() / 1000);
+        const dbMessageEntry = TwilioApiUtil.sendMessage.mock.calls[0][2];
+        const newLastVoterMessageSecsFromEpoch = dbMessageEntry.lastVoterMessageSecsFromEpoch;
+        expect(newLastVoterMessageSecsFromEpoch - secsFromEpochNow).toBeLessThan(10);
+      });
     });
 
     test("Relays voter text to Slack lobby", () => {
-      expectNthSlackMessageToChannel("#lobby", 0, ["NC"], "293874928374");
+      return determineVoterStateWrapper({
+        userPhoneNumber: "+1234567890",
+        userMessage: "NC",
+        userInfo,
+      }, redisClient, twilioPhoneNumber, inboundDbMessageEntry).then(() => {
+        expectNthSlackMessageToChannel("#lobby", 0, ["NC"], "293874928374");
+      });
     });
 
     test("Sends copy of U.S. state confirmation message to Slack lobby", () => {
-      expectNthSlackMessageToChannel("#lobby", 1, ["We try to reply within minutes but may take up to 24 hours."], "293874928374");
+      return determineVoterStateWrapper({
+        userPhoneNumber: "+1234567890",
+        userMessage: "NC",
+        userInfo,
+      }, redisClient, twilioPhoneNumber, inboundDbMessageEntry).then(() => {
+        expectNthSlackMessageToChannel("#lobby", 1, ["We try to reply within minutes but may take up to 24 hours."], "293874928374");
+      });
     });
 
     test("Sends operator message to lobby announcing voter is being routed", () => {
-      expectNthSlackMessageToChannel("#lobby", 2, ["Routing voter"], "293874928374");
+      return determineVoterStateWrapper({
+        userPhoneNumber: "+1234567890",
+        userMessage: "NC",
+        userInfo,
+      }, redisClient, twilioPhoneNumber, inboundDbMessageEntry).then(() => {
+        expectNthSlackMessageToChannel("#lobby", 2, ["Routing voter"], "293874928374");
+      });
     });
 
     test("Sends first Slack message to U.S. state channel announcing voter with userId", () => {
-      const MD5 = new Hashes.MD5;
-      const userId = MD5.hex("+1234567890");
-      expectNthSlackMessageToChannel("north-carolina", 0, ["New North Carolina voter", userId]);
+      return determineVoterStateWrapper({
+        userPhoneNumber: "+1234567890",
+        userMessage: "NC",
+        userInfo,
+      }, redisClient, twilioPhoneNumber, inboundDbMessageEntry).then(() => {
+        const MD5 = new Hashes.MD5;
+        const userId = MD5.hex("+1234567890");
+        expectNthSlackMessageToChannel("north-carolina-0", 0, ["New North Carolina voter", userId]);
+      });
+    });
+
+    test("Sends first voter to Slack channel for first pod in U.S. state", () => {
+      return determineVoterStateWrapper({
+        userPhoneNumber: "+1234567890",
+        userMessage: "NC",
+        userInfo,
+      }, redisClient, twilioPhoneNumber, inboundDbMessageEntry).then(() => {
+        expectNthSlackMessageToChannel("north-carolina-0", 0, ["New North Carolina voter"]);
+      });
+    });
+
+    test("Sends second voter to Slack channel for second pod in U.S. state, if more than one pods exists", () => {
+        redisClient.mgetAsync = jest.fn();
+        redisClient.mgetAsync.mockResolvedValue(["2" /* num pods */, "1" /* num (previous) voters*/]);
+        return determineVoterStateWrapper({
+          userPhoneNumber: "+1234567890",
+          userMessage: "NC",
+          userInfo,
+        }, redisClient, twilioPhoneNumber, inboundDbMessageEntry).then(() => {
+          expectNthSlackMessageToChannel("north-carolina-1", 0, ["New North Carolina voter"]);
+        });
+    });
+
+    test("Sends third voter to Slack channel for first pod in U.S. state, if only two pods exist", () => {
+        redisClient.mgetAsync = jest.fn();
+        redisClient.mgetAsync.mockResolvedValue(["2" /* num pods */, "2" /* num (previous) voters*/]);
+        return determineVoterStateWrapper({
+          userPhoneNumber: "+1234567890",
+          userMessage: "NC",
+          userInfo,
+        }, redisClient, twilioPhoneNumber, inboundDbMessageEntry).then(() => {
+          expectNthSlackMessageToChannel("north-carolina-0", 0, ["New North Carolina voter"]);
+        });
+    });
+
+    test("Sends third voter to Slack channel for first pod in U.S. state, if only two pods exist", () => {
+        redisClient.mgetAsync = jest.fn();
+        redisClient.mgetAsync.mockResolvedValue(["2" /* num pods */, "2" /* num (previous) voters*/]);
+        return determineVoterStateWrapper({
+          userPhoneNumber: "+1234567890",
+          userMessage: "NC",
+          userInfo,
+        }, redisClient, twilioPhoneNumber, inboundDbMessageEntry).then(() => {
+          expectNthSlackMessageToChannel("north-carolina-0", 0, ["New North Carolina voter"]);
+        });
+    });
+
+    test("Sends demo voters to Slack demo channel independent of normal channel number of voters and pods", () => {
+        redisClient.mgetAsync = jest.fn().mockImplementation((numPodsKey, voterCounterKey) => {
+          console.log(numPodsKey)
+          console.log(voterCounterKey)
+          if (numPodsKey == "numPodsNorthCarolina" && voterCounterKey == "voterCounterNorthCarolina") {
+            // 0 pods, first real voter.
+            return Promise.resolve(["1", "0"]);
+          } else if (numPodsKey == "numPodsDemoNorthCarolina" && voterCounterKey == "voterCounterDemoNorthCarolina") {
+            // 5 pods, 51st demo voter.
+            return Promise.resolve(["5", "50"]);
+          }
+        });
+
+        userInfo.isDemo = true;
+
+        return determineVoterStateWrapper({
+          userPhoneNumber: "+1234567890",
+          userMessage: "NC",
+          userInfo,
+        }, redisClient, twilioPhoneNumber, inboundDbMessageEntry).then(() => {
+          expectNthSlackMessageToChannel("demo-north-carolina-0", 0, ["New North Carolina voter"]);
+        });
     });
 
     test("Sends old message history to Slack U.S. state channel thread", () => {
-      // # of assertions = # of message parts + # of calls with parentMessageTs
-      expect.assertions(2);
-      expectNthSlackMessageToChannel("north-carolina", 1, ["can you help me vote"], null, true);
-      expectNthSlackMessageToChannel("north-carolina", 2, ["Welcome to the Voter Help Line"], null, true);
+      return determineVoterStateWrapper({
+        userPhoneNumber: "+1234567890",
+        userMessage: "NC",
+        userInfo,
+      }, redisClient, twilioPhoneNumber, inboundDbMessageEntry).then(() => {
+      // prepSuccessfullyDeterminedUsState().then(() => {
+        // # of assertions = # of message parts + # of calls with parentMessageTs
+        expect.assertions(2);
+        expectNthSlackMessageToChannel("north-carolina-0", 1, ["can you help me vote"], null, true);
+        expectNthSlackMessageToChannel("north-carolina-0", 2, ["Welcome to the Voter Help Line"], null, true);
+      });
     });
 
     test("Copies U.S. state confirmation messages from lobby to Slack U.S. state channel thread", () => {
-      // # of assertions = # of message parts + # of calls with parentMessageTs
-      expect.assertions(4);
-      expectNthSlackMessageToChannel("north-carolina", 3, ["NC"], "823487983742", true);
-      expectNthSlackMessageToChannel("north-carolina", 4, ["We try to reply within minutes but may take up to 24 hours."], "823487983742", true);
+      return determineVoterStateWrapper({
+        userPhoneNumber: "+1234567890",
+        userMessage: "NC",
+        userInfo,
+      }, redisClient, twilioPhoneNumber, inboundDbMessageEntry).then(() => {
+      // prepSuccessfullyDeterminedUsState().then(() => {
+        // # of assertions = # of message parts + # of calls with parentMessageTs
+        expect.assertions(4);
+        expectNthSlackMessageToChannel("north-carolina-0", 3, ["NC"], "823487983742", true);
+        expectNthSlackMessageToChannel("north-carolina-0", 4, ["We try to reply within minutes but may take up to 24 hours."], "823487983742", true);
+      });
     });
 
     test("Updates redisClient Twilio-to-Slack lookup", () => {
-      expect.assertions(2);
-      const secsFromEpochNow = Math.round(Date.now() / 1000);
-      for (call of RedisApiUtil.setHash.mock.calls) {
-        const key = call[1];
-        if (key == "+1234567890:+12054985052") {
-          const value = call[2];
-          expect(value).toEqual(expect.objectContaining({
-            // Preserved:
-            lobbyChannel: "#lobby",
-            lobbyParentMessageTs: "293874928374",
-            confirmedDisclaimer: false,
-            isDemo: false,
-            messageHistory: [
-              "0923e1f4fb612739d9c5918c57656d5f: can you help me vote",
-              "Welcome to the Voter Help Line! To match you with the most knowlegeable volunteer, in which U.S. state are you looking to vote? We currently service FL, NC and OH. (Msg & data rates may apply).",
-            // Added:
-              "0923e1f4fb612739d9c5918c57656d5f: NC",
-              expect.stringMatching(/We try to reply within minutes but may take up to 24 hours./i),
-            ],
-            stateChannelChannel: "north-carolina",
-            stateChannelParentMessageTs: "823487983742",
-            stateName: "North Carolina",
-          }));
-          const lastVoterMessageSecsFromEpoch = value.lastVoterMessageSecsFromEpoch;
-          expect(lastVoterMessageSecsFromEpoch - secsFromEpochNow).toBeLessThan(10);
+      return determineVoterStateWrapper({
+        userPhoneNumber: "+1234567890",
+        userMessage: "NC",
+        userInfo,
+      }, redisClient, twilioPhoneNumber, inboundDbMessageEntry).then(() => {
+      // prepSuccessfullyDeterminedUsState().then(() => {
+        expect.assertions(2);
+        const secsFromEpochNow = Math.round(Date.now() / 1000);
+        for (call of RedisApiUtil.setHash.mock.calls) {
+          const key = call[1];
+          if (key == "+1234567890:+12054985052") {
+            const value = call[2];
+            expect(value).toEqual(expect.objectContaining({
+              // Preserved:
+              lobbyChannel: "#lobby",
+              lobbyParentMessageTs: "293874928374",
+              confirmedDisclaimer: false,
+              isDemo: false,
+              messageHistory: [
+                "0923e1f4fb612739d9c5918c57656d5f: can you help me vote",
+                "Welcome to the Voter Help Line! To match you with the most knowlegeable volunteer, in which U.S. state are you looking to vote? We currently service FL, NC and OH. (Msg & data rates may apply).",
+              // Added:
+                "0923e1f4fb612739d9c5918c57656d5f: NC",
+                expect.stringMatching(/We try to reply within minutes but may take up to 24 hours./i),
+              ],
+              stateChannelChannel: "north-carolina-0",
+              stateChannelParentMessageTs: "823487983742",
+              stateName: "North Carolina",
+            }));
+            const lastVoterMessageSecsFromEpoch = value.lastVoterMessageSecsFromEpoch;
+            expect(lastVoterMessageSecsFromEpoch - secsFromEpochNow).toBeLessThan(10);
+          }
         }
-      }
+      });
     });
 
     test("Adds redisClient Slack-to-Twilio lookup for the Slack U.S. state channel and thread", () => {
-      expect.assertions(1);
-      const secsFromEpochNow = Math.round(Date.now() / 1000);
-      console.log(RedisApiUtil.setHash.mock.calls)
-      for (call of RedisApiUtil.setHash.mock.calls) {
-        const key = call[1];
-        if (key == "north-carolina:823487983742") {
-          const value = call[2];
-          expect(value).toEqual(expect.objectContaining({
-            userPhoneNumber: "+1234567890",
-            twilioPhoneNumber: "+12054985052",
-          }));
+      return determineVoterStateWrapper({
+        userPhoneNumber: "+1234567890",
+        userMessage: "NC",
+        userInfo,
+      }, redisClient, twilioPhoneNumber, inboundDbMessageEntry).then(() => {
+      // prepSuccessfullyDeterminedUsState().then(() => {
+        expect.assertions(1);
+        const secsFromEpochNow = Math.round(Date.now() / 1000);
+        for (call of RedisApiUtil.setHash.mock.calls) {
+          const key = call[1];
+          if (key == "north-carolina-0:823487983742") {
+            const value = call[2];
+            expect(value).toEqual(expect.objectContaining({
+              userPhoneNumber: "+1234567890",
+              twilioPhoneNumber: "+12054985052",
+            }));
+          }
         }
-      }
+      });
     });
   });
 });
@@ -708,7 +860,7 @@ describe("handleDisclaimer", () => {
     });
 
     test("Texts voter asking them again to agree to ToS disclaimer", () => {
-      expect(TwilioApiUtil.sendMessage.mock.calls[0][0]).toEqual(expect.stringMatching(/Please reply “agree” to confirm that you understand and would like to continue/i));
+      expect(TwilioApiUtil.sendMessage.mock.calls[0][0]).toEqual(expect.stringMatching(/to confirm that you understand/i));
       expect(TwilioApiUtil.sendMessage.mock.calls[0][1]).toEqual(expect.objectContaining({
         userPhoneNumber: "+1234567890",
         twilioPhoneNumber: "+12054985052",
@@ -730,7 +882,7 @@ describe("handleDisclaimer", () => {
     });
 
     test("Passes to Slack message asking voter again to agree to ToS disclaimer", () => {
-      expect(SlackApiUtil.sendMessage.mock.calls[1][0]).toEqual(expect.stringMatching(/Please reply “agree” to confirm that you understand and would like to continue/i));
+      expect(SlackApiUtil.sendMessage.mock.calls[1][0]).toEqual(expect.stringMatching(/to confirm that you understand/i));
       expect(SlackApiUtil.sendMessage.mock.calls[1][1]).toEqual(expect.objectContaining({
         parentMessageTs: "293874928374",
         channel: "#lobby",

@@ -5,6 +5,7 @@ const MessageParserUtil = require('./message_parser_util');
 const RouterUtil = require('./router_util');
 const DbApiUtil = require('./db_api_util');
 const RedisApiUtil = require('./redis_api_util');
+const LoadBalancer = require('./load_balancer');
 const Hashes = require('jshashes'); // v1.0.5
 
 const MINS_BEFORE_WELCOME_BACK_MESSAGE = 60;
@@ -19,7 +20,7 @@ exports.handleNewVoter = (userOptions, redisClient, twilioPhoneNumber, inboundDb
   userInfo.userId = MD5.hex(userPhoneNumber);
   userInfo.messageHistory = [`${userInfo.userId}: ${userMessage}`, `Automated Message: ${MessageConstants.WELCOME_AND_DISCLAIMER}`];
   userInfo.isDemo = false;
-  if (twilioPhoneNumber == "+15619338683" || userPhoneNumber == process.env.TESTER_PHONE_NUMBER) {
+  if (twilioPhoneNumber == process.env.DEMO_PHONE_NUMBER || userPhoneNumber == process.env.TESTER_PHONE_NUMBER) {
     userInfo.isDemo = true;
   }
   userInfo.confirmedDisclaimer = false;
@@ -125,21 +126,20 @@ exports.determineVoterState = (userOptions, redisClient, twilioPhoneNumber, inbo
       } else {
         userInfo.stateName = stateName;
 
-        // Slack channel name must abide by this rule.
-        userInfo.stateChannelChannel = stateName.toLowerCase().replace(/\s/g, '-');
-        if (userInfo.isDemo) {
-          userInfo.stateChannelChannel = `demo-${userInfo.stateChannelChannel}`;
-        }
         TwilioApiUtil.sendMessage(MessageConstants.STATE_CONFIRMATION(stateName), {userPhoneNumber, twilioPhoneNumber},
           DbApiUtil.populateAutomatedDbMessageEntry(userInfo)
         );
         userInfo.messageHistory.push(`Automated Message: ${MessageConstants.STATE_CONFIRMATION(stateName)}`);
 
-        SlackApiUtil.sendMessages([`Automated Message: ${MessageConstants.STATE_CONFIRMATION(stateName)}`,
-                                    `Operator: Routing voter to #${userInfo.stateChannelChannel}.`],
-                                  {parentMessageTs: userInfo.lobbyParentMessageTs, channel: userInfo.lobbyChannel});
+        // Slack channel name must abide by the rules in this function.
+        return LoadBalancer.selectChannelByRoundRobin(redisClient, userInfo.isDemo, stateName).then(selectedChannel => {
+          userInfo.stateChannelChannel = selectedChannel;
+          SlackApiUtil.sendMessages([`Automated Message: ${MessageConstants.STATE_CONFIRMATION(stateName)}`,
+                                      `Operator: Routing voter to #${userInfo.stateChannelChannel}.`],
+                                    {parentMessageTs: userInfo.lobbyParentMessageTs, channel: userInfo.lobbyChannel});
 
-        return introduceVoterToStateChannel({userPhoneNumber, userId, userInfo}, redisClient, twilioPhoneNumber);
+          return introduceVoterToStateChannel({userPhoneNumber, userId, userInfo}, redisClient, twilioPhoneNumber);
+        });
       }
     });
 };
