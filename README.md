@@ -63,7 +63,7 @@ In addition to threads in which volunteers chat with voters, each channel can be
 - **State parsing failure count**: After a certain number of failures at determining in which state a voter would like to vote, the system will mention to the voter that it is seeking a volunteer to help.
 - **Admin controls via Slack**: Volunteers will be able to route voters to another U.S. state or reset their Redis memory from the Slack app by mentioning the Slack bot.
 - **Done! Volunteer assignment**: Volunteers will be assigned to new voters, prioritized based on their schedules and availability, or by "[round-robin](https://en.wikipedia.org/wiki/Round-robin_scheduling)."
-- **Done!Logging**: Every message sent between voters and volunteers will be written to a persistent database, for data analysis and monitoring.
+- **Done! Logging**: Every message sent between voters and volunteers will be written to a persistent database, for data analysis and monitoring.
 - **Resilience to edge cases**: The system will be more resilient to unexpected values or paths (e.g. unfound Slack thread or channel).
 - **Browser chat**: Voters can choose to chat with a volunteer via the website (instead of via text).
 - **Done! Additional unit tests**: Programmers will have additional unit tests that allow them to develop faster without fear of breaking existing features.
