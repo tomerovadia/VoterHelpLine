@@ -96,7 +96,7 @@ const introduceVoterToStateChannel = (userOptions, redisClient, twilioPhoneNumbe
       return SlackApiUtil.sendMessages(userInfo.messageHistory, {parentMessageTs: userInfo.stateChannelParentMessageTs,
                                                  channel: userInfo.stateChannelChannel});
     });
-}
+};
 
 exports.determineVoterState = (userOptions, redisClient, twilioPhoneNumber, inboundDbMessageEntry) => {
   const userInfo = userOptions.userInfo;
@@ -174,7 +174,7 @@ exports.handleDisclaimer = (userOptions, redisClient, twilioPhoneNumber, inbound
       );
       SlackApiUtil.sendMessage(`Automated Message: ${automatedMessage}`, slackLobbyMessageParams);
     });
-}
+};
 
 exports.handleClearedVoter = (userOptions, redisClient, twilioPhoneNumber, inboundDbMessageEntry) => {
   const userInfo = userOptions.userInfo;
@@ -204,4 +204,4 @@ exports.handleClearedVoter = (userOptions, redisClient, twilioPhoneNumber, inbou
 
       return RedisApiUtil.setHash(redisClient, `${userPhoneNumber}:${twilioPhoneNumber}`, userInfo);
     });
-}
+};
