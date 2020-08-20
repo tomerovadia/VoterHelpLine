@@ -94,6 +94,8 @@ const passesAuth = (req) => {
 }
 
 app.post('/slack', upload.array(), (req, res) => {
+  console.log("Received /slack request");
+  console.log(JSON.stringify(req.headers));
   res.type('application/json');
 
   const reqBody = req.body;
