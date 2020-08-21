@@ -97,10 +97,10 @@ describe('handleNewVoter', () => {
     });
   });
 
-  test("Includes user id in new voter announcement in Slack", () => {
+  test("Includes truncated user id in new voter announcement in Slack", () => {
     const MD5 = new Hashes.MD5;
     const userId = MD5.hex("+1234567890");
-    expect(SlackApiUtil.sendMessage.mock.calls[0][0]).toContain(userId);
+    expect(SlackApiUtil.sendMessage.mock.calls[0][0]).toContain(userId.substring(0, 5));
   });
 
   test("Relays voter message in subsequent message to Slack", () => {
@@ -126,10 +126,10 @@ describe('handleNewVoter', () => {
     expect(newLastVoterMessageSecsFromEpoch - secsFromEpochNow).toBeLessThan(10);
   });
 
-  test("Includes user id in relay of voter message", () => {
+  test("Includes truncated user id in relay of voter message", () => {
     const MD5 = new Hashes.MD5;
     const userId = MD5.hex("+1234567890");
-    expect(SlackApiUtil.sendMessage.mock.calls[1][0]).toEqual(expect.stringContaining(userId));
+    expect(SlackApiUtil.sendMessage.mock.calls[1][0]).toEqual(expect.stringContaining(userId.substring(0, 5)));
   });
 
   test("Relays automated welcoming of voter to Slack", () => {
@@ -322,7 +322,7 @@ describe('determineVoterState', () => {
             "can you help me vote",
             "Welcome to the Voter Help Line!"
           ],
-          userId: "0923e1f4fb612739d9c5918c57656d5f",
+          userId: "0923e",
         },
       }, redisClient, "+12054985052", inboundDbMessageEntry);
     });
@@ -330,10 +330,10 @@ describe('determineVoterState', () => {
       expect(SlackApiUtil.sendMessage.mock.calls[0][0]).toContain("nonsensical statement");
     });
 
-    test("Includes user id in passing voter message to Slack", () => {
+    test("Includes truncated user id in passing voter message to Slack", () => {
       const MD5 = new Hashes.MD5;
       const userId = MD5.hex("+1234567890");
-      expect(SlackApiUtil.sendMessage.mock.calls[0][0]).toContain(userId);
+      expect(SlackApiUtil.sendMessage.mock.calls[0][0]).toContain(userId.substring(0, 5));
     });
 
     test("Sends voter message to voter's channel/thread in Slack lobby", () => {
@@ -385,7 +385,7 @@ describe('determineVoterState', () => {
             "can you help me vote",
             "Welcome to the Voter Help Line! We are finding an available volunteer -- in the meantime, please tell us more about how we can help you vote. Please note that we currently only service North Carolina. (Msg & data rates may apply)."
           ],
-          userId: "0923e1f4fb612739d9c5918c57656d5f",
+          userId: "0923e",
         },
       }, redisClient, "+12054985052", inboundDbMessageEntry);
     });
@@ -511,12 +511,12 @@ describe('determineVoterState', () => {
         lobbyParentMessageTs: "293874928374",
         confirmedDisclaimer: false,
         isDemo: false,
-        userId: "0923e1f4fb612739d9c5918c57656d5f",
+        userId: "0923e",
         messageHistory: [
-          "0923e1f4fb612739d9c5918c57656d5f: can you help me vote",
+          "0923e: can you help me vote",
           "Welcome to the Voter Help Line! To match you with the most knowlegeable volunteer, in which U.S. state are you looking to vote? We currently service FL, NC and OH. (Msg & data rates may apply).",
         ],
-        userId: "0923e1f4fb612739d9c5918c57656d5f",
+        userId: "0923e",
       };
 
       twilioPhoneNumber = "+12054985052";
@@ -596,14 +596,14 @@ describe('determineVoterState', () => {
       });
     });
 
-    test("Sends first Slack message to U.S. state channel announcing voter with userId", () => {
+    test("Sends first Slack message to U.S. state channel announcing voter with truncated user id", () => {
       return determineVoterStateWrapper({
         userPhoneNumber: "+1234567890",
         userMessage: "NC",
         userInfo,
       }, redisClient, twilioPhoneNumber, inboundDbMessageEntry).then(() => {
         const MD5 = new Hashes.MD5;
-        const userId = MD5.hex("+1234567890");
+        const userId = MD5.hex("+1234567890").substring(0, 5);
         expectNthSlackMessageToChannel("north-carolina-0", 0, ["New North Carolina voter", userId]);
       });
     });
@@ -726,10 +726,10 @@ describe('determineVoterState', () => {
               confirmedDisclaimer: false,
               isDemo: false,
               messageHistory: [
-                "0923e1f4fb612739d9c5918c57656d5f: can you help me vote",
+                "0923e: can you help me vote",
                 "Welcome to the Voter Help Line! To match you with the most knowlegeable volunteer, in which U.S. state are you looking to vote? We currently service FL, NC and OH. (Msg & data rates may apply).",
               // Added:
-                "0923e1f4fb612739d9c5918c57656d5f: NC",
+                "0923e: NC",
                 expect.stringMatching(/We try to reply within minutes but may take up to 24 hours./i),
               ],
               stateChannelChannel: "north-carolina-0",
@@ -795,7 +795,7 @@ describe("handleDisclaimer", () => {
           "can you help me vote",
           'Welcome to the Voter Help Line!',
         ],
-        userId: "0923e1f4fb612739d9c5918c57656d5f",
+        userId: "0923e",
       };
 
       const inboundDbMessageEntry = {
@@ -845,6 +845,7 @@ describe("handleDisclaimer", () => {
           "can you help me vote",
           "Welcome to the Voter Help Line!",
         ],
+        userId: "0923e",
       };
 
       const inboundDbMessageEntry = {
@@ -963,6 +964,7 @@ describe("handleDisclaimer", () => {
           "can you help me vote",
           "Welcome to the Voter Help Line!",
         ],
+        userId: "0923e",
       };
 
       const inboundDbMessageEntry = {
@@ -1096,6 +1098,7 @@ describe("handleClearedVoter", () => {
       confirmedDisclaimer: true,
       isDemo: false,
       messageHistory: [],
+      userId: "0923e",
     };
 
     const inboundDbMessageEntry = {
@@ -1119,6 +1122,7 @@ describe("handleClearedVoter", () => {
       confirmedDisclaimer: true,
       isDemo: false,
       messageHistory: [],
+      userId: "0923e",
     };
 
     const inboundDbMessageEntry = {
@@ -1145,6 +1149,7 @@ describe("handleClearedVoter", () => {
       confirmedDisclaimer: true,
       isDemo: false,
       messageHistory: [],
+      userId: "0923e",
     };
 
     const inboundDbMessageEntry = {
@@ -1176,6 +1181,7 @@ describe("handleClearedVoter", () => {
       isDemo: false,
       messageHistory: [],
       lastVoterMessageSecsFromEpoch: mockLastVoterMessageSecsFromEpoch,
+      userId: "0923e",
     };
 
     const inboundDbMessageEntry = {
@@ -1208,6 +1214,7 @@ describe("handleClearedVoter", () => {
       isDemo: false,
       messageHistory: [],
       lastVoterMessageSecsFromEpoch: mockLastVoterMessageSecsFromEpoch,
+      userId: "0923e",
     };
 
     const inboundDbMessageEntry = {
@@ -1232,6 +1239,7 @@ describe("handleClearedVoter", () => {
       confirmedDisclaimer: true,
       isDemo: false,
       messageHistory: [],
+      userId: "0923e",
     };
 
     const inboundDbMessageEntry = {
