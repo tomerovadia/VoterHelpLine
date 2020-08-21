@@ -21,7 +21,9 @@ exports.handleNewVoter = (userOptions, redisClient, twilioPhoneNumber, inboundDb
   let truncatedUserId = userInfo.userId.substring(0,5);
   userInfo.messageHistory = [`${truncatedUserId}: ${userMessage}`, `Automated Message: ${MessageConstants.WELCOME_AND_DISCLAIMER}`];
   userInfo.isDemo = false;
-  if (twilioPhoneNumber == process.env.DEMO_PHONE_NUMBER || userPhoneNumber == process.env.TESTER_PHONE_NUMBER) {
+  if (twilioPhoneNumber == process.env.DEMO_PHONE_NUMBER ||
+      twilioPhoneNumber == process.env.PREVIOUS_DEMO_PHONE_NUMBER ||
+      userPhoneNumber == process.env.TESTER_PHONE_NUMBER) {
     userInfo.isDemo = true;
   }
   userInfo.confirmedDisclaimer = false;
