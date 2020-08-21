@@ -19,9 +19,9 @@ Interested in helping people vote? Please reach out to volunteer@voterhelpline.o
 
 ## Demo
 
-Text **(561) 933-VOTE** to demo the system.
+Text **(855) 521-8008** to demo the system.
 
-Text **(205) 498-5052** for help voting on the live system, which currently serves FL, NC and OH.
+Text **(855) 212-4406** for help voting on the live system, which currently serves FL, NC and OH.
 
 ## Technical Overview
 
