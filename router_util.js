@@ -18,7 +18,8 @@ exports.handleNewVoter = (userOptions, redisClient, twilioPhoneNumber, inboundDb
 
   const MD5 = new Hashes.MD5;
   userInfo.userId = MD5.hex(userPhoneNumber);
-  userInfo.messageHistory = [`${userInfo.userId}: ${userMessage}`, `Automated Message: ${MessageConstants.WELCOME_AND_DISCLAIMER}`];
+  let truncatedUserId = userInfo.userId.substring(0,5);
+  userInfo.messageHistory = [`${truncatedUserId}: ${userMessage}`, `Automated Message: ${MessageConstants.WELCOME_AND_DISCLAIMER}`];
   userInfo.isDemo = false;
   if (twilioPhoneNumber == process.env.DEMO_PHONE_NUMBER || userPhoneNumber == process.env.TESTER_PHONE_NUMBER) {
     userInfo.isDemo = true;
@@ -27,7 +28,7 @@ exports.handleNewVoter = (userOptions, redisClient, twilioPhoneNumber, inboundDb
 
   let welcomeMessage = MessageConstants.WELCOME_AND_DISCLAIMER;
   userInfo.lobbyChannel = "#lobby";
-  let operatorMessage = `<!channel> Operator: New voter! (${userInfo.userId}).`;
+  let operatorMessage = `<!channel> Operator: New voter! (${truncatedUserId}).`;
 
   if (userInfo.isDemo) {
     userInfo.lobbyChannel = "#demo-lobby";
@@ -54,7 +55,7 @@ exports.handleNewVoter = (userOptions, redisClient, twilioPhoneNumber, inboundDb
     // Pass the voter's message along to the Slack lobby thread,
     // and show in the Slack lobby thread the welcome message the voter received
     // in response.
-    SlackApiUtil.sendMessage(`${userInfo.userId}: ${userMessage}`,
+    SlackApiUtil.sendMessage(`${truncatedUserId}: ${userMessage}`,
       {parentMessageTs: userInfo.lobbyParentMessageTs, channel: userInfo.lobbyChannel}, inboundDbMessageEntry, userInfo).then(() => {
         SlackApiUtil.sendMessage(`Automated Message: ${welcomeMessage}`,
           {parentMessageTs: userInfo.lobbyParentMessageTs, channel: userInfo.lobbyChannel});
@@ -77,7 +78,7 @@ const introduceVoterToStateChannel = (userOptions, redisClient, twilioPhoneNumbe
   const userId = userInfo.userId;
 
   // Create thread in state channel.
-  return SlackApiUtil.sendMessage(`<!channel> Operator: New ${userInfo.stateName} voter! (${userId}).`,
+  return SlackApiUtil.sendMessage(`<!channel> Operator: New ${userInfo.stateName} voter! (${userId.substring(0,5)}).`,
     {channel: userInfo.stateChannelChannel}).then(response => {
       userInfo.stateChannelParentMessageTs = response.data.ts;
 
@@ -106,8 +107,8 @@ exports.determineVoterState = (userOptions, redisClient, twilioPhoneNumber, inbo
 
   userInfo.lastVoterMessageSecsFromEpoch = Math.round(Date.now() / 1000);
 
-  userInfo.messageHistory.push(`${userId}: ${userMessage}`);
-  return SlackApiUtil.sendMessage(`${userId}: ${userMessage}`, {
+  userInfo.messageHistory.push(`${userId.substring(0,5)}: ${userMessage}`);
+  return SlackApiUtil.sendMessage(`${userId.substring(0,5)}: ${userMessage}`, {
     parentMessageTs: userInfo.lobbyParentMessageTs,
     channel: userInfo.lobbyChannel},
     inboundDbMessageEntry, userInfo).then(response => {
@@ -152,12 +153,12 @@ exports.handleDisclaimer = (userOptions, redisClient, twilioPhoneNumber, inbound
       parentMessageTs: userInfo.lobbyParentMessageTs,
       channel: userInfo.lobbyChannel,
     };
-  userInfo.messageHistory.push(`${userId}: ${userMessage}`);
+  userInfo.messageHistory.push(`${userId.substring(0,5)}: ${userMessage}`);
 
   const nowSecondsEpoch = Math.round(Date.now() / 1000);
   userInfo.lastVoterMessageSecsFromEpoch = nowSecondsEpoch;
 
-  SlackApiUtil.sendMessage(`${userId}: ${userMessage}`, slackLobbyMessageParams, inboundDbMessageEntry, userInfo).then(response => {
+  SlackApiUtil.sendMessage(`${userId.substring(0,5)}: ${userMessage}`, slackLobbyMessageParams, inboundDbMessageEntry, userInfo).then(response => {
       const userMessageNoPunctuation = userOptions.userMessage.replace(/[.,?\/#!$%\^&\*;:{}=\-_`~()]/g, '');
       const cleared = userMessageNoPunctuation.toLowerCase().trim() == "agree";
       let automatedMessage;
@@ -191,7 +192,7 @@ exports.handleClearedVoter = (userOptions, redisClient, twilioPhoneNumber, inbou
   // Update the lastVoterMessageSecsFromEpoch, for use in DB write below.
   userInfo.lastVoterMessageSecsFromEpoch = nowSecondsEpoch;
 
-  return SlackApiUtil.sendMessage(`${userId}: ${userOptions.userMessage}`,
+  return SlackApiUtil.sendMessage(`${userId.substring(0,5)}: ${userOptions.userMessage}`,
     slackStateChannelMessageParams,
     inboundDbMessageEntry, userInfo).then(response => {
       console.log(`Seconds since last message from voter: ${nowSecondsEpoch - lastVoterMessageSecsFromEpoch}`);
