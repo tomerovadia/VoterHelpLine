@@ -1,6 +1,6 @@
 const requireModules = () => {
   RouterUtil = require('./router_util');
-  MessageParserUtil = require('./message_parser_util');
+  StateParser = require('./state_parser');
   TwilioApiUtil = require('./twilio_api_util');
   SlackApiUtil = require('./slack_api_util');
   RedisApiUtil = require('./redis_api_util');
@@ -8,7 +8,7 @@ const requireModules = () => {
   redis = require("redis-mock"), redisClient = redis.createClient();
 
   jest.mock('./twilio_api_util');
-  jest.mock('./message_parser_util');
+  jest.mock('./state_parser');
 
   SlackApiUtil.sendMessage = jest.fn();
   RedisApiUtil.setHash = jest.fn();
@@ -361,7 +361,7 @@ describe('determineVoterState', () => {
 
   describe("Couldn't determine voter U.S. state", () => {
     beforeEach(() => {
-      MessageParserUtil.determineState.mockReturnValue(null);
+      StateParser.determineState.mockReturnValue(null);
       SlackApiUtil.sendMessage.mockResolvedValue({
         data: {
           ts: "293874928374",
@@ -486,7 +486,7 @@ describe('determineVoterState', () => {
         }
       };
 
-      MessageParserUtil.determineState.mockReturnValue("North Carolina");
+      StateParser.determineState.mockReturnValue("North Carolina");
 
       // This default response will kick in once the mockResolvedValueOnce calls run out.
       SlackApiUtil.sendMessage.mockResolvedValue(lobbySlackMessageResponse);
