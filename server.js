@@ -16,6 +16,7 @@ const MessagingResponse = require('twilio').twiml.MessagingResponse;
 const { Client } = require('pg');
 const DbApiUtil = require('./db_api_util');
 const RedisApiUtil = require('./redis_api_util');
+const MessageParser = require('./message_parser');
 
 app.use(bodyParser.urlencoded({ extended: false }));
 
@@ -108,7 +109,18 @@ app.post('/slack', upload.array(), (req, res) => {
   console.log('Passes Slack auth');
 
   if (reqBody.event.type === "message" && reqBody.event.user != process.env.SLACK_BOT_USER_ID) {
-    console.log(`Received message from Slack: ${reqBody.event.text}`);
+    const unprocessedSlackMessage = reqBody.event.text;
+    console.log(`Received message from Slack: ${unprocessedSlackMessage}`);
+
+    // IF the message doesnt need processing.
+    let messageToSend = unprocessedSlackMessage;
+    let unprocessedMessageToLog = null;
+    const processedSlackMessage = MessageParser.processMessageText(unprocessedSlackMessage);
+    // If the message did need processing.
+    if (processedSlackMessage != null) {
+      messageToSend = processedSlackMessage;
+      unprocessedMessageToLog = unprocessedSlackMessage;
+    }
 
     const redisHashKey = `${reqBody.event.channel}:${reqBody.event.thread_ts}`;
 
@@ -127,6 +139,7 @@ app.post('/slack', upload.array(), (req, res) => {
             slackChannel: reqBody.event.channel,
             slackParentMessageTs: reqBody.event.thread_ts,
             slackMessageTs: reqBody.event.ts,
+            unprocessedMessage: unprocessedMessageToLog,
           });
 
           RedisApiUtil.getHash(redisClient, `${userPhoneNumber}:${twilioPhoneNumber}`).then(userInfo => {
@@ -134,7 +147,7 @@ app.post('/slack', upload.array(), (req, res) => {
               userInfo.lastVoterMessageSecsFromEpoch = Math.round(Date.now() / 1000);
               RedisApiUtil.setHash(redisClient, `${userPhoneNumber}:${twilioPhoneNumber}`, userInfo);
               DbApiUtil.updateDbMessageEntryWithUserInfo(userInfo, outboundDbMessageEntry);
-              TwilioApiUtil.sendMessage(reqBody.event.text,
+              TwilioApiUtil.sendMessage(messageToSend,
                                         {userPhoneNumber,
                                           twilioPhoneNumber},
                                           outboundDbMessageEntry);

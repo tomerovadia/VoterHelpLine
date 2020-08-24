@@ -8,7 +8,7 @@ exports.logMessageToDb = (databaseMessageEntry) => {
 
   pgDatabaseClient.connect()
     .then(() => {
-      pgDatabaseClient.query("INSERT INTO messages (message, direction, automated, successfully_sent, from_phone_number, user_id, to_phone_number, originating_slack_user_id, slack_channel, slack_parent_message_ts, twilio_message_sid, slack_message_ts, slack_error, twilio_error, twilio_send_timestamp, twilio_receive_timestamp, slack_send_timestamp, slack_receive_timestamp, confirmed_disclaimer, is_demo, last_voter_message_secs_from_epoch) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21);", [
+      pgDatabaseClient.query("INSERT INTO messages (message, direction, automated, successfully_sent, from_phone_number, user_id, to_phone_number, originating_slack_user_id, slack_channel, slack_parent_message_ts, twilio_message_sid, slack_message_ts, slack_error, twilio_error, twilio_send_timestamp, twilio_receive_timestamp, slack_send_timestamp, slack_receive_timestamp, confirmed_disclaimer, is_demo, last_voter_message_secs_from_epoch, unprocessed_message) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22);", [
         databaseMessageEntry.message,
         databaseMessageEntry.direction,
         databaseMessageEntry.automated,
@@ -29,7 +29,8 @@ exports.logMessageToDb = (databaseMessageEntry) => {
         databaseMessageEntry.slackReceiveTimestamp,
         databaseMessageEntry.confirmedDisclaimer,
         databaseMessageEntry.isDemo,
-        databaseMessageEntry.lastVoterMessageSecsFromEpoch
+        databaseMessageEntry.lastVoterMessageSecsFromEpoch,
+        databaseMessageEntry.unprocessedMessage
       ], (err, res) => {
         if (err) {
           console.log("Error from PostgreSQL database insert", err);
@@ -46,6 +47,8 @@ exports.logMessageToDb = (databaseMessageEntry) => {
 exports.populateIncomingDbMessageTwilioEntry = ({userMessage, userPhoneNumber, twilioPhoneNumber, twilioMessageSid}) => {
   return {
     message: userMessage,
+    // Only for Slack incoming
+    unprocessedMessage: null,
     direction: "INBOUND",
     automated: null,
     // To be updated later
@@ -85,8 +88,9 @@ exports.populateIncomingDbMessageTwilioEntry = ({userMessage, userPhoneNumber, t
 };
 
 // Populates immediately available info into the DB entry upon receiving a message from Slack.
-exports.populateIncomingDbMessageSlackEntry = ({originatingSlackUserId, slackChannel, slackParentMessageTs, slackMessageTs}) => {
+exports.populateIncomingDbMessageSlackEntry = ({unprocessedMessage, originatingSlackUserId, slackChannel, slackParentMessageTs, slackMessageTs}) => {
   return {
+    unprocessedMessage,
     direction: "OUTBOUND",
     automated: false,
 
@@ -136,6 +140,8 @@ exports.updateDbMessageEntryWithUserInfo = (userInfo, dbMessageEntry) => {
 exports.populateAutomatedDbMessageEntry = (userInfo) => {
   return {
     message: null,
+    // Only for incoming Slack messages.
+    unprocessedMessage: null,
     direction: "OUTBOUND",
     automated: true,
 

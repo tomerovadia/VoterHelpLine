@@ -1,7 +1,7 @@
 const MessageConstants = require('./message_constants');
 const SlackApiUtil = require('./slack_api_util');
 const TwilioApiUtil = require('./twilio_api_util');
-const MessageParserUtil = require('./message_parser_util');
+const StateParser = require('./state_parser');
 const RouterUtil = require('./router_util');
 const DbApiUtil = require('./db_api_util');
 const RedisApiUtil = require('./redis_api_util');
@@ -114,7 +114,7 @@ exports.determineVoterState = (userOptions, redisClient, twilioPhoneNumber, inbo
     parentMessageTs: userInfo.lobbyParentMessageTs,
     channel: userInfo.lobbyChannel},
     inboundDbMessageEntry, userInfo).then(response => {
-      const stateName = MessageParserUtil.determineState(userMessage);
+      const stateName = StateParser.determineState(userMessage);
       if (stateName == null) {
         console.log("State not determined");
         TwilioApiUtil.sendMessage(MessageConstants.CLARIFY_STATE, {userPhoneNumber, twilioPhoneNumber},
