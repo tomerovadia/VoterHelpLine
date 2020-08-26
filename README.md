@@ -14,8 +14,6 @@ The premises behind this project are:
 
 Interested in helping people vote? Please **[sign up here](https://docs.google.com/forms/d/e/1FAIpQLSdHJsZjKF72ZSmAptYo1et2ZwfUgDfnImqTcwSjDXuXRSsZVQ/viewform)** or email to volunteer@voterhelpline.org learn more.
 
-We need currently need volunteers to learn voting rules, join our Slack workspace and answer voter questions.
-
 ## Demo
 
 Text "DEMO" to **(855) 521-8008** to demo the system.
@@ -43,7 +41,7 @@ These primary technologies are supported by:
 
 The system immediately greets a voter upon initial message and attempts to automatically ask the voter for the U.S. state in which they are seeking to vote. A voter is then connected directly with a volunteer with expertise in that U.S. state.
 
-If a voter sends a message after having been idle for a set amount of time (currently one hour), the system sends an automated message acknowledging their message and informing them that a volunteer (likely the same volunteer with which they previously communicated) is being sought.
+If a voter sends a message after having been idle for a set amount of time (currently one hour), the system sends an automated message acknowledging their message and informing them that a volunteer is being sought.
 
 ### Volunteer Experience
 
