@@ -66,7 +66,7 @@ Volunteers can also direct message each other or the *#general* channel for guid
 
 #### Volunteer Pods
 
-![wireframe](images/pod_diagram.png)
+![wireframe](images/pod_diagram2.png)
 
 This system supports grouping volunteers into separate **"pods"** of 3-6 volunteers each. This allows for easy training, practice, organizational structure and routing of new voters to available volunteers.
 
