@@ -1,3 +1,7 @@
+if (process.env.NODE_ENV === 'development') {
+  require('dotenv').config();
+}
+
 const MessageConstants = require('./message_constants');
 const SlackApiUtil = require('./slack_api_util');
 const TwilioApiUtil = require('./twilio_api_util');
