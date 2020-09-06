@@ -192,3 +192,40 @@ exports.populateAutomatedDbMessageEntry = (userInfo) => {
     lastVoterMessageSecsFromEpoch: userInfo.lastVoterMessageSecsFromEpoch,
   };
 };
+
+const MESSAGE_HISTORY_SQL_SCRIPT = `SELECT
+                                    (CASE
+                                        WHEN twilio_receive_timestamp IS NOT NULL
+                                          THEN twilio_receive_timestamp
+                                        WHEN slack_receive_timestamp IS NOT NULL
+                                          THEN slack_receive_timestamp
+                                        ELSE twilio_send_timestamp
+                                      END) AS timestamp,
+                                    message,
+                                    automated,
+                                    direction,
+                                    originating_slack_user_id
+                                  FROM messages
+                                  WHERE user_id = $1
+                                  ORDER BY timestamp ASC;`;
+
+exports.getMessageHistoryFor = (userId) => {
+  const pgDatabaseClient = new Client({
+    connectionString: process.env.DATABASE_URL,
+  });
+  return pgDatabaseClient.connect()
+    .then(() => {
+      return pgDatabaseClient.query(MESSAGE_HISTORY_SQL_SCRIPT, [userId]).then(result => {
+        if (process.env.NODE_ENV !== "test") console.log("No error from PostgreSQL message history lookup");
+        pgDatabaseClient.end();
+        return result.rows;
+      })
+      .catch(err => {
+        console.log("Error from PostgreSQL message history lookup", err);
+        pgDatabaseClient.end();
+      });
+    })
+    .catch(err => {
+      console.error('PostgreSQL database connection error for message history lookup', err.stack);
+    });
+};

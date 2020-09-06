@@ -4,6 +4,7 @@ const requireModules = () => {
   TwilioApiUtil = require('./twilio_api_util');
   SlackApiUtil = require('./slack_api_util');
   RedisApiUtil = require('./redis_api_util');
+  DbApiUtil = require('./db_api_util');
   Hashes = require('jshashes'); // v1.0.5
   redis = require("redis-mock"), redisClient = redis.createClient();
 
@@ -12,6 +13,7 @@ const requireModules = () => {
 
   SlackApiUtil.sendMessage = jest.fn();
   RedisApiUtil.setHash = jest.fn();
+  DbApiUtil.getMessageHistoryFor = jest.fn();
 };
 
 process.on('unhandledRejection', (reason, p) => {
@@ -26,12 +28,13 @@ const expectNthSlackMessageToChannel = (channel, n, messageParts, parentMessageT
   if (!skipAssertions) {
     expect.assertions(numAssertions);
   }
-  let lobbyMessageNum = -1;
+  let channelMessageNum = -1;
+  console.log(SlackApiUtil.sendMessage.mock.calls)
   for (let i = 0; i < SlackApiUtil.sendMessage.mock.calls.length; i++) {
     const slackMessageParams = SlackApiUtil.sendMessage.mock.calls[i][1];
     if (slackMessageParams.channel == channel) {
-      lobbyMessageNum++;
-      if (lobbyMessageNum == n) {
+      channelMessageNum++;
+      if (channelMessageNum == n) {
         const slackMessage = SlackApiUtil.sendMessage.mock.calls[i][0];
         for (let j = 0; j < messageParts.length; j++) {
           expect(slackMessage).toEqual(expect.stringContaining(messageParts[j]));
@@ -233,20 +236,6 @@ describe('handleNewVoter', () => {
     }
   });
 
-  test("Adds redisClient Twilio-to-Slack lookup with messageHistory", () => {
-    expect.assertions(1);
-    for (call of RedisApiUtil.setHash.mock.calls) {
-      const key = call[1];
-      if (key == "+1234567890:+12054985052") {
-        const value = call[2];
-        expect(value).toEqual(expect.objectContaining({messageHistory: expect.arrayContaining([
-          expect.stringContaining("can you help me vote"),
-          expect.stringContaining("Welcome"),
-        ])}));
-      }
-    }
-  });
-
   test("Adds redisClient Twilio-to-Slack lookup with lastVoterMessageSecsFromEpoch", () => {
     expect.assertions(1);
     const secsFromEpochNow = Math.round(Date.now() / 1000);
@@ -318,10 +307,6 @@ describe('determineVoterState', () => {
           lobbyParentMessageTs: "293874928374",
           confirmedDisclaimer: false,
           isDemo: false,
-          messageHistory: [
-            "can you help me vote",
-            "Welcome to the Voter Help Line!"
-          ],
           userId: "0923e",
         },
       }, redisClient, "+12054985052", inboundDbMessageEntry);
@@ -381,10 +366,6 @@ describe('determineVoterState', () => {
           lobbyParentMessageTs: "293874928374",
           confirmedDisclaimer: false,
           isDemo: false,
-          messageHistory: [
-            "can you help me vote",
-            "Welcome to the Voter Help Line! We are finding an available volunteer -- in the meantime, please tell us more about how we can help you vote. Please note that we currently only service North Carolina. (Msg & data rates may apply)."
-          ],
           userId: "0923e",
         },
       }, redisClient, "+12054985052", inboundDbMessageEntry);
@@ -431,34 +412,6 @@ describe('determineVoterState', () => {
         }
       }
     });
-
-    test("Adds new messages to redisClient Twilio-to-Slack lookup messageHistory", () => {
-      expect.assertions(1);
-      for (call of RedisApiUtil.setHash.mock.calls) {
-        const key = call[1];
-        if (key == "+1234567890:+12054985052") {
-          const value = call[2];
-          expect(value).toEqual(expect.objectContaining({messageHistory: expect.arrayContaining([
-            expect.stringContaining("nonsensical statement"),
-            expect.stringContaining("didn't understand"),
-          ])}));
-        }
-      }
-    });
-
-    test("Keeps old messages in redisClient Twilio-to-Slack lookup messageHistory", () => {
-      expect.assertions(1);
-      for (call of RedisApiUtil.setHash.mock.calls) {
-        const key = call[1];
-        if (key == "+1234567890:+12054985052") {
-          const value = call[2];
-          expect(value).toEqual(expect.objectContaining({messageHistory: expect.arrayContaining([
-            expect.stringContaining("can you help me vote"),
-            expect.stringContaining("Welcome to the Voter Help Line! We are finding an available volunteer -- in the meantime, please tell us more about how we can help you vote. Please note that we currently only service North Carolina. (Msg & data rates may apply)."),
-          ])}));
-        }
-      }
-    });
   });
 
   describe("Successfully determined voter U.S. state", () => {
@@ -489,17 +442,34 @@ describe('determineVoterState', () => {
       StateParser.determineState.mockReturnValue("North Carolina");
 
       // This default response will kick in once the mockResolvedValueOnce calls run out.
-      SlackApiUtil.sendMessage.mockResolvedValue(lobbySlackMessageResponse);
+      SlackApiUtil.sendMessage.mockResolvedValue(stateSlackMessageResponse);
 
       // This is a bit hacky. Because the calls are async, the messages send
       // simultaneously to lobby and state channels. Second message sent happens
       // to be to state channel (which sort of makes sense when you think about it).
       SlackApiUtil.sendMessage.mockResolvedValueOnce(lobbySlackMessageResponse).mockResolvedValueOnce(stateSlackMessageResponse);
 
+      DbApiUtil.getMessageHistoryFor.mockResolvedValue([
+        {
+          timestamp: '2020-09-06T13:47:50.500Z',
+          message: 'Hi can you help me vote?',
+          automated: null,
+          direction: 'INBOUND',
+          originating_slack_user_id: null
+        },
+        {
+          timestamp: "2020-09-06T13:47:50.511Z",
+          message: 'Welcome to Voter Help Line! We are excited to help you vote.',
+          automated: true,
+          direction: 'OUTBOUND',
+          originating_slack_user_id: null
+        },
+      ]);
+
       // Mock these functions, as they are called by load balancer.
       redisClient.setAsync = jest.fn();
       redisClient.mgetAsync = jest.fn();
-      // Load balancer requires a return value from this function, so mock it.
+      // Load balancer requires a return value from this function, so we mock it.
       redisClient.mgetAsync.mockResolvedValue(["1", "0"]);
 
       inboundDbMessageEntry = {
@@ -512,10 +482,6 @@ describe('determineVoterState', () => {
         confirmedDisclaimer: false,
         isDemo: false,
         userId: "0923e",
-        messageHistory: [
-          "0923e: can you help me vote",
-          "Welcome to the Voter Help Line! To match you with the most knowlegeable volunteer, in which U.S. state are you looking to vote? We currently service FL, NC and OH. (Msg & data rates may apply).",
-        ],
         userId: "0923e",
       };
 
@@ -656,8 +622,6 @@ describe('determineVoterState', () => {
 
     test("Sends demo voters to Slack demo channel independent of normal channel number of voters and pods", () => {
         redisClient.mgetAsync = jest.fn().mockImplementation((numPodsKey, voterCounterKey) => {
-          console.log(numPodsKey)
-          console.log(voterCounterKey)
           if (numPodsKey == "numPodsNorthCarolina" && voterCounterKey == "voterCounterNorthCarolina") {
             // 0 pods, first real voter.
             return Promise.resolve(["1", "0"]);
@@ -684,25 +648,9 @@ describe('determineVoterState', () => {
         userMessage: "NC",
         userInfo,
       }, redisClient, twilioPhoneNumber, inboundDbMessageEntry).then(() => {
-      // prepSuccessfullyDeterminedUsState().then(() => {
         // # of assertions = # of message parts + # of calls with parentMessageTs
-        expect.assertions(2);
-        expectNthSlackMessageToChannel("north-carolina-0", 1, ["can you help me vote"], null, true);
-        expectNthSlackMessageToChannel("north-carolina-0", 2, ["Welcome to the Voter Help Line"], null, true);
-      });
-    });
-
-    test("Copies U.S. state confirmation messages from lobby to Slack U.S. state channel thread", () => {
-      return determineVoterStateWrapper({
-        userPhoneNumber: "+1234567890",
-        userMessage: "NC",
-        userInfo,
-      }, redisClient, twilioPhoneNumber, inboundDbMessageEntry).then(() => {
-      // prepSuccessfullyDeterminedUsState().then(() => {
-        // # of assertions = # of message parts + # of calls with parentMessageTs
-        expect.assertions(4);
-        expectNthSlackMessageToChannel("north-carolina-0", 3, ["NC"], "823487983742", true);
-        expectNthSlackMessageToChannel("north-carolina-0", 4, ["We try to reply within minutes but may take up to 24 hours."], "823487983742", true);
+        expect.assertions(1);
+        expectNthSlackMessageToChannel("north-carolina-0", 1, ["Welcome to Voter Help Line"], null, true);
       });
     });
 
@@ -712,7 +660,6 @@ describe('determineVoterState', () => {
         userMessage: "NC",
         userInfo,
       }, redisClient, twilioPhoneNumber, inboundDbMessageEntry).then(() => {
-      // prepSuccessfullyDeterminedUsState().then(() => {
         expect.assertions(2);
         const secsFromEpochNow = Math.round(Date.now() / 1000);
         for (call of RedisApiUtil.setHash.mock.calls) {
@@ -725,13 +672,7 @@ describe('determineVoterState', () => {
               lobbyParentMessageTs: "293874928374",
               confirmedDisclaimer: false,
               isDemo: false,
-              messageHistory: [
-                "0923e: can you help me vote",
-                "Welcome to the Voter Help Line! To match you with the most knowlegeable volunteer, in which U.S. state are you looking to vote? We currently service FL, NC and OH. (Msg & data rates may apply).",
               // Added:
-                "0923e: NC",
-                expect.stringMatching(/We try to reply within minutes but may take up to 24 hours./i),
-              ],
               stateChannelChannel: "north-carolina-0",
               stateChannelParentMessageTs: "823487983742",
               stateName: "North Carolina",
@@ -749,7 +690,6 @@ describe('determineVoterState', () => {
         userMessage: "NC",
         userInfo,
       }, redisClient, twilioPhoneNumber, inboundDbMessageEntry).then(() => {
-      // prepSuccessfullyDeterminedUsState().then(() => {
         expect.assertions(1);
         const secsFromEpochNow = Math.round(Date.now() / 1000);
         for (call of RedisApiUtil.setHash.mock.calls) {
@@ -791,10 +731,6 @@ describe("handleDisclaimer", () => {
         lobbyParentMessageTs: "293874928374",
         confirmedDisclaimer: false,
         isDemo: false,
-        messageHistory: [
-          "can you help me vote",
-          'Welcome to the Voter Help Line!',
-        ],
         userId: "0923e",
       };
 
@@ -841,10 +777,6 @@ describe("handleDisclaimer", () => {
         lobbyParentMessageTs: "293874928374",
         confirmedDisclaimer: false,
         isDemo: false,
-        messageHistory: [
-          "can you help me vote",
-          "Welcome to the Voter Help Line!",
-        ],
         userId: "0923e",
       };
 
@@ -901,10 +833,6 @@ describe("handleDisclaimer", () => {
             lobbyChannel: "#lobby",
             lobbyParentMessageTs: "293874928374",
             isDemo: false,
-            messageHistory: expect.arrayContaining([
-              "can you help me vote",
-              "Welcome to the Voter Help Line!",
-            ]),
           }));
         }
       }
@@ -918,23 +846,6 @@ describe("handleDisclaimer", () => {
           const value = call[2];
           expect(value).toEqual(expect.objectContaining({
             confirmedDisclaimer: false,
-          }));
-        }
-      }
-    });
-
-    test("Updates redisClient Twilio-to-Slack lookup with message history including new user message and automated response", () => {
-      expect.assertions(1);
-      const secsFromEpochNow = Math.round(Date.now() / 1000);
-      for (call of RedisApiUtil.setHash.mock.calls) {
-        const key = call[1];
-        if (key == "+1234567890:+12054985052") {
-          const value = call[2];
-          expect(value).toEqual(expect.objectContaining({
-            messageHistory: expect.arrayContaining([
-              expect.stringMatching(/i dont agree/i),
-              expect.stringMatching(/to confirm that you understand/i),
-            ])
           }));
         }
       }
@@ -960,10 +871,6 @@ describe("handleDisclaimer", () => {
         lobbyParentMessageTs: "293874928374",
         confirmedDisclaimer: false,
         isDemo: false,
-        messageHistory: [
-          "can you help me vote",
-          "Welcome to the Voter Help Line!",
-        ],
         userId: "0923e",
       };
 
@@ -1020,10 +927,6 @@ describe("handleDisclaimer", () => {
             lobbyChannel: "#lobby",
             lobbyParentMessageTs: "293874928374",
             isDemo: false,
-            messageHistory: expect.arrayContaining([
-              "can you help me vote",
-              "Welcome to the Voter Help Line!",
-            ]),
           }));
         }
       }
@@ -1038,23 +941,6 @@ describe("handleDisclaimer", () => {
           const value = call[2];
           expect(value).toEqual(expect.objectContaining({
             confirmedDisclaimer: true,
-          }));
-        }
-      }
-    });
-
-    test("Updates redisClient Twilio-to-Slack lookup with message history including new user message and automated response", () => {
-      expect.assertions(1);
-      const secsFromEpochNow = Math.round(Date.now() / 1000);
-      for (call of RedisApiUtil.setHash.mock.calls) {
-        const key = call[1];
-        if (key == "+1234567890:+12054985052") {
-          const value = call[2];
-          expect(value).toEqual(expect.objectContaining({
-            messageHistory: expect.arrayContaining([
-              expect.stringMatching(/agree/i),
-              expect.stringMatching(/Great!.*in which U.S. state/i),
-            ])
           }));
         }
       }
@@ -1097,7 +983,6 @@ describe("handleClearedVoter", () => {
       stateChannelParentMessageTs: "823487983742",
       confirmedDisclaimer: true,
       isDemo: false,
-      messageHistory: [],
       userId: "0923e",
     };
 
@@ -1121,7 +1006,6 @@ describe("handleClearedVoter", () => {
       stateChannelParentMessageTs: "823487983742",
       confirmedDisclaimer: true,
       isDemo: false,
-      messageHistory: [],
       userId: "0923e",
     };
 
@@ -1148,7 +1032,6 @@ describe("handleClearedVoter", () => {
       stateChannelParentMessageTs: "823487983742",
       confirmedDisclaimer: true,
       isDemo: false,
-      messageHistory: [],
       userId: "0923e",
     };
 
@@ -1179,7 +1062,6 @@ describe("handleClearedVoter", () => {
       stateChannelParentMessageTs: "823487983742",
       confirmedDisclaimer: true,
       isDemo: false,
-      messageHistory: [],
       lastVoterMessageSecsFromEpoch: mockLastVoterMessageSecsFromEpoch,
       userId: "0923e",
     };
@@ -1212,7 +1094,6 @@ describe("handleClearedVoter", () => {
       stateChannelParentMessageTs: "823487983742",
       confirmedDisclaimer: true,
       isDemo: false,
-      messageHistory: [],
       lastVoterMessageSecsFromEpoch: mockLastVoterMessageSecsFromEpoch,
       userId: "0923e",
     };
@@ -1238,7 +1119,6 @@ describe("handleClearedVoter", () => {
       stateChannelParentMessageTs: "823487983742",
       confirmedDisclaimer: true,
       isDemo: false,
-      messageHistory: [],
       userId: "0923e",
     };
 
