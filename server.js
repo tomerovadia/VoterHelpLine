@@ -98,6 +98,10 @@ const passesAuth = (req) => {
   return true;
 }
 
+const isRetry = (req) => {
+  return "x-slack-retry-reason" in JSON.stringify(req.headers);
+};
+
 app.post('/slack', upload.array(), (req, res) => {
   console.log("Received /slack request");
   console.log(JSON.stringify(req.headers));
@@ -112,7 +116,8 @@ app.post('/slack', upload.array(), (req, res) => {
   res.sendStatus(200);
   console.log('Passes Slack auth');
 
-  if (reqBody.event.type === "message" && reqBody.event.user != process.env.SLACK_BOT_USER_ID) {
+  if (reqBody.event.type === "message"
+      && reqBody.event.user != process.env.SLACK_BOT_USER_ID) {
     const unprocessedSlackMessage = reqBody.event.text;
     console.log(`Received message from Slack: ${unprocessedSlackMessage}`);
 

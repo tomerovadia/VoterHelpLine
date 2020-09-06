@@ -92,7 +92,7 @@ describe('handleNewVoter', () => {
     return handleNewVoterWrapper({
       userPhoneNumber: "+1234567890",
       userMessage: "can you help me vote",
-    }, redisClient, "+15619338683", inboundDbMessageEntry).then(() => {
+    }, redisClient, "+18556843440", inboundDbMessageEntry).then(() => {
       expect(SlackApiUtil.sendMessage.mock.calls[0][1].channel).toBe("#demo-lobby");
     });
   });
@@ -200,10 +200,10 @@ describe('handleNewVoter', () => {
     return handleNewVoterWrapper({
       userPhoneNumber: "+1234567890",
       userMessage: "can you help me vote",
-    }, redisClient, "+15619338683", inboundDbMessageEntry).then(() => {
+    }, redisClient, "+18556843440", inboundDbMessageEntry).then(() => {
       for (call of RedisApiUtil.setHash.mock.calls) {
         const key = call[1];
-        if (key == "+1234567890:+15619338683") {
+        if (key == "+1234567890:+18556843440") {
           const value = call[2];
           expect(value).toEqual(expect.objectContaining({isDemo: true}));
         }
