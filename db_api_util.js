@@ -8,7 +8,7 @@ exports.logMessageToDb = (databaseMessageEntry) => {
 
   pgDatabaseClient.connect()
     .then(() => {
-      pgDatabaseClient.query("INSERT INTO messages (message, direction, automated, successfully_sent, from_phone_number, user_id, to_phone_number, originating_slack_user_id, slack_channel, slack_parent_message_ts, twilio_message_sid, slack_message_ts, slack_error, twilio_error, twilio_send_timestamp, twilio_receive_timestamp, slack_send_timestamp, slack_receive_timestamp, confirmed_disclaimer, is_demo, last_voter_message_secs_from_epoch, unprocessed_message) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22);", [
+      pgDatabaseClient.query("INSERT INTO messages (message, direction, automated, successfully_sent, from_phone_number, user_id, to_phone_number, originating_slack_user_id, slack_channel, slack_parent_message_ts, twilio_message_sid, slack_message_ts, slack_error, twilio_error, twilio_send_timestamp, twilio_receive_timestamp, slack_send_timestamp, slack_receive_timestamp, confirmed_disclaimer, is_demo, last_voter_message_secs_from_epoch, unprocessed_message, slack_retry_num, slack_retry_reason) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24);", [
         databaseMessageEntry.message,
         databaseMessageEntry.direction,
         databaseMessageEntry.automated,
@@ -30,7 +30,9 @@ exports.logMessageToDb = (databaseMessageEntry) => {
         databaseMessageEntry.confirmedDisclaimer,
         databaseMessageEntry.isDemo,
         databaseMessageEntry.lastVoterMessageSecsFromEpoch,
-        databaseMessageEntry.unprocessedMessage
+        databaseMessageEntry.unprocessedMessage,
+        databaseMessageEntry.slackRetryNum,
+        databaseMessageEntry.slackRetryReason
       ], (err, res) => {
         if (err) {
           console.log("Error from PostgreSQL database insert", err);
@@ -75,6 +77,11 @@ exports.populateIncomingDbMessageTwilioEntry = ({userMessage, userPhoneNumber, t
     slackSendTimestamp: null,
     slackReceiveTimestamp: null,
 
+    // Only for Slack incoming
+    slackRetryNum: null,
+    // Only for Slack incoming
+    slackRetryReason: null,
+
     // Note: These are userInfo fields. Keep these null so that their only set is right before sending, so that the actual values are ensured to be logged.
     // To be filled later
     userId: null,
@@ -88,7 +95,7 @@ exports.populateIncomingDbMessageTwilioEntry = ({userMessage, userPhoneNumber, t
 };
 
 // Populates immediately available info into the DB entry upon receiving a message from Slack.
-exports.populateIncomingDbMessageSlackEntry = ({unprocessedMessage, originatingSlackUserId, slackChannel, slackParentMessageTs, slackMessageTs}) => {
+exports.populateIncomingDbMessageSlackEntry = ({unprocessedMessage, originatingSlackUserId, slackChannel, slackParentMessageTs, slackMessageTs, slackRetryNum, slackRetryReason}) => {
   return {
     unprocessedMessage,
     direction: "OUTBOUND",
@@ -115,6 +122,9 @@ exports.populateIncomingDbMessageSlackEntry = ({unprocessedMessage, originatingS
     twilioReceiveTimestamp: null,
     slackSendTimestamp: null,
     slackReceiveTimestamp: new Date(),
+
+    slackRetryNum,
+    slackRetryReason,
 
     // Note: These are userInfo fields. Keep these null so that their only set is right before sending, so that the actual values are ensured to be logged.
     // To be filled later
@@ -170,6 +180,11 @@ exports.populateAutomatedDbMessageEntry = (userInfo) => {
     twilioReceiveTimestamp: null,
     slackSendTimestamp: null,
     slackReceiveTimestamp: null,
+
+    // Only for Slack incoming
+    slackRetryNum: null,
+    // Only for Slack incoming
+    slackRetryReason: null,
 
     userId: userInfo.userId,
     confirmedDisclaimer: userInfo.confirmedDisclaimer,

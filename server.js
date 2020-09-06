@@ -103,7 +103,6 @@ const isRetry = (req) => {
 };
 
 app.post('/slack', upload.array(), (req, res) => {
-  console.log("Received /slack request");
   console.log(JSON.stringify(req.headers));
   res.type('application/json');
 
@@ -149,6 +148,8 @@ app.post('/slack', upload.array(), (req, res) => {
             slackParentMessageTs: reqBody.event.thread_ts,
             slackMessageTs: reqBody.event.ts,
             unprocessedMessage: unprocessedMessageToLog,
+            slackRetryNum: req.header('X-Slack-Retry-Num'),
+            slackRetryReason: req.header('X-Slack-Retry-Reason'),
           });
 
           RedisApiUtil.getHash(redisClient, `${userPhoneNumber}:${twilioPhoneNumber}`).then(userInfo => {
