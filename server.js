@@ -140,9 +140,10 @@ app.post('/slack', upload.array(), (req, res) => {
             unprocessedMessageToLog = unprocessedSlackMessage;
           }
           const MD5 = new Hashes.MD5;
+          const userId = MD5.hex(userPhoneNumber);
 
           const outboundDbMessageEntry = DbApiUtil.populateIncomingDbMessageSlackEntry({
-            userId: MD5.hex(userPhoneNumber),
+            userId,
             originatingSlackUserId: reqBody.event.user,
             slackChannel: reqBody.event.channel,
             slackParentMessageTs: reqBody.event.thread_ts,
@@ -152,7 +153,7 @@ app.post('/slack', upload.array(), (req, res) => {
             slackRetryReason: req.header('X-Slack-Retry-Reason'),
           });
 
-          RedisApiUtil.getHash(redisClient, `${userPhoneNumber}:${twilioPhoneNumber}`).then(userInfo => {
+          RedisApiUtil.getHash(redisClient, `${userId}:${twilioPhoneNumber}`).then(userInfo => {
             if (userInfo != null) {
               userInfo.lastVoterMessageSecsFromEpoch = Math.round(Date.now() / 1000);
               RedisApiUtil.setHash(redisClient, `${userPhoneNumber}:${twilioPhoneNumber}`, userInfo);

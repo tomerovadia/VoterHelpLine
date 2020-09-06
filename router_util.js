@@ -33,7 +33,7 @@ exports.handleNewVoter = (userOptions, redisClient, twilioPhoneNumber, inboundDb
 
   let welcomeMessage = MessageConstants.WELCOME_AND_DISCLAIMER;
   userInfo.lobbyChannel = "#lobby";
-  let operatorMessage = `<!channel> *Operator:* New voter! (${userInfo.userId}).`;
+  let operatorMessage = `<!channel> New voter! (${userInfo.userId}).`;
 
   if (userInfo.isDemo) {
     userInfo.lobbyChannel = "#demo-lobby";
@@ -83,7 +83,7 @@ const introduceVoterToStateChannel = (userOptions, redisClient, twilioPhoneNumbe
   const userId = userInfo.userId;
 
   // Create thread in state channel.
-  return SlackApiUtil.sendMessage(`<!channel> *Operator:* New ${userInfo.stateName} voter! (${userId}).`,
+  return SlackApiUtil.sendMessage(`<!channel> New ${userInfo.stateName} voter! (${userId}).`,
     {channel: userInfo.stateChannelChannel}).then(response => {
       userInfo.stateChannelParentMessageTs = response.data.ts;
 
