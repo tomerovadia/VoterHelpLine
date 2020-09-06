@@ -1,4 +1,4 @@
-if (process.env.NODE_ENV === 'development') {
+if (process.env.NODE_ENV === "development" || process.env.NODE_ENV === "test") {
   require('dotenv').config();
 }
 
@@ -117,28 +117,26 @@ app.post('/slack', upload.array(), (req, res) => {
 
   if (reqBody.event.type === "message"
       && reqBody.event.user != process.env.SLACK_BOT_USER_ID) {
-    const unprocessedSlackMessage = reqBody.event.text;
-    console.log(`Received message from Slack: ${unprocessedSlackMessage}`);
-
-    // IF the message doesnt need processing.
-    let messageToSend = unprocessedSlackMessage;
-    let unprocessedMessageToLog = null;
-    const processedSlackMessage = MessageParser.processMessageText(unprocessedSlackMessage);
-    // If the message did need processing.
-    if (processedSlackMessage != null) {
-      messageToSend = processedSlackMessage;
-      unprocessedMessageToLog = unprocessedSlackMessage;
-    }
-
     const redisHashKey = `${reqBody.event.channel}:${reqBody.event.thread_ts}`;
 
     // Pass Slack message to Twilio
     RedisApiUtil.getHash(redisClient, redisHashKey).then(redisData => {
-      // TODO Handle unexpected case where no record is found for voter
       if (redisData != null) {
         const userPhoneNumber = redisData.userPhoneNumber;
         const twilioPhoneNumber = redisData.twilioPhoneNumber;
         if (userPhoneNumber) {
+          const unprocessedSlackMessage = reqBody.event.text;
+          console.log(`Received message from Slack: ${unprocessedSlackMessage}`);
+
+          // If the message doesnt need processing.
+          let messageToSend = unprocessedSlackMessage;
+          let unprocessedMessageToLog = null;
+          const processedSlackMessage = MessageParser.processMessageText(unprocessedSlackMessage);
+          // If the message did need processing.
+          if (processedSlackMessage != null) {
+            messageToSend = processedSlackMessage;
+            unprocessedMessageToLog = unprocessedSlackMessage;
+          }
           const MD5 = new Hashes.MD5;
 
           const outboundDbMessageEntry = DbApiUtil.populateIncomingDbMessageSlackEntry({
@@ -164,9 +162,9 @@ app.post('/slack', upload.array(), (req, res) => {
             }
           });
         }
-      // Hash doesn't exist (Slack message sent to non-existent user somehow)
+      // Hash doesn't exist (this message is likely outside of a voter thread).
       } else {
-        console.log("Error: Hash doesn't exist (Slack message sent to non-existent user somehow)")
+        console.log("Server received Slack message outside a voter thread.")
       }
     });
   }
@@ -174,11 +172,11 @@ app.post('/slack', upload.array(), (req, res) => {
 
 // Authenticate Slack connection to Heroku.
 // app.post('/slack', upload.array(), (req, res) => {
-//   if(!passesAuth(req)) {
-//     console.log('doesnt pass auth');
-//     res.sendStatus(401);
-//     return;
-//   }
+//   // if(!passesAuth(req)) {
+//   //   console.log('doesnt pass auth');
+//   //   res.sendStatus(401);
+//   //   return;
+//   // }
 //   res.type('application/json');
 //   if (SlackApiUtil.authenticateConnectionToSlack(req.body.token)) {
 //     res.status(200).json({ challenge: req.body.challenge });

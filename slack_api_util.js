@@ -25,7 +25,7 @@ const sendMessage = (message, options, databaseMessageEntry = null, userInfo = n
       "Authorization": `Bearer ${process.env.SLACK_BOT_ACCESS_TOKEN}`,
     },
   }).then(response => {
-    console.log(`\n\nSuccessfully sent message to Slack: ${message}`);
+    if (process.env.NODE_ENV !== "test") console.log(`\n\nSuccessfully sent message to Slack: ${message}`);
     if (databaseMessageEntry) {
       databaseMessageEntry.successfullySent = true;
       databaseMessageEntry.slackMessageTs = response.data.message.ts;
