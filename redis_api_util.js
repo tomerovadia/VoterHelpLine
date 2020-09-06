@@ -11,9 +11,6 @@ exports.setHash = (redisClient, key, hash) => {
   let promise;
   for (const field in hash) {
     let value = hash[field];
-    if (field == "messageHistory") {
-      value = JSON.stringify(value);
-    }
     promise = redisClient.hsetAsync(key, field, value);
   }
   return promise;
@@ -22,9 +19,6 @@ exports.setHash = (redisClient, key, hash) => {
 exports.getHash = (redisClient, key) => {
   return redisClient.hgetallAsync(key).then(hash => {
     if (hash != null) {
-      if (hash.messageHistory != null) {
-        hash.messageHistory = JSON.parse(hash.messageHistory);
-      }
       for (let field in hash) {
         switch(fieldTypes[field]) {
           case "boolean":
