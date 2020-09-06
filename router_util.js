@@ -33,7 +33,7 @@ exports.handleNewVoter = (userOptions, redisClient, twilioPhoneNumber, inboundDb
 
   let welcomeMessage = MessageConstants.WELCOME_AND_DISCLAIMER;
   userInfo.lobbyChannel = "#lobby";
-  let operatorMessage = `<!channel> Operator: New voter! (${userInfo.userId}).`;
+  let operatorMessage = `<!channel> *Operator:* New voter! (${userInfo.userId}).`;
 
   if (userInfo.isDemo) {
     userInfo.lobbyChannel = "#demo-lobby";
@@ -60,9 +60,9 @@ exports.handleNewVoter = (userOptions, redisClient, twilioPhoneNumber, inboundDb
     // Pass the voter's message along to the Slack lobby thread,
     // and show in the Slack lobby thread the welcome message the voter received
     // in response.
-    SlackApiUtil.sendMessage(`${userInfo.userId.substring(0,5)}: ${userMessage}`,
+    SlackApiUtil.sendMessage(`*${userInfo.userId.substring(0,5)}:* ${userMessage}`,
       {parentMessageTs: userInfo.lobbyParentMessageTs, channel: userInfo.lobbyChannel}, inboundDbMessageEntry, userInfo).then(() => {
-        SlackApiUtil.sendMessage(`Automated Message: ${welcomeMessage}`,
+        SlackApiUtil.sendMessage(`*Automated Message:* ${welcomeMessage}`,
           {parentMessageTs: userInfo.lobbyParentMessageTs, channel: userInfo.lobbyChannel});
       });
 
@@ -83,7 +83,7 @@ const introduceVoterToStateChannel = (userOptions, redisClient, twilioPhoneNumbe
   const userId = userInfo.userId;
 
   // Create thread in state channel.
-  return SlackApiUtil.sendMessage(`<!channel> Operator: New ${userInfo.stateName} voter! (${userId}).`,
+  return SlackApiUtil.sendMessage(`<!channel> *Operator:* New ${userInfo.stateName} voter! (${userId}).`,
     {channel: userInfo.stateChannelChannel}).then(response => {
       userInfo.stateChannelParentMessageTs = response.data.ts;
 
@@ -102,7 +102,7 @@ const introduceVoterToStateChannel = (userOptions, redisClient, twilioPhoneNumbe
       return DbApiUtil.getMessageHistoryFor(userId).then(messageHistory => {
         const formattedMessageHistory = SlackMessageFormatter.formatMessageHistory(messageHistory, userId.substring(0,5));
 
-        return SlackApiUtil.sendMessage(`Below is the voter's message history so far.\n\n${formattedMessageHistory}`, {parentMessageTs: userInfo.stateChannelParentMessageTs,
+        return SlackApiUtil.sendMessage(`*Operator:* Below is the voter's message history so far.\n\n${formattedMessageHistory}`, {parentMessageTs: userInfo.stateChannelParentMessageTs,
                                                    channel: userInfo.stateChannelChannel});
       });
     });
@@ -116,7 +116,7 @@ exports.determineVoterState = (userOptions, redisClient, twilioPhoneNumber, inbo
 
   userInfo.lastVoterMessageSecsFromEpoch = Math.round(Date.now() / 1000);
 
-  return SlackApiUtil.sendMessage(`${userId.substring(0,5)}: ${userMessage}`, {
+  return SlackApiUtil.sendMessage(`*${userId.substring(0,5)}:* ${userMessage}`, {
     parentMessageTs: userInfo.lobbyParentMessageTs,
     channel: userInfo.lobbyChannel},
     inboundDbMessageEntry, userInfo).then(response => {
@@ -126,7 +126,7 @@ exports.determineVoterState = (userOptions, redisClient, twilioPhoneNumber, inbo
         TwilioApiUtil.sendMessage(MessageConstants.CLARIFY_STATE, {userPhoneNumber, twilioPhoneNumber},
           DbApiUtil.populateAutomatedDbMessageEntry(userInfo)
         );
-        SlackApiUtil.sendMessage(`Automated Message: ${MessageConstants.CLARIFY_STATE}`,
+        SlackApiUtil.sendMessage(`*Automated Message:* ${MessageConstants.CLARIFY_STATE}`,
           {parentMessageTs: userInfo.lobbyParentMessageTs, channel: userInfo.lobbyChannel});
 
         userInfo.lastVoterMessageSecsFromEpoch = Math.round(Date.now() / 1000);
@@ -141,7 +141,7 @@ exports.determineVoterState = (userOptions, redisClient, twilioPhoneNumber, inbo
         // Slack channel name must abide by the rules in this function.
         return LoadBalancer.selectChannelByRoundRobin(redisClient, userInfo.isDemo, stateName).then(selectedChannel => {
           userInfo.stateChannelChannel = selectedChannel;
-          return SlackApiUtil.sendMessages([`Automated Message: ${MessageConstants.STATE_CONFIRMATION(stateName)}`,
+          return SlackApiUtil.sendMessages([`*Automated Message:* ${MessageConstants.STATE_CONFIRMATION(stateName)}`,
                                       `Operator: Routing voter to #${userInfo.stateChannelChannel}.`],
                                     {parentMessageTs: userInfo.lobbyParentMessageTs, channel: userInfo.lobbyChannel}).then(() => {
             return introduceVoterToStateChannel({userPhoneNumber, userId, userInfo}, redisClient, twilioPhoneNumber);
@@ -163,7 +163,7 @@ exports.handleDisclaimer = (userOptions, redisClient, twilioPhoneNumber, inbound
   const nowSecondsEpoch = Math.round(Date.now() / 1000);
   userInfo.lastVoterMessageSecsFromEpoch = nowSecondsEpoch;
 
-  SlackApiUtil.sendMessage(`${userId.substring(0,5)}: ${userMessage}`, slackLobbyMessageParams, inboundDbMessageEntry, userInfo).then(response => {
+  SlackApiUtil.sendMessage(`*${userId.substring(0,5)}:* ${userMessage}`, slackLobbyMessageParams, inboundDbMessageEntry, userInfo).then(response => {
       const userMessageNoPunctuation = userOptions.userMessage.replace(/[.,?\/#!$%\^&\*;:{}=\-_`~()]/g, '');
       const cleared = userMessageNoPunctuation.toLowerCase().trim() == "agree";
       let automatedMessage;
@@ -177,7 +177,7 @@ exports.handleDisclaimer = (userOptions, redisClient, twilioPhoneNumber, inbound
       TwilioApiUtil.sendMessage(automatedMessage, {userPhoneNumber: userOptions.userPhoneNumber, twilioPhoneNumber},
         DbApiUtil.populateAutomatedDbMessageEntry(userInfo)
       );
-      SlackApiUtil.sendMessage(`Automated Message: ${automatedMessage}`, slackLobbyMessageParams);
+      SlackApiUtil.sendMessage(`*Automated Message:* ${automatedMessage}`, slackLobbyMessageParams);
     });
 };
 
@@ -196,7 +196,7 @@ exports.handleClearedVoter = (userOptions, redisClient, twilioPhoneNumber, inbou
   // Update the lastVoterMessageSecsFromEpoch, for use in DB write below.
   userInfo.lastVoterMessageSecsFromEpoch = nowSecondsEpoch;
 
-  return SlackApiUtil.sendMessage(`${userId.substring(0,5)}: ${userOptions.userMessage}`,
+  return SlackApiUtil.sendMessage(`*${userId.substring(0,5)}:* ${userOptions.userMessage}`,
     slackStateChannelMessageParams,
     inboundDbMessageEntry, userInfo).then(response => {
       if (process.env.NODE_ENV !== "test") console.log(`Seconds since last message from voter: ${nowSecondsEpoch - lastVoterMessageSecsFromEpoch}`);
@@ -204,7 +204,7 @@ exports.handleClearedVoter = (userOptions, redisClient, twilioPhoneNumber, inbou
       if (nowSecondsEpoch - lastVoterMessageSecsFromEpoch > MINS_BEFORE_WELCOME_BACK_MESSAGE * 60) {
         const welcomeBackMessage = MessageConstants.WELCOME_BACK(userInfo.stateName);
         TwilioApiUtil.sendMessage(welcomeBackMessage, {userPhoneNumber: userOptions.userPhoneNumber, twilioPhoneNumber});
-        SlackApiUtil.sendMessage(`Automated Message: ${welcomeBackMessage}`, slackStateChannelMessageParams);
+        SlackApiUtil.sendMessage(`*Automated Message:* ${welcomeBackMessage}`, slackStateChannelMessageParams);
       }
 
       return RedisApiUtil.setHash(redisClient, `${userPhoneNumber}:${twilioPhoneNumber}`, userInfo);

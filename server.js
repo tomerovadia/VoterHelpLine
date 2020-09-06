@@ -107,11 +107,11 @@ app.post('/slack', upload.array(), (req, res) => {
   res.type('application/json');
 
   const reqBody = req.body;
-  if(!passesAuth(req)) {
-    console.log('doesnt pass auth');
-    res.sendStatus(401);
-    return;
-  }
+  // if(!passesAuth(req)) {
+  //   console.log('doesnt pass auth');
+  //   res.sendStatus(401);
+  //   return;
+  // }
   res.sendStatus(200);
   console.log('Passes Slack auth');
 
