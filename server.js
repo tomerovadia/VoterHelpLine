@@ -41,6 +41,8 @@ app.post('/twilio-sms', (req, res) => {
   const userPhoneNumber = req.body.From;
   const twilioPhoneNumber = req.body.To;
   const userMessage = req.body.Body;
+  const MD5 = new Hashes.MD5;
+  const userId = MD5.hex(userPhoneNumber);
 
   const inboundDbMessageEntry = DbApiUtil.populateIncomingDbMessageTwilioEntry({
     userMessage,
@@ -49,7 +51,7 @@ app.post('/twilio-sms', (req, res) => {
     twilioMessageSid: req.body.SmsMessageSid,
   });
 
-  const redisHashKey = `${userPhoneNumber}:${twilioPhoneNumber}`;
+  const redisHashKey = `${userId}:${twilioPhoneNumber}`;
 
   RedisApiUtil.getHash(redisClient, redisHashKey).then(userInfo => {
     // Seen this voter before

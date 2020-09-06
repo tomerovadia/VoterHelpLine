@@ -68,7 +68,7 @@ exports.handleNewVoter = (userOptions, redisClient, twilioPhoneNumber, inboundDb
 
     // Add key/value such that given a user phone number we can get the
     // Slack lobby thread associated with that user.
-    RedisApiUtil.setHash(redisClient, `${userPhoneNumber}:${twilioPhoneNumber}`, userInfo);
+    RedisApiUtil.setHash(redisClient, `${userInfo.userId}:${twilioPhoneNumber}`, userInfo);
 
     // Add key/value such that given Slack thread data we can get a
     // user phone number.
@@ -91,7 +91,7 @@ const introduceVoterToStateChannel = (userOptions, redisClient, twilioPhoneNumbe
       userInfo.stateChannelChannel = response.data.channel;
 
       // Remember state channel thread identifying info.
-      RedisApiUtil.setHash(redisClient, `${userPhoneNumber}:${twilioPhoneNumber}`, userInfo);
+      RedisApiUtil.setHash(redisClient, `${userId}:${twilioPhoneNumber}`, userInfo);
 
       // Be able to identify phone number using STATE channel identifying info.
       RedisApiUtil.setHash(redisClient,
@@ -130,7 +130,7 @@ exports.determineVoterState = (userOptions, redisClient, twilioPhoneNumber, inbo
           {parentMessageTs: userInfo.lobbyParentMessageTs, channel: userInfo.lobbyChannel});
 
         userInfo.lastVoterMessageSecsFromEpoch = Math.round(Date.now() / 1000);
-        return RedisApiUtil.setHash(redisClient, `${userPhoneNumber}:${twilioPhoneNumber}`, userInfo);
+        return RedisApiUtil.setHash(redisClient, `${userId}:${twilioPhoneNumber}`, userInfo);
       } else {
         userInfo.stateName = stateName;
 
@@ -173,7 +173,7 @@ exports.handleDisclaimer = (userOptions, redisClient, twilioPhoneNumber, inbound
       } else {
         automatedMessage = MessageConstants.CLARIFY_DISCLAIMER;
       }
-      RedisApiUtil.setHash(redisClient, `${userOptions.userPhoneNumber}:${twilioPhoneNumber}`, userInfo);
+      RedisApiUtil.setHash(redisClient, `${userId}:${twilioPhoneNumber}`, userInfo);
       TwilioApiUtil.sendMessage(automatedMessage, {userPhoneNumber: userOptions.userPhoneNumber, twilioPhoneNumber},
         DbApiUtil.populateAutomatedDbMessageEntry(userInfo)
       );
@@ -207,6 +207,6 @@ exports.handleClearedVoter = (userOptions, redisClient, twilioPhoneNumber, inbou
         SlackApiUtil.sendMessage(`*Automated Message:* ${welcomeBackMessage}`, slackStateChannelMessageParams);
       }
 
-      return RedisApiUtil.setHash(redisClient, `${userPhoneNumber}:${twilioPhoneNumber}`, userInfo);
+      return RedisApiUtil.setHash(redisClient, `${userId}:${twilioPhoneNumber}`, userInfo);
     });
 };
