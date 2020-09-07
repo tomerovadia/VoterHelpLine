@@ -21,6 +21,7 @@ const { Client } = require('pg');
 const DbApiUtil = require('./db_api_util');
 const RedisApiUtil = require('./redis_api_util');
 const MessageParser = require('./message_parser');
+const AdminUtil = require('./admin_util');
 
 app.use(bodyParser.urlencoded({ extended: false }));
 
@@ -57,8 +58,10 @@ app.post('/twilio-sms', (req, res) => {
     // Seen this voter before
     if (userInfo != null) {
       if (userInfo.confirmedDisclaimer) {
-        // Voter has a state determined
-        if (userInfo.stateChannelChannel) {
+        // Voter has a state determined. The U.S. state name is used for
+        // operator messages as well as to know whether a U.S. state is known
+        // for the voter. This may not be ideal (create separate bool?).
+        if (userInfo.stateName) {
           RouterUtil.handleClearedVoter({userInfo, userPhoneNumber, userMessage}, redisClient, twilioPhoneNumber, inboundDbMessageEntry);
         // Voter has no state determined
         } else {
@@ -109,6 +112,7 @@ app.post('/slack', upload.array(), (req, res) => {
   res.type('application/json');
 
   const reqBody = req.body;
+  console.log(reqBody);
   // if(!passesAuth(req)) {
   //   console.log('doesnt pass auth');
   //   res.sendStatus(401);
@@ -170,6 +174,13 @@ app.post('/slack', upload.array(), (req, res) => {
         console.log("Server received Slack message outside a voter thread.")
       }
     });
+  } else if (reqBody.event.type === "app_mention"
+              // Require that the Slack bot be the (first) user mentioned.
+              && reqBody.authed_users[0] === process.env.SLACK_BOT_USER_ID) {
+    const adminCommandParams = AdminUtil.parseAdminSlackMessage(reqBody.event.text);
+    if (adminCommandParams) {
+
+    }
   }
 });
 
