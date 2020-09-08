@@ -6,7 +6,7 @@ const getMessageSender = (messageObject, userId) => {
       if (messageObject.automated) {
         return "Automated:";
       }
-      return `Volunteer ${messageObject.originating_slack_user_id}:`;
+      return `${messageObject.originating_slack_user_name}:`;
     default:
       console.log("Error getting message sender: message is either INBOUND nor OUTBOUND");
   }

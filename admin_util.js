@@ -1,8 +1,10 @@
+const MessageParser = require('./message_parser');
+
 const VALID_COMMANDS = ["ROUTE_VOTER"];
 
 exports.parseAdminSlackMessage = (message) => {
   let adminCommandParams = {};
-  const words = message.split(" ");
+  const words = message.split(/\s+/);
 
   // Rules for all commands.
   if (words[0] != `<@${process.env.SLACK_BOT_USER_ID}>`
@@ -12,13 +14,21 @@ exports.parseAdminSlackMessage = (message) => {
 
   // Rules for ROUTE_VOTER command.
   if (words[1] === "ROUTE_VOTER"
-      && words.length !== 4) {
+      && words.length !== 5) {
     return null;
   }
+
+  // Parsing necessary because phone numbers are converted to links in Slack
+  // and sent as e.g. <tel:+18551234567|+18551234567>.
+  const parsedTwilioPhoneNumber = MessageParser.processMessageText(words[3]);
 
   return {
     command: words[1],
     userId: words[2],
-    destinationChannel: words[3],
+    // Ternary is necessary because MessageParser returns null if unchanged,
+    // which is necessary for its other use case (to know if a message was modified
+    // so the DB write can indicate this).
+    twilioPhoneNumber: parsedTwilioPhoneNumber ? parsedTwilioPhoneNumber : words[3],
+    destinationSlackChannelName: words[4],
   };
 };

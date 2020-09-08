@@ -1,5 +1,5 @@
 const requireModules = () => {
-  RouterUtil = require('./router_util');
+  Router = require('./router');
   StateParser = require('./state_parser');
   TwilioApiUtil = require('./twilio_api_util');
   SlackApiUtil = require('./slack_api_util');
@@ -28,6 +28,7 @@ const expectNthSlackMessageToChannel = (channel, n, messageParts, parentMessageT
   if (!skipAssertions) {
     expect.assertions(numAssertions);
   }
+  console.log(SlackApiUtil.sendMessage.mock.calls)
   let channelMessageNum = -1;
   for (let i = 0; i < SlackApiUtil.sendMessage.mock.calls.length; i++) {
     const slackMessageParams = SlackApiUtil.sendMessage.mock.calls[i][1];
@@ -56,7 +57,7 @@ beforeEach(() => {
 
 const handleNewVoterWrapper = (userOptions, redisClient, twilioPhoneNumber, inboundDbMessageEntry) => {
   return new Promise((resolve, reject) => {
-    resolve(RouterUtil.handleNewVoter(userOptions, redisClient, twilioPhoneNumber, inboundDbMessageEntry));
+    resolve(Router.handleNewVoter(userOptions, redisClient, twilioPhoneNumber, inboundDbMessageEntry));
   });
 };
 
@@ -85,7 +86,7 @@ describe('handleNewVoter', () => {
   });
 
   test("Announces new voter message to Slack #lobby channel if non-demo line", () => {
-    expect(SlackApiUtil.sendMessage.mock.calls[0][1].channel).toBe("#lobby");
+    expect(SlackApiUtil.sendMessage.mock.calls[0][1].channel).toBe("lobby");
   });
 
   test("Announces new voter message to Slack #demo-lobby channel if demo line", () => {
@@ -95,7 +96,7 @@ describe('handleNewVoter', () => {
       userPhoneNumber: "+1234567890",
       userMessage: "can you help me vote",
     }, redisClient, "+18556843440", inboundDbMessageEntry).then(() => {
-      expect(SlackApiUtil.sendMessage.mock.calls[0][1].channel).toBe("#demo-lobby");
+      expect(SlackApiUtil.sendMessage.mock.calls[0][1].channel).toBe("demo-lobby");
     });
   });
 
@@ -183,7 +184,7 @@ describe('handleNewVoter', () => {
       const key = call[1];
       if (key == `${userId}:+12054985052`) {
         const value = call[2];
-        expect(value.activeChannel).toEqual("CTHELOBBYID");
+        expect(value.activeChannelId).toEqual("CTHELOBBYID");
       }
     }
   });
@@ -262,6 +263,19 @@ describe('handleNewVoter', () => {
     }
   });
 
+  test("Adds redisClient Twilio-to-Slack lookup with userPhoneNumber", () => {
+    expect.assertions(1);
+    const MD5 = new Hashes.MD5;
+    const userId = MD5.hex("+1234567890");
+    for (call of RedisApiUtil.setHash.mock.calls) {
+      const key = call[1];
+      if (key == `${userId}:+12054985052`) {
+        const value = call[2];
+        expect(value).toEqual(expect.objectContaining({userPhoneNumber: "+1234567890"}));
+      }
+    }
+  });
+
   test("Adds redisClient Slack-to-Twilio lookup", () => {
     expect(RedisApiUtil.setHash.mock.calls).toEqual(expect.arrayContaining([expect.arrayContaining(["CTHELOBBYID:293874928374"])]));
   });
@@ -290,7 +304,7 @@ describe('handleNewVoter', () => {
 
 const determineVoterStateWrapper = (userOptions, redisClient, twilioPhoneNumber, inboundDbMessageEntry) => {
   return new Promise((resolve, reject) => {
-    resolve(RouterUtil.determineVoterState(userOptions, redisClient, twilioPhoneNumber, inboundDbMessageEntry));
+    resolve(Router.determineVoterState(userOptions, redisClient, twilioPhoneNumber, inboundDbMessageEntry));
   });
 };
 
@@ -316,7 +330,7 @@ describe('determineVoterState', () => {
         userPhoneNumber: "+1234567890",
         userMessage: "nonsensical statement",
         userInfo: {
-          activeChannel: "CTHELOBBYID",
+          activeChannelId: "CTHELOBBYID",
           "CTHELOBBYID": "293874928374",
           confirmedDisclaimer: false,
           isDemo: false,
@@ -375,7 +389,7 @@ describe('determineVoterState', () => {
         userPhoneNumber: "+1234567890",
         userMessage: "nonsensical statement",
         userInfo: {
-          activeChannel: "CTHELOBBYID",
+          activeChannelId: "CTHELOBBYID",
           "CTHELOBBYID": "293874928374",
           confirmedDisclaimer: false,
           isDemo: false,
@@ -483,18 +497,24 @@ describe('determineVoterState', () => {
       redisClient.setAsync = jest.fn();
       redisClient.mgetAsync = jest.fn();
       // Load balancer requires a return value from this function, so we mock it.
+      // Format: [number of pods, number of voters]
       redisClient.mgetAsync.mockResolvedValue(["1", "0"]);
+
+      // Mock Redis providing the slackChannelId->slackChannelName lookup.
+      redisClient.hgetallAsync = jest.fn();
+      redisClient.hgetallAsync.mockResolvedValue(["CNORTHCAROLINACHANNELID", "demo-north-carolina-0"]);
 
       inboundDbMessageEntry = {
         mock: "inboundDbMessageEntryData",
       };
 
       userInfo = {
-        activeChannel: "CTHELOBBYID",
+        activeChannelId: "CTHELOBBYID",
         "CTHELOBBYID": "293874928374",
         confirmedDisclaimer: false,
         isDemo: false,
         userId: "0923e1f4fb612739d9c5918c57656d5f",
+        userPhoneNumber: "+1234567890",
       };
 
       twilioPhoneNumber = "+12054985052";
@@ -655,7 +675,6 @@ describe('determineVoterState', () => {
     });
 
     test("Sends old message history to Slack U.S. state channel thread", () => {
-      //TOMER
       return determineVoterStateWrapper({
         userPhoneNumber: "+1234567890",
         userMessage: "NC",
@@ -688,7 +707,7 @@ describe('determineVoterState', () => {
               confirmedDisclaimer: false,
               isDemo: false,
               // Added:
-              activeChannel: "CNORTHCAROLINACHANNELID",
+              activeChannelId: "CNORTHCAROLINACHANNELID",
               "CNORTHCAROLINACHANNELID": "823487983742",
               stateName: "North Carolina",
             }));
@@ -724,7 +743,7 @@ describe('determineVoterState', () => {
 
 const handleDisclaimerWrapper = (userOptions, redisClient, twilioPhoneNumber, inboundDbMessageEntry) => {
   return new Promise((resolve, reject) => {
-    resolve(RouterUtil.handleDisclaimer(userOptions, redisClient, twilioPhoneNumber, inboundDbMessageEntry));
+    resolve(Router.handleDisclaimer(userOptions, redisClient, twilioPhoneNumber, inboundDbMessageEntry));
   });
 };
 
@@ -742,7 +761,7 @@ describe("handleDisclaimer", () => {
   describe("Runs regardless of whether voter is cleared", () => {
     beforeEach(() => {
       const userInfo = {
-        activeChannel: "CTHELOBBYID",
+        activeChannelId: "CTHELOBBYID",
         "CTHELOBBYID": "293874928374",
         confirmedDisclaimer: false,
         isDemo: false,
@@ -788,7 +807,7 @@ describe("handleDisclaimer", () => {
   describe("Voter is not cleared", () => {
     beforeEach(() => {
       const userInfo = {
-        activeChannel: "CTHELOBBYID",
+        activeChannelId: "CTHELOBBYID",
         "CTHELOBBYID": "293874928374",
         confirmedDisclaimer: false,
         isDemo: false,
@@ -847,7 +866,7 @@ describe("handleDisclaimer", () => {
         if (key === `${userId}:+12054985052`) {
           const value = call[2];
           expect(value).toEqual(expect.objectContaining({
-            activeChannel: "CTHELOBBYID",
+            activeChannelId: "CTHELOBBYID",
             "CTHELOBBYID": "293874928374",
             isDemo: false,
           }));
@@ -888,7 +907,7 @@ describe("handleDisclaimer", () => {
   describe("Voter is cleared", () => {
     beforeEach(() => {
       const userInfo = {
-        activeChannel: "CTHELOBBYID",
+        activeChannelId: "CTHELOBBYID",
         "CTHELOBBYID": "293874928374",
         confirmedDisclaimer: false,
         isDemo: false,
@@ -947,7 +966,7 @@ describe("handleDisclaimer", () => {
         if (key === `${userId}:+12054985052`) {
           const value = call[2];
           expect(value).toEqual(expect.objectContaining({
-            activeChannel: "CTHELOBBYID",
+            activeChannelId: "CTHELOBBYID",
             "CTHELOBBYID": "293874928374",
             isDemo: false,
           }));
@@ -987,7 +1006,7 @@ describe("handleDisclaimer", () => {
 
 const handleClearedVoterWrapper = (userOptions, redisClient, twilioPhoneNumber, inboundDbMessageEntry) => {
   return new Promise((resolve, reject) => {
-    resolve(RouterUtil.handleClearedVoter(userOptions, redisClient, twilioPhoneNumber, inboundDbMessageEntry));
+    resolve(Router.handleClearedVoter(userOptions, redisClient, twilioPhoneNumber, inboundDbMessageEntry));
   });
 };
 
@@ -1004,7 +1023,7 @@ describe("handleClearedVoter", () => {
 
   test("Passes voter message to Slack", () => {
     const userInfo = {
-      activeChannel: "CNORTHCAROLINACHANNELID",
+      activeChannelId: "CNORTHCAROLINACHANNELID",
       "CNORTHCAROLINACHANNELID": "823487983742",
       "CTHELOBBYID": "293874928374",
       confirmedDisclaimer: true,
@@ -1028,7 +1047,7 @@ describe("handleClearedVoter", () => {
 
   test("Passes inbound database entry object to SlackApiUtil for logging", () => {
     const userInfo = {
-      activeChannel: "CNORTHCAROLINACHANNELID",
+      activeChannelId: "CNORTHCAROLINACHANNELID",
       "CNORTHCAROLINACHANNELID": "823487983742",
       "CTHELOBBYID": "293874928374",
       confirmedDisclaimer: true,
@@ -1055,7 +1074,7 @@ describe("handleClearedVoter", () => {
 
   test("Includes updated lastVoterMessageSecsFromEpoch in inbound database entry object for logging", () => {
     const userInfo = {
-      activeChannel: "CNORTHCAROLINACHANNELID",
+      activeChannelId: "CNORTHCAROLINACHANNELID",
       "CNORTHCAROLINACHANNELID": "823487983742",
       "CTHELOBBYID": "293874928374",
       confirmedDisclaimer: true,
@@ -1086,7 +1105,7 @@ describe("handleClearedVoter", () => {
     const oneHourAndOneMinInSecs = (60 * 60) + 60;
     const mockLastVoterMessageSecsFromEpoch = Math.round((Date.now() / 1000) - oneHourAndOneMinInSecs);
     const userInfo = {
-      activeChannel: "CNORTHCAROLINACHANNELID",
+      activeChannelId: "CNORTHCAROLINACHANNELID",
       "CNORTHCAROLINACHANNELID": "823487983742",
       "CTHELOBBYID": "293874928374",
       confirmedDisclaimer: true,
@@ -1145,7 +1164,7 @@ describe("handleClearedVoter", () => {
   test("Updates redisClient Twilio-to-Slack lookup with lastVoterMessageSecsFromEpoch", () => {
     expect.assertions(1);
     const userInfo = {
-      activeChannel: "CNORTHCAROLINACHANNELID",
+      activeChannelId: "CNORTHCAROLINACHANNELID",
       "CNORTHCAROLINACHANNELID": "823487983742",
       "CTHELOBBYID": "293874928374",
       confirmedDisclaimer: true,

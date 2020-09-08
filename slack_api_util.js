@@ -76,3 +76,45 @@ exports.copyUserInfoToDbMessageEntry = (userInfo, dbMessageEntry) => {
   dbMessageEntry.isDemo = userInfo.isDemo;
   dbMessageEntry.confirmedDisclaimer = userInfo.lastVoterMessageSecsFromEpoch;
 };
+
+exports.fetchSlackChannelName = (channelId) => {
+  return axios.get('https://slack.com/api/conversations.info', {
+    params: {
+      'Content-Type': 'application/json',
+      'channel': channelId,
+      'token': process.env.SLACK_BOT_ACCESS_TOKEN,
+    }
+  }).then(response => {
+    if (response.data.ok) {
+      if (process.env.NODE_ENV !== "test") console.log(`SlackApiUtil: Successfully revealed Slack channel name (${channelId} -> ${response.data.channel.name})`);
+      return response.data.channel.name;
+    } else {
+      if (process.env.NODE_ENV !== "test") console.log(`SlackApiUtil: Failed to reveal Slack channel name (${channelId}). Error: ${response.data.error}.`);
+      return null;
+    }
+  }).catch(error => {
+    if (process.env.NODE_ENV !== "test") console.log(`SlackApiUtil: Failed to reveal Slack channel name (${channelId}). Error: ${error}.`);
+    return error;
+  });
+};
+
+exports.fetchSlackUserName = (userId) => {
+  return axios.get('https://slack.com/api/users.info', {
+    params: {
+      'Content-Type': 'application/json',
+      'user': userId,
+      'token': process.env.SLACK_BOT_ACCESS_TOKEN,
+    }
+  }).then(response => {
+    if (response.data.ok) {
+      if (process.env.NODE_ENV !== "test") console.log(`SlackApiUtil: Successfully revealed Slack user name (${userId} -> ${response.data.user.real_name})`);
+      return response.data.user.real_name;
+    } else {
+      if (process.env.NODE_ENV !== "test") console.log(`SlackApiUtil: Failed to reveal Slack user name (${userId}). Error: ${response.data.error}.`);
+      return null;
+    }
+  }).catch(error => {
+    if (process.env.NODE_ENV !== "test") console.log(`SlackApiUtil: Failed to reveal Slack user name (${userId}). Error: ${error}.`);
+    return error;
+  });
+};

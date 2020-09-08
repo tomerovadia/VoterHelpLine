@@ -1,7 +1,6 @@
 const fieldTypes = {
+  // Not necessary (is default)
   userId: "string",
-  lobbyChannel: "string",
-  lobbyParentMessageTs: "string",
   isDemo: "boolean",
   confirmedDisclaimer: "boolean",
   lastVoterMessageSecsFromEpoch: "integer",
