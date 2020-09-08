@@ -175,10 +175,10 @@ const routeVoterToSlackChannel = (userInfo, redisClient, {userId, twilioPhoneNum
         });
     // If this user HAS been to the destination channel, use the same thread info.
     } else {
-      SlackApiUtil.sendMessage(`*Operator:* Voter ${userId} was routed back to this channel by ${adminCommandParams.routingSlackUserName}. See their thread with ${twilioPhoneNumber} above.`,
+      SlackApiUtil.sendMessage(`*Operator:* Voter ${userId} was routed from ${adminCommandParams.previousSlackChannelName} back to this channel by ${adminCommandParams.routingSlackUserName}. See their thread with ${twilioPhoneNumber} above.`,
         {channel: destinationSlackChannelId});
         return DbApiUtil.getTimestampOfLastMessageInThread(userInfo[destinationSlackChannelId]).then(timestampOfLastMessageInThread => {
-          return SlackApiUtil.sendMessage(`*Operator:* Voter ${userId} was routed back to this thread by ${adminCommandParams.routingSlackUserName}. Messages sent here will again relay to the voter.`,
+          return SlackApiUtil.sendMessage(`*Operator:* Voter ${userId} was routed from ${adminCommandParams.previousSlackChannelName} back to this thread by ${adminCommandParams.routingSlackUserName}. Messages sent here will again relay to the voter.`,
             {channel: destinationSlackChannelId, parentMessageTs: userInfo[destinationSlackChannelId]}).then(() => {
             return routeVoterToSlackChannelHelper(userInfo, redisClient, twilioPhoneNumber,
                                             {destinationSlackChannelName, destinationSlackChannelId, destinationSlackParentMessageTs: userInfo[destinationSlackChannelId]},
