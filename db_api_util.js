@@ -8,7 +8,7 @@ exports.logMessageToDb = (databaseMessageEntry) => {
 
   pgDatabaseClient.connect()
     .then(() => {
-      pgDatabaseClient.query("INSERT INTO messages (message, direction, automated, successfully_sent, from_phone_number, user_id, to_phone_number, originating_slack_user_id, slack_channel, slack_parent_message_ts, twilio_message_sid, slack_message_ts, slack_error, twilio_error, twilio_send_timestamp, twilio_receive_timestamp, slack_send_timestamp, slack_receive_timestamp, confirmed_disclaimer, is_demo, last_voter_message_secs_from_epoch, unprocessed_message, slack_retry_num, slack_retry_reason) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24);", [
+      pgDatabaseClient.query("INSERT INTO messages (message, direction, automated, successfully_sent, from_phone_number, user_id, to_phone_number, originating_slack_user_id, slack_channel, slack_parent_message_ts, twilio_message_sid, slack_message_ts, slack_error, twilio_error, twilio_send_timestamp, twilio_receive_timestamp, slack_send_timestamp, slack_receive_timestamp, confirmed_disclaimer, is_demo, last_voter_message_secs_from_epoch, unprocessed_message, slack_retry_num, slack_retry_reason, originating_slack_user_name) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25);", [
         databaseMessageEntry.message,
         databaseMessageEntry.direction,
         databaseMessageEntry.automated,
@@ -32,7 +32,8 @@ exports.logMessageToDb = (databaseMessageEntry) => {
         databaseMessageEntry.lastVoterMessageSecsFromEpoch,
         databaseMessageEntry.unprocessedMessage,
         databaseMessageEntry.slackRetryNum,
-        databaseMessageEntry.slackRetryReason
+        databaseMessageEntry.slackRetryReason,
+        databaseMessageEntry.originatingSlackUserName
       ], (err, res) => {
         if (err) {
           console.log("Error from PostgreSQL database insert", err);
@@ -58,6 +59,7 @@ exports.populateIncomingDbMessageTwilioEntry = ({userMessage, userPhoneNumber, t
     fromPhoneNumber: userPhoneNumber,
     toPhoneNumber: twilioPhoneNumber,
     originatingSlackUserId: null,
+    originatingSlackUserName: null,
 
     // To be filled later
     slackChannel: null,
@@ -95,7 +97,7 @@ exports.populateIncomingDbMessageTwilioEntry = ({userMessage, userPhoneNumber, t
 };
 
 // Populates immediately available info into the DB entry upon receiving a message from Slack.
-exports.populateIncomingDbMessageSlackEntry = ({unprocessedMessage, originatingSlackUserId, slackChannel, slackParentMessageTs, slackMessageTs, slackRetryNum, slackRetryReason}) => {
+exports.populateIncomingDbMessageSlackEntry = ({unprocessedMessage, originatingSlackUserId, slackChannel, slackParentMessageTs, slackMessageTs, slackRetryNum, slackRetryReason, originatingSlackUserName}) => {
   return {
     unprocessedMessage,
     direction: "OUTBOUND",
@@ -108,6 +110,7 @@ exports.populateIncomingDbMessageSlackEntry = ({unprocessedMessage, originatingS
     // To be filled later
     toPhoneNumber: null,
     originatingSlackUserId,
+    originatingSlackUserName,
 
     slackChannel,
     slackParentMessageTs,
@@ -162,6 +165,7 @@ exports.populateAutomatedDbMessageEntry = (userInfo) => {
     // To be filled later
     toPhoneNumber: null,
     originatingSlackUserId: null,
+    originatingSlackUserName: null,
 
     // Since this message doesn't originate from and isn't intended for Slack,
     // these are considered irrelevant.
@@ -204,18 +208,19 @@ const MESSAGE_HISTORY_SQL_SCRIPT = `SELECT
                                     message,
                                     automated,
                                     direction,
-                                    originating_slack_user_id
+                                    originating_slack_user_name
                                   FROM messages
                                   WHERE user_id = $1
+                                        AND (CASE WHEN twilio_receive_timestamp IS NOT NULL THEN twilio_receive_timestamp WHEN slack_receive_timestamp IS NOT NULL THEN slack_receive_timestamp ELSE twilio_send_timestamp END) > $2
                                   ORDER BY timestamp ASC;`;
 
-exports.getMessageHistoryFor = (userId) => {
+exports.getMessageHistoryFor = (userId, timestampSince) => {
   const pgDatabaseClient = new Client({
     connectionString: process.env.DATABASE_URL,
   });
   return pgDatabaseClient.connect()
     .then(() => {
-      return pgDatabaseClient.query(MESSAGE_HISTORY_SQL_SCRIPT, [userId]).then(result => {
+      return pgDatabaseClient.query(MESSAGE_HISTORY_SQL_SCRIPT, [userId, timestampSince]).then(result => {
         if (process.env.NODE_ENV !== "test") console.log("No error from PostgreSQL message history lookup");
         pgDatabaseClient.end();
         return result.rows;
@@ -227,5 +232,39 @@ exports.getMessageHistoryFor = (userId) => {
     })
     .catch(err => {
       console.error('PostgreSQL database connection error for message history lookup', err.stack);
+    });
+};
+
+const LAST_TIMESTAMP_SQL_SCRIPT = `SELECT
+                                    	(CASE WHEN twilio_receive_timestamp IS NOT NULL THEN twilio_receive_timestamp WHEN slack_receive_timestamp IS NOT NULL THEN slack_receive_timestamp ELSE twilio_send_timestamp END) AS timestamp
+                                    FROM messages
+                                    WHERE
+                                    	slack_parent_message_ts = $1
+                                    ORDER BY timestamp DESC
+                                    LIMIT 1;`;
+
+exports.getTimestampOfLastMessageInThread = (parentMessageTs) => {
+  const pgDatabaseClient = new Client({
+    connectionString: process.env.DATABASE_URL,
+  });
+  return pgDatabaseClient.connect()
+    .then(() => {
+      return pgDatabaseClient.query(LAST_TIMESTAMP_SQL_SCRIPT, [parentMessageTs]).then(result => {
+        if (process.env.NODE_ENV !== "test") console.log("No error from PostgreSQL last timestamp in thread lookup");
+        pgDatabaseClient.end();
+        // Just in case nobody said anything while the user was at a channel.
+        if (result.rows.length > 0) {
+          return result.rows[0].timestamp;
+        } else {
+          return "1990-01-01 10:00:00.000";
+        }
+      })
+      .catch(err => {
+        console.log("Error from PostgreSQL last timestamp in thread lookup", err);
+        pgDatabaseClient.end();
+      });
+    })
+    .catch(err => {
+      console.error('PostgreSQL database connection error for last timestamp in thread lookup', err.stack);
     });
 };

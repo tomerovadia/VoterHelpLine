@@ -8,9 +8,7 @@ const http = require('http').createServer(app);;
 const redis = require('redis');
 const bluebird = require('bluebird');
 const SlackApiUtil = require('./slack_api_util');
-const TwilioApiUtil = require('./twilio_api_util');
-const MessageConstants = require('./message_constants');
-const RouterUtil = require('./router_util');
+const Router = require('./router');
 const Hashes = require('jshashes'); // v1.0.5
 const bodyParser = require('body-parser');
 const multer = require('multer'); // v1.0.5
@@ -20,7 +18,6 @@ const MessagingResponse = require('twilio').twiml.MessagingResponse;
 const { Client } = require('pg');
 const DbApiUtil = require('./db_api_util');
 const RedisApiUtil = require('./redis_api_util');
-const MessageParser = require('./message_parser');
 
 app.use(bodyParser.urlencoded({ extended: false }));
 
@@ -41,6 +38,8 @@ app.post('/twilio-sms', (req, res) => {
   const userPhoneNumber = req.body.From;
   const twilioPhoneNumber = req.body.To;
   const userMessage = req.body.Body;
+  const MD5 = new Hashes.MD5;
+  const userId = MD5.hex(userPhoneNumber);
 
   const inboundDbMessageEntry = DbApiUtil.populateIncomingDbMessageTwilioEntry({
     userMessage,
@@ -49,25 +48,27 @@ app.post('/twilio-sms', (req, res) => {
     twilioMessageSid: req.body.SmsMessageSid,
   });
 
-  const redisHashKey = `${userPhoneNumber}:${twilioPhoneNumber}`;
+  const redisHashKey = `${userId}:${twilioPhoneNumber}`;
 
   RedisApiUtil.getHash(redisClient, redisHashKey).then(userInfo => {
     // Seen this voter before
     if (userInfo != null) {
       if (userInfo.confirmedDisclaimer) {
-        // Voter has a state determined
-        if (userInfo.stateChannelChannel) {
-          RouterUtil.handleClearedVoter({userInfo, userPhoneNumber, userMessage}, redisClient, twilioPhoneNumber, inboundDbMessageEntry);
+        // Voter has a state determined. The U.S. state name is used for
+        // operator messages as well as to know whether a U.S. state is known
+        // for the voter. This may not be ideal (create separate bool?).
+        if (userInfo.stateName) {
+          Router.handleClearedVoter({userInfo, userPhoneNumber, userMessage}, redisClient, twilioPhoneNumber, inboundDbMessageEntry);
         // Voter has no state determined
         } else {
-          RouterUtil.determineVoterState({userInfo, userPhoneNumber, userMessage}, redisClient, twilioPhoneNumber, inboundDbMessageEntry);
+          Router.determineVoterState({userInfo, userPhoneNumber, userMessage}, redisClient, twilioPhoneNumber, inboundDbMessageEntry);
         }
       } else {
-        RouterUtil.handleDisclaimer({userInfo, userPhoneNumber, userMessage}, redisClient, twilioPhoneNumber, inboundDbMessageEntry);
+        Router.handleDisclaimer({userInfo, userPhoneNumber, userMessage}, redisClient, twilioPhoneNumber, inboundDbMessageEntry);
       }
     // Haven't seen this voter before
     } else {
-      RouterUtil.handleNewVoter({userPhoneNumber, userMessage}, redisClient, twilioPhoneNumber, inboundDbMessageEntry);
+      Router.handleNewVoter({userPhoneNumber, userMessage}, redisClient, twilioPhoneNumber, inboundDbMessageEntry);
     }
   });
 
@@ -115,59 +116,29 @@ app.post('/slack', upload.array(), (req, res) => {
   res.sendStatus(200);
   console.log('Passes Slack auth');
 
-  if (reqBody.event.type === "message"
-      && reqBody.event.user != process.env.SLACK_BOT_USER_ID) {
-    const redisHashKey = `${reqBody.event.channel}:${reqBody.event.thread_ts}`;
+  SlackApiUtil.fetchSlackUserName(reqBody.event.user).then(originatingSlackUserName => {
+    if (reqBody.event.type === "message"
+        && reqBody.event.user != process.env.SLACK_BOT_USER_ID) {
+      const redisHashKey = `${reqBody.event.channel}:${reqBody.event.thread_ts}`;
 
-    // Pass Slack message to Twilio
-    RedisApiUtil.getHash(redisClient, redisHashKey).then(redisData => {
-      if (redisData != null) {
-        const userPhoneNumber = redisData.userPhoneNumber;
-        const twilioPhoneNumber = redisData.twilioPhoneNumber;
-        if (userPhoneNumber) {
-          const unprocessedSlackMessage = reqBody.event.text;
-          console.log(`Received message from Slack: ${unprocessedSlackMessage}`);
-
-          // If the message doesnt need processing.
-          let messageToSend = unprocessedSlackMessage;
-          let unprocessedMessageToLog = null;
-          const processedSlackMessage = MessageParser.processMessageText(unprocessedSlackMessage);
-          // If the message did need processing.
-          if (processedSlackMessage != null) {
-            messageToSend = processedSlackMessage;
-            unprocessedMessageToLog = unprocessedSlackMessage;
-          }
-          const MD5 = new Hashes.MD5;
-
-          const outboundDbMessageEntry = DbApiUtil.populateIncomingDbMessageSlackEntry({
-            userId: MD5.hex(userPhoneNumber),
-            originatingSlackUserId: reqBody.event.user,
-            slackChannel: reqBody.event.channel,
-            slackParentMessageTs: reqBody.event.thread_ts,
-            slackMessageTs: reqBody.event.ts,
-            unprocessedMessage: unprocessedMessageToLog,
-            slackRetryNum: req.header('X-Slack-Retry-Num'),
-            slackRetryReason: req.header('X-Slack-Retry-Reason'),
-          });
-
-          RedisApiUtil.getHash(redisClient, `${userPhoneNumber}:${twilioPhoneNumber}`).then(userInfo => {
-            if (userInfo != null) {
-              userInfo.lastVoterMessageSecsFromEpoch = Math.round(Date.now() / 1000);
-              RedisApiUtil.setHash(redisClient, `${userPhoneNumber}:${twilioPhoneNumber}`, userInfo);
-              DbApiUtil.updateDbMessageEntryWithUserInfo(userInfo, outboundDbMessageEntry);
-              TwilioApiUtil.sendMessage(messageToSend,
-                                        {userPhoneNumber,
-                                          twilioPhoneNumber},
-                                          outboundDbMessageEntry);
-            }
-          });
+      // Pass Slack message to Twilio
+      RedisApiUtil.getHash(redisClient, redisHashKey).then(redisData => {
+        if (redisData != null) {
+          Router.handleSlackVoterThreadMessage(req, redisClient, redisData, originatingSlackUserName);
+        } else {
+          // Hash doesn't exist (this message is likely outside of a voter thread).
+          console.log("Server received Slack message outside a voter thread.")
         }
-      // Hash doesn't exist (this message is likely outside of a voter thread).
-      } else {
-        console.log("Server received Slack message outside a voter thread.")
-      }
-    });
-  }
+      });
+    } else if (reqBody.event.type === "app_mention"
+                // Require that the Slack bot be the (first) user mentioned.
+                && reqBody.authed_users[0] === process.env.SLACK_BOT_USER_ID
+                // Require that the message was sent in the #admin-control-room Slack channel
+                && reqBody.event.channel == process.env.ADMIN_CONTROL_ROOM_SLACK_CHANNEL_ID) {
+      console.log(`Received admin control command: ${reqBody.event.text}`);
+      Router.handleSlackAdminCommand(reqBody, redisClient, originatingSlackUserName);
+    }
+  });
 });
 
 // Authenticate Slack connection to Heroku.
