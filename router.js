@@ -178,6 +178,7 @@ const routeVoterToSlackChannel = (userInfo, redisClient, {userId, twilioPhoneNum
       SlackApiUtil.sendMessage(`*Operator:* Voter ${userId} was routed from ${adminCommandParams.previousSlackChannelName} back to this channel by ${adminCommandParams.routingSlackUserName}. See their thread with ${twilioPhoneNumber} above.`,
         {channel: destinationSlackChannelId});
         return DbApiUtil.getTimestampOfLastMessageInThread(userInfo[destinationSlackChannelId]).then(timestampOfLastMessageInThread => {
+          if (process.env.NODE_ENV !== "test")  console.log(`timestampOfLastMessageInThread: ${timestampOfLastMessageInThread}`);
           return SlackApiUtil.sendMessage(`*Operator:* Voter ${userId} was routed from ${adminCommandParams.previousSlackChannelName} back to this thread by ${adminCommandParams.routingSlackUserName}. Messages sent here will again relay to the voter.`,
             {channel: destinationSlackChannelId, parentMessageTs: userInfo[destinationSlackChannelId]}).then(() => {
             return routeVoterToSlackChannelHelper(userInfo, redisClient, twilioPhoneNumber,
