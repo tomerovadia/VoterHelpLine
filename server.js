@@ -113,6 +113,8 @@ app.post('/slack', upload.array(), (req, res) => {
   console.log(JSON.stringify(req.headers));
   res.type('application/json');
 
+  console.log(req);
+
   const reqBody = req.body;
   if(process.env.NODE_ENV !== "development" && !passesAuth(req)) {
     console.log('doesnt pass auth');
