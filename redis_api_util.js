@@ -3,6 +3,7 @@ const fieldTypes = {
   userId: "string",
   isDemo: "boolean",
   confirmedDisclaimer: "boolean",
+  volunteerEngaged: "boolean",
   lastVoterMessageSecsFromEpoch: "integer",
 };
 

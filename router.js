@@ -33,6 +33,7 @@ exports.handleNewVoter = (userOptions, redisClient, twilioPhoneNumber, inboundDb
     userInfo.isDemo = true;
   }
   userInfo.confirmedDisclaimer = false;
+  userInfo.volunteerEngaged = false;
 
   const welcomeMessage = MessageConstants.WELCOME_AND_DISCLAIMER;
   let lobbyChannel = "lobby";
@@ -333,7 +334,11 @@ exports.handleSlackVoterThreadMessage = (req, redisClient, redisData, originatin
       // Only relay Slack messages from the active Slack thread.
       if (userInfo.activeChannelId === reqBody.event.channel) {
         userInfo.lastVoterMessageSecsFromEpoch = Math.round(Date.now() / 1000);
-        RedisApiUtil.setHash(redisClient, `${userPhoneNumber}:${twilioPhoneNumber}`, userInfo);
+        if (!userInfo.volunteerEngaged) {
+          if (process.env.NODE_ENV !== "test") console.log("Router: volunteer engaged, suppressing automated system.")
+          userInfo.volunteerEngaged = true;
+        }
+        RedisApiUtil.setHash(redisClient, `${userId}:${twilioPhoneNumber}`, userInfo);
         DbApiUtil.updateDbMessageEntryWithUserInfo(userInfo, outboundDbMessageEntry);
         TwilioApiUtil.sendMessage(messageToSend,
                                   {userPhoneNumber,

@@ -57,17 +57,23 @@ app.post('/twilio-sms', (req, res) => {
         // Voter has a state determined. The U.S. state name is used for
         // operator messages as well as to know whether a U.S. state is known
         // for the voter. This may not be ideal (create separate bool?).
-        if (userInfo.stateName) {
+        // If a volunteer has intervened, turn off automated replies.
+        if (!userInfo.stateName && userInfo.volunteerEngaged) console.log("Server: No U.S. state for voter but volunteer engaged, so disabling automated replies.")
+        if (userInfo.stateName || userInfo.volunteerEngaged) {
+          console.log("Server: handleClearedVoter");
           Router.handleClearedVoter({userInfo, userPhoneNumber, userMessage}, redisClient, twilioPhoneNumber, inboundDbMessageEntry);
         // Voter has no state determined
         } else {
+          console.log("Server: determineVoterState");
           Router.determineVoterState({userInfo, userPhoneNumber, userMessage}, redisClient, twilioPhoneNumber, inboundDbMessageEntry);
         }
       } else {
+        console.log("Server: handleDisclaimer");
         Router.handleDisclaimer({userInfo, userPhoneNumber, userMessage}, redisClient, twilioPhoneNumber, inboundDbMessageEntry);
       }
     // Haven't seen this voter before
     } else {
+      console.log("Server: handleNewVoter");
       Router.handleNewVoter({userPhoneNumber, userMessage}, redisClient, twilioPhoneNumber, inboundDbMessageEntry);
     }
   });
