@@ -5,6 +5,7 @@ const requireModules = () => {
   SlackApiUtil = require('./slack_api_util');
   RedisApiUtil = require('./redis_api_util');
   DbApiUtil = require('./db_api_util');
+  LoadBalancer = require('./load_balancer');
   Hashes = require('jshashes'); // v1.0.5
   redis = require("redis-mock"), redisClient = redis.createClient();
 
@@ -28,7 +29,6 @@ const expectNthSlackMessageToChannel = (channel, n, messageParts, parentMessageT
   if (!skipAssertions) {
     expect.assertions(numAssertions);
   }
-  console.log(SlackApiUtil.sendMessage.mock.calls)
   let channelMessageNum = -1;
   for (let i = 0; i < SlackApiUtil.sendMessage.mock.calls.length; i++) {
     const slackMessageParams = SlackApiUtil.sendMessage.mock.calls[i][1];
@@ -57,7 +57,7 @@ beforeEach(() => {
 
 const handleNewVoterWrapper = (userOptions, redisClient, twilioPhoneNumber, inboundDbMessageEntry) => {
   return new Promise((resolve, reject) => {
-    resolve(Router.handleNewVoter(userOptions, redisClient, twilioPhoneNumber, inboundDbMessageEntry));
+    resolve(Router.handleNewVoter(userOptions, redisClient, twilioPhoneNumber, inboundDbMessageEntry, LoadBalancer.PULL_ENTRY_POINT));
   });
 };
 
@@ -75,9 +75,14 @@ describe('handleNewVoter', () => {
       mock: "inboundDbMessageEntryData",
     };
 
+    const userPhoneNumber = "+1234567890";
+    const MD5 = new Hashes.MD5;
+    const userId = MD5.hex(userPhoneNumber);
+
     return handleNewVoterWrapper({
-      userPhoneNumber: "+1234567890",
+      userPhoneNumber,
       userMessage: "can you help me vote",
+      userId,
     }, redisClient, "+12054985052", inboundDbMessageEntry);
   });
 
@@ -92,9 +97,15 @@ describe('handleNewVoter', () => {
   test("Announces new voter message to Slack #demo-lobby channel if demo line", () => {
     jest.clearAllMocks();
     const inboundDbMessageEntry = {};
+
+    const userPhoneNumber = "+1234567890";
+    const MD5 = new Hashes.MD5;
+    const userId = MD5.hex(userPhoneNumber);
+
     return handleNewVoterWrapper({
-      userPhoneNumber: "+1234567890",
+      userPhoneNumber,
       userMessage: "can you help me vote",
+      userId,
     }, redisClient, "+18556843440", inboundDbMessageEntry).then(() => {
       expect(SlackApiUtil.sendMessage.mock.calls[0][1].channel).toBe("demo-lobby");
     });
@@ -204,13 +215,16 @@ describe('handleNewVoter', () => {
 
   test("Adds redisClient Twilio-to-Slack lookup with isDemo:true for demo line", () => {
     expect.assertions(1);
+    const userPhoneNumber = "+1234567890";
     const MD5 = new Hashes.MD5;
-    const userId = MD5.hex("+1234567890");
+    const userId = MD5.hex(userPhoneNumber);
+
     jest.clearAllMocks();
     const inboundDbMessageEntry = {};
     return handleNewVoterWrapper({
-      userPhoneNumber: "+1234567890",
+      userPhoneNumber,
       userMessage: "can you help me vote",
+      userId,
     }, redisClient, "+18556843440", inboundDbMessageEntry).then(() => {
       for (call of RedisApiUtil.setHash.mock.calls) {
         const key = call[1];
@@ -495,10 +509,14 @@ describe('determineVoterState', () => {
 
       // Mock these functions, as they are called by load balancer.
       redisClient.setAsync = jest.fn();
-      redisClient.mgetAsync = jest.fn();
-      // Load balancer requires a return value from this function, so we mock it.
-      // Format: [number of pods, number of voters]
-      redisClient.mgetAsync.mockResolvedValue(["1", "0"]);
+      redisClient.getAsync = jest.fn();
+      redisClient.lrangeAsync = jest.fn();
+      // Load balancer requires a return value from these functions
+      // so we mock them...
+      // ...voter counter.
+      redisClient.getAsync.mockResolvedValue("0");
+      // ...open voter channels.
+      redisClient.lrangeAsync.mockResolvedValue(["north-carolina-0", "north-carolina-1"]);
 
       // Mock Redis providing the slackChannelId->slackChannelName lookup.
       redisClient.hgetallAsync = jest.fn();
@@ -607,71 +625,97 @@ describe('determineVoterState', () => {
     });
 
     test("Sends first voter to Slack channel for first pod in U.S. state", () => {
+      redisClient.lrangeAsync.mockResolvedValue(["north-carolina-3", "north-carolina-5"]);
       return determineVoterStateWrapper({
         userPhoneNumber: "+1234567890",
         userMessage: "NC",
         userInfo,
       }, redisClient, twilioPhoneNumber, inboundDbMessageEntry).then(() => {
-        expectNthSlackMessageToChannel("north-carolina-0", 0, ["New North Carolina voter"]);
+        expectNthSlackMessageToChannel("north-carolina-3", 0, ["New North Carolina voter"]);
       });
     });
 
-    test("Sends second voter to Slack channel for second pod in U.S. state, if more than one pods exists", () => {
-        redisClient.mgetAsync = jest.fn();
-        redisClient.mgetAsync.mockResolvedValue(["2" /* num pods */, "1" /* num (previous) voters*/]);
+    test("Sends second voter to Slack channel for second open pod, if more than one pods exists.", () => {
+        redisClient.getAsync = jest.fn();
+        redisClient.getAsync.mockResolvedValue("1" /* num (previous) voters*/);
+        redisClient.lrangeAsync.mockResolvedValue(["north-carolina-3", "north-carolina-5"]);
         return determineVoterStateWrapper({
           userPhoneNumber: "+1234567890",
           userMessage: "NC",
           userInfo,
         }, redisClient, twilioPhoneNumber, inboundDbMessageEntry).then(() => {
-          expectNthSlackMessageToChannel("north-carolina-1", 0, ["New North Carolina voter"]);
+          expectNthSlackMessageToChannel("north-carolina-5", 0, ["New North Carolina voter"]);
         });
     });
 
-    test("Sends third voter to Slack channel for first pod in U.S. state, if only two pods exist", () => {
-        redisClient.mgetAsync = jest.fn();
-        redisClient.mgetAsync.mockResolvedValue(["2" /* num pods */, "2" /* num (previous) voters*/]);
+    test("Sends third voter to Slack channel for first pod in U.S. state, if only two pods exist in entry point", () => {
+      redisClient.getAsync = jest.fn();
+      redisClient.getAsync.mockResolvedValue("2" /* num (previous) voters*/);
+      redisClient.lrangeAsync.mockResolvedValue(["north-carolina-3", "north-carolina-5"]);
         return determineVoterStateWrapper({
           userPhoneNumber: "+1234567890",
           userMessage: "NC",
           userInfo,
         }, redisClient, twilioPhoneNumber, inboundDbMessageEntry).then(() => {
-          expectNthSlackMessageToChannel("north-carolina-0", 0, ["New North Carolina voter"]);
+          expectNthSlackMessageToChannel("north-carolina-3", 0, ["New North Carolina voter"]);
         });
     });
 
-    test("Sends third voter to Slack channel for first pod in U.S. state, if only two pods exist", () => {
-        redisClient.mgetAsync = jest.fn();
-        redisClient.mgetAsync.mockResolvedValue(["2" /* num pods */, "2" /* num (previous) voters*/]);
+    test("Sends third voter to Slack channel for first pod in U.S. state, if only two pods exist in entry point", () => {
+      redisClient.getAsync = jest.fn();
+      redisClient.getAsync.mockResolvedValue("2" /* num (previous) voters*/);
+      redisClient.lrangeAsync.mockResolvedValue(["north-carolina-10", "north-carolina-15"]);
         return determineVoterStateWrapper({
           userPhoneNumber: "+1234567890",
           userMessage: "NC",
           userInfo,
         }, redisClient, twilioPhoneNumber, inboundDbMessageEntry).then(() => {
-          expectNthSlackMessageToChannel("north-carolina-0", 0, ["New North Carolina voter"]);
+          expectNthSlackMessageToChannel("north-carolina-10", 0, ["New North Carolina voter"]);
         });
     });
 
-    test("Sends demo voters to Slack demo channel independent of normal channel number of voters and pods", () => {
-        redisClient.mgetAsync = jest.fn().mockImplementation((numPodsKey, voterCounterKey) => {
-          if (numPodsKey == "numPodsNorthCarolina" && voterCounterKey == "voterCounterNorthCarolina") {
-            // 0 pods, first real voter.
-            return Promise.resolve(["1", "0"]);
-          } else if (numPodsKey == "numPodsDemoNorthCarolina" && voterCounterKey == "voterCounterDemoNorthCarolina") {
-            // 5 pods, 51st demo voter.
-            return Promise.resolve(["5", "50"]);
-          }
-        });
+    test("Sends demo voters to Slack demo channel independent of normal channel number of voters and open pods", () => {
+      // TOMER
+      redisClient.getAsync = jest.fn().mockImplementation((voterCounterKey) => {
+        let result;
+        switch(voterCounterKey) {
+          case "voterCounterPullNorthCarolina":
+            result = "0";
+            break;
+          case "voterCounterPullDemoNorthCarolina":
+            result = "52"
+            break;
+          default:
+            result = null;
+        }
+        return new Promise(resolve => resolve(result));
+      });
 
-        userInfo.isDemo = true;
+      redisClient.lrangeAsync = jest.fn().mockImplementation((openPodsKey) => {
+        let result;
+        switch(openPodsKey) {
+          case "openPodsPullNorthCarolina":
+            result = ["north-carolina-0"];
+            break;
+          case "openPodsPullDemoNorthCarolina":
+            result = ["demo-north-carolina-0", "demo-north-carolina-1", "demo-north-carolina-2", "demo-north-carolina-3", "demo-north-carolina-4"];
+            break;
+          default:
+            result = [];
+        }
+        return new Promise(resolve => resolve(result));
+      });
 
-        return determineVoterStateWrapper({
-          userPhoneNumber: "+1234567890",
-          userMessage: "NC",
-          userInfo,
-        }, redisClient, twilioPhoneNumber, inboundDbMessageEntry).then(() => {
-          expectNthSlackMessageToChannel("demo-north-carolina-0", 0, ["New North Carolina voter"]);
-        });
+      userInfo.isDemo = true;
+
+      return determineVoterStateWrapper({
+        userPhoneNumber: "+1234567890",
+        userMessage: "NC",
+        userInfo,
+      }, redisClient, twilioPhoneNumber, inboundDbMessageEntry).then(() => {
+        // 53rd demo NC voter goes to #demo-north-carolina-2
+        expectNthSlackMessageToChannel("demo-north-carolina-2", 0, ["New North Carolina voter"]);
+      });
     });
 
     test("Sends old message history to Slack U.S. state channel thread", () => {

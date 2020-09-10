@@ -18,6 +18,7 @@ const MessagingResponse = require('twilio').twiml.MessagingResponse;
 const { Client } = require('pg');
 const DbApiUtil = require('./db_api_util');
 const RedisApiUtil = require('./redis_api_util');
+const LoadBalancer = require('./load_balancer');
 
 app.use(bodyParser.urlencoded({ extended: false }));
 
@@ -32,9 +33,8 @@ app.use(bodyParser.json({
 bluebird.promisifyAll(redis);
 var redisClient = redis.createClient(process.env.REDISCLOUD_URL);
 
-app.post('/twilio-sms', (req, res) => {
-  const twiml = new MessagingResponse();
-  console.log('receiving Twilio message');
+const handleIncomingTwilioMessage = (req, entryPoint) => {
+  console.log(`Receiving Twilio message from ${entryPoint} entry point voter.`);
   const userPhoneNumber = req.body.From;
   const twilioPhoneNumber = req.body.To;
   const userMessage = req.body.Body;
@@ -46,6 +46,7 @@ app.post('/twilio-sms', (req, res) => {
     userPhoneNumber,
     twilioPhoneNumber,
     twilioMessageSid: req.body.SmsMessageSid,
+    // ADD ENTRY_POINT
   });
 
   const redisHashKey = `${userId}:${twilioPhoneNumber}`;
@@ -53,7 +54,13 @@ app.post('/twilio-sms', (req, res) => {
   RedisApiUtil.getHash(redisClient, redisHashKey).then(userInfo => {
     // Seen this voter before
     if (userInfo != null) {
-      if (userInfo.confirmedDisclaimer) {
+      // PUSH
+      if (entryPoint === LoadBalancer.PUSH_ENTRY_POINT) {
+        console.log("Server: handleClearedVoter");
+        // Don't do dislcaimer or U.S. state checks for push voters.
+        Router.handleClearedVoter({userInfo, userPhoneNumber, userMessage}, redisClient, twilioPhoneNumber, inboundDbMessageEntry);
+      // PULL
+      } else if (userInfo.confirmedDisclaimer) {
         // Voter has a state determined. The U.S. state name is used for
         // operator messages as well as to know whether a U.S. state is known
         // for the voter. This may not be ideal (create separate bool?).
@@ -74,9 +81,67 @@ app.post('/twilio-sms', (req, res) => {
     // Haven't seen this voter before
     } else {
       console.log("Server: handleNewVoter");
-      Router.handleNewVoter({userPhoneNumber, userMessage}, redisClient, twilioPhoneNumber, inboundDbMessageEntry);
+      Router.handleNewVoter({userPhoneNumber, userMessage, userId}, redisClient, twilioPhoneNumber, inboundDbMessageEntry, entryPoint);
     }
   });
+};
+
+app.post('/twilio-push', (req, res) => {
+  const twiml = new MessagingResponse();
+  handleIncomingTwilioMessage(req, LoadBalancer.PUSH_ENTRY_POINT);
+
+  res.writeHead(200, {'Content-Type': 'text/xml'});
+  res.end(twiml.toString());
+});
+
+
+app.post('/twilio-pull', (req, res) => {
+  const twiml = new MessagingResponse();
+  handleIncomingTwilioMessage(req, LoadBalancer.PULL_ENTRY_POINT);
+  // console.log('Receiving Twilio message from pull entry point voter.');
+  // const userPhoneNumber = req.body.From;
+  // const twilioPhoneNumber = req.body.To;
+  // const userMessage = req.body.Body;
+  // const MD5 = new Hashes.MD5;
+  // const userId = MD5.hex(userPhoneNumber);
+  //
+  // const inboundDbMessageEntry = DbApiUtil.populateIncomingDbMessageTwilioEntry({
+  //   userMessage,
+  //   userPhoneNumber,
+  //   twilioPhoneNumber,
+  //   twilioMessageSid: req.body.SmsMessageSid,
+  //   // ADD ENTRY_POINT
+  // });
+  //
+  // const redisHashKey = `${userId}:${twilioPhoneNumber}`;
+  //
+  // RedisApiUtil.getHash(redisClient, redisHashKey).then(userInfo => {
+  //   // Seen this voter before
+  //   if (userInfo != null) {
+  //     if (userInfo.confirmedDisclaimer) {
+  //       // Voter has a state determined. The U.S. state name is used for
+  //       // operator messages as well as to know whether a U.S. state is known
+  //       // for the voter. This may not be ideal (create separate bool?).
+  //       // If a volunteer has intervened, turn off automated replies.
+  //       if (!userInfo.stateName && userInfo.volunteerEngaged) console.log("Server: No U.S. state for voter but volunteer engaged, so disabling automated replies.")
+  //       if (userInfo.stateName || userInfo.volunteerEngaged) {
+  //         console.log("Server: handleClearedVoter");
+  //         Router.handleClearedVoter({userInfo, userPhoneNumber, userMessage}, redisClient, twilioPhoneNumber, inboundDbMessageEntry);
+  //       // Voter has no state determined
+  //       } else {
+  //         console.log("Server: determineVoterState");
+  //         Router.determineVoterState({userInfo, userPhoneNumber, userMessage}, redisClient, twilioPhoneNumber, inboundDbMessageEntry);
+  //       }
+  //     } else {
+  //       console.log("Server: handleDisclaimer");
+  //       Router.handleDisclaimer({userInfo, userPhoneNumber, userMessage}, redisClient, twilioPhoneNumber, inboundDbMessageEntry);
+  //     }
+  //   // Haven't seen this voter before
+  //   } else {
+  //     console.log("Server: handleNewVoter");
+  //     Router.handleNewVoter({userPhoneNumber, userMessage, userId}, redisClient, twilioPhoneNumber, inboundDbMessageEntry);
+  //   }
+  // });
 
   res.writeHead(200, {'Content-Type': 'text/xml'});
   res.end(twiml.toString());
