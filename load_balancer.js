@@ -1,19 +1,31 @@
+const ENTRY_POINT_TYPE = "Pull";
+
 exports.selectChannelByRoundRobin = (redisClient, isDemo, stateName) => {
   const stateNameNoSpace = stateName.replace(/\s/g, '');
-  const demoString = isDemo? "Demo" : "";
+  const demoString = isDemo ? "Demo" : "";
 
-  const numPodsKey = `numPods${demoString}${stateNameNoSpace}`;
+  // Key to Redis values of number of voters must follow this format.
   const voterCounterKey = `voterCounter${demoString}${stateNameNoSpace}`;
+  // Keys to Redis lists of open pods must follow this format.
+  const openPodsKey = `open${ENTRY_POINT_TYPE}${demoString}${stateNameNoSpace}Pods`;
 
-  return redisClient.mgetAsync(numPodsKey, voterCounterKey).then(response => {
-    const numPods = parseInt(response[0]);
-    const numVoters = parseInt(response[1]);
-    const selectedPodNumber = numVoters % numPods;
+  console.log(openPodsKey);
 
-    const selectedChannel = `${isDemo ? "demo-" : ""}${stateName.toLowerCase().replace(/\s/g, '-')}-${selectedPodNumber}`;
+  return redisClient.getAsync(voterCounterKey).then((numVoters, err) => {
+    if (err) console.log("LoadBalancer: Error! Couldn't find openPodsKey in Redis:", err);
+    return redisClient.lrangeAsync(openPodsKey, "0", "1000" /* max # of pods */).then((openPods, err) => {
+      if (err) {
+        console.log("LoadBalancer: Error! Couldn't find openPodsKey in Redis:", err);
+        return;
+      }
 
-    redisClient.setAsync(voterCounterKey, numVoters + 1);
+      numVoters = parseInt(numVoters);
+      const selectedPodNumber = numVoters % openPods.length;
+      const selectedChannelName = openPods[selectedPodNumber];
 
-    return new Promise(resolve => resolve(selectedChannel));
-  });
+      redisClient.setAsync(voterCounterKey, numVoters + 1);
+
+      return new Promise(resolve => resolve(selectedChannelName));
+    }).catch(err => console.log("LoadBalancer: Error selecting a channel:", err));
+  }).catch(err => console.log("LoadBalancer: Error selecting a channel:", err));;
 };

@@ -113,55 +113,47 @@ app.post('/slack', upload.array(), (req, res) => {
   console.log(JSON.stringify(req.headers));
   res.type('application/json');
 
-  const reqBody = req.body;
-  if(process.env.NODE_ENV !== "development" && !passesAuth(req)) {
-    console.log('doesnt pass auth');
-    res.sendStatus(401);
-    return;
-  }
-  res.sendStatus(200);
-  console.log('Passes Slack auth');
-  if (reqBody.event.type === "message"
-      && reqBody.event.user != process.env.SLACK_BOT_USER_ID) {
-    const redisHashKey = `${reqBody.event.channel}:${reqBody.event.thread_ts}`;
+  if (!req.body.challenge) {
+    const reqBody = req.body;
+    if(process.env.NODE_ENV !== "development" && !passesAuth(req)) {
+      console.log('doesnt pass auth');
+      res.sendStatus(401);
+      return;
+    }
+    res.sendStatus(200);
+    console.log('Passes Slack auth');
+    if (reqBody.event.type === "message"
+        && reqBody.event.user != process.env.SLACK_BOT_USER_ID) {
+      const redisHashKey = `${reqBody.event.channel}:${reqBody.event.thread_ts}`;
 
-    // Pass Slack message to Twilio
-    RedisApiUtil.getHash(redisClient, redisHashKey).then(redisData => {
-      if (redisData != null) {
-        SlackApiUtil.fetchSlackUserName(reqBody.event.user).then(originatingSlackUserName => {
-          Router.handleSlackVoterThreadMessage(req, redisClient, redisData, originatingSlackUserName);
-        });
-      } else {
-        // Hash doesn't exist (this message is likely outside of a voter thread).
-        console.log("Server received Slack message outside a voter thread.")
-      }
-    });
-  } else if (reqBody.event.type === "app_mention"
-              // Require that the Slack bot be the (first) user mentioned.
-              && reqBody.authed_users[0] === process.env.SLACK_BOT_USER_ID
-              // Require that the message was sent in the #admin-control-room Slack channel
-              && reqBody.event.channel == process.env.ADMIN_CONTROL_ROOM_SLACK_CHANNEL_ID) {
-    SlackApiUtil.fetchSlackUserName(reqBody.event.user).then(originatingSlackUserName => {
-      console.log(`Received admin control command from ${originatingSlackUserName}: ${reqBody.event.text}`);
-      Router.handleSlackAdminCommand(reqBody, redisClient, originatingSlackUserName);
-    });
+      // Pass Slack message to Twilio
+      RedisApiUtil.getHash(redisClient, redisHashKey).then(redisData => {
+        if (redisData != null) {
+          SlackApiUtil.fetchSlackUserName(reqBody.event.user).then(originatingSlackUserName => {
+            Router.handleSlackVoterThreadMessage(req, redisClient, redisData, originatingSlackUserName);
+          });
+        } else {
+          // Hash doesn't exist (this message is likely outside of a voter thread).
+          console.log("Server received Slack message outside a voter thread.")
+        }
+      });
+    } else if (reqBody.event.type === "app_mention"
+                // Require that the Slack bot be the (first) user mentioned.
+                && reqBody.authed_users[0] === process.env.SLACK_BOT_USER_ID
+                // Require that the message was sent in the #admin-control-room Slack channel
+                && reqBody.event.channel == process.env.ADMIN_CONTROL_ROOM_SLACK_CHANNEL_ID) {
+      SlackApiUtil.fetchSlackUserName(reqBody.event.user).then(originatingSlackUserName => {
+        console.log(`Received admin control command from ${originatingSlackUserName}: ${reqBody.event.text}`);
+        Router.handleSlackAdminCommand(reqBody, redisClient, originatingSlackUserName);
+      });
+    }
+  } else {
+    // Authenticate Slack connection to Heroku.
+    if (SlackApiUtil.authenticateConnectionToSlack(req.body.token)) {
+      res.status(200).json({ challenge: req.body.challenge });
+    }
   }
 });
-
-// Authenticate Slack connection to Heroku.
-// app.post('/slack', upload.array(), (req, res) => {
-//   // if(!passesAuth(req)) {
-//   //   console.log('doesnt pass auth');
-//   //   res.sendStatus(401);
-//   //   return;
-//   // }
-//   res.type('application/json');
-//   if (SlackApiUtil.authenticateConnectionToSlack(req.body.token)) {
-//     res.status(200).json({ challenge: req.body.challenge });
-//   }
-//
-//   res.sendStatus(200);
-// });
 
 http.listen(process.env.PORT || 8080, function() {
   console.log('listening on *:8080');
