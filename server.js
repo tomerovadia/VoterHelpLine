@@ -8,6 +8,7 @@ const http = require('http').createServer(app);;
 const redis = require('redis');
 const bluebird = require('bluebird');
 const SlackApiUtil = require('./slack_api_util');
+const TwilioApiUtil = require('./twilio_api_util');
 const Router = require('./router');
 const Hashes = require('jshashes'); // v1.0.5
 const bodyParser = require('body-parser');
@@ -86,6 +87,32 @@ const handleIncomingTwilioMessage = (req, entryPoint) => {
   });
 };
 
+app.post('/push', (req, res) => {
+  const MESSAGE = "This is Voter Help Line! Do you have any voting questions? Reply to instantly connect with a volunteer. Text STOP to stop messages. Msg & data rates may apply.";
+  const TWILIO_PHONE_NUMBER = "+18557041009";
+  const USER_PHONE_NUMBERS = [
+    "+18183702015",
+    "+18183702015",
+    "+18183702015",
+  ];
+
+  let delay = 0;
+  let INTERVAL_MILLISECONDS = 5000;
+  for (let idx in USER_PHONE_NUMBERS) {
+    const userPhoneNumber = USER_PHONE_NUMBERS[idx];
+    const dbMessageEntry = {
+      direction: "OUTBOUND",
+      automated: true,
+      // ADD ENTRY POINT
+    };
+    setTimeout(TwilioApiUtil.sendMessage, delay, MESSAGE,
+                {twilioPhoneNumber: TWILIO_PHONE_NUMBER, userPhoneNumber},
+                dbMessageEntry);
+    delay += INTERVAL_MILLISECONDS;
+  }
+  res.status(200).json({ message: "success" });
+});
+
 app.post('/twilio-push', (req, res) => {
   const twiml = new MessagingResponse();
   handleIncomingTwilioMessage(req, LoadBalancer.PUSH_ENTRY_POINT);
@@ -98,50 +125,6 @@ app.post('/twilio-push', (req, res) => {
 app.post('/twilio-pull', (req, res) => {
   const twiml = new MessagingResponse();
   handleIncomingTwilioMessage(req, LoadBalancer.PULL_ENTRY_POINT);
-  // console.log('Receiving Twilio message from pull entry point voter.');
-  // const userPhoneNumber = req.body.From;
-  // const twilioPhoneNumber = req.body.To;
-  // const userMessage = req.body.Body;
-  // const MD5 = new Hashes.MD5;
-  // const userId = MD5.hex(userPhoneNumber);
-  //
-  // const inboundDbMessageEntry = DbApiUtil.populateIncomingDbMessageTwilioEntry({
-  //   userMessage,
-  //   userPhoneNumber,
-  //   twilioPhoneNumber,
-  //   twilioMessageSid: req.body.SmsMessageSid,
-  //   // ADD ENTRY_POINT
-  // });
-  //
-  // const redisHashKey = `${userId}:${twilioPhoneNumber}`;
-  //
-  // RedisApiUtil.getHash(redisClient, redisHashKey).then(userInfo => {
-  //   // Seen this voter before
-  //   if (userInfo != null) {
-  //     if (userInfo.confirmedDisclaimer) {
-  //       // Voter has a state determined. The U.S. state name is used for
-  //       // operator messages as well as to know whether a U.S. state is known
-  //       // for the voter. This may not be ideal (create separate bool?).
-  //       // If a volunteer has intervened, turn off automated replies.
-  //       if (!userInfo.stateName && userInfo.volunteerEngaged) console.log("Server: No U.S. state for voter but volunteer engaged, so disabling automated replies.")
-  //       if (userInfo.stateName || userInfo.volunteerEngaged) {
-  //         console.log("Server: handleClearedVoter");
-  //         Router.handleClearedVoter({userInfo, userPhoneNumber, userMessage}, redisClient, twilioPhoneNumber, inboundDbMessageEntry);
-  //       // Voter has no state determined
-  //       } else {
-  //         console.log("Server: determineVoterState");
-  //         Router.determineVoterState({userInfo, userPhoneNumber, userMessage}, redisClient, twilioPhoneNumber, inboundDbMessageEntry);
-  //       }
-  //     } else {
-  //       console.log("Server: handleDisclaimer");
-  //       Router.handleDisclaimer({userInfo, userPhoneNumber, userMessage}, redisClient, twilioPhoneNumber, inboundDbMessageEntry);
-  //     }
-  //   // Haven't seen this voter before
-  //   } else {
-  //     console.log("Server: handleNewVoter");
-  //     Router.handleNewVoter({userPhoneNumber, userMessage, userId}, redisClient, twilioPhoneNumber, inboundDbMessageEntry);
-  //   }
-  // });
 
   res.writeHead(200, {'Content-Type': 'text/xml'});
   res.end(twiml.toString());
