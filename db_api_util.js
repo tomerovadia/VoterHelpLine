@@ -1,7 +1,7 @@
 const { Client } = require('pg');
 
 exports.logMessageToDb = (databaseMessageEntry) => {
-  console.log('Inserting into database');
+  console.log(`\nENTERING DBAPIUTIL.logMessageToDb`);
   const pgDatabaseClient = new Client({
     connectionString: process.env.DATABASE_URL,
   });
@@ -36,14 +36,14 @@ exports.logMessageToDb = (databaseMessageEntry) => {
         databaseMessageEntry.originatingSlackUserName
       ], (err, res) => {
         if (err) {
-          console.log("Error from PostgreSQL database insert", err);
+          console.log(`DBAPIUTIL.logMessageToDb: ERROR from PostgreSQL database insert:`, err);
         } else {
-          console.log("No error from PostgreSQL database insert");
+          console.log(`DBAPIUTIL.logMessageToDb: Successfully inserted into PostgreSQL database.`);
         }
         pgDatabaseClient.end();
       });
     })
-    .catch(err => console.error('PostgreSQL database connection error', err.stack));
+    .catch(err => console.log(`DBAPIUTIL.logMessageToDb: ERROR connecting to PostgreSQL database:`, err.stack));
 };
 
 // Populates immediately available info into the DB entry upon receiving a message from Twilio.
@@ -215,23 +215,25 @@ const MESSAGE_HISTORY_SQL_SCRIPT = `SELECT
                                   ORDER BY timestamp ASC;`;
 
 exports.getMessageHistoryFor = (userId, timestampSince) => {
+  console.log(`\nENTERING DBAPIUTIL.getMessageHistoryFor`);
+  console.log(`DBAPIUTIL.getMessageHistoryFor: Looking up user:${userId}, message history since timestamp: ${timestampSince}.`);
   const pgDatabaseClient = new Client({
     connectionString: process.env.DATABASE_URL,
   });
   return pgDatabaseClient.connect()
     .then(() => {
       return pgDatabaseClient.query(MESSAGE_HISTORY_SQL_SCRIPT, [userId, timestampSince]).then(result => {
-        if (process.env.NODE_ENV !== "test") console.log("No error from PostgreSQL message history lookup");
+        console.log(`DBAPIUTIL.getMessageHistoryFor: Successfully looked up message historyin PostgreSQL.`);
         pgDatabaseClient.end();
         return result.rows;
       })
       .catch(err => {
-        console.log("Error from PostgreSQL message history lookup", err);
+        console.log(`DBAPIUTIL.getMessageHistoryFor: ERROR from PostgreSQL message history lookup:`, err);
         pgDatabaseClient.end();
       });
     })
     .catch(err => {
-      console.error('PostgreSQL database connection error for message history lookup', err.stack);
+      console.log(`DBAPIUTIL.getMessageHistoryFor: ERROR connecting to PostgreSQL database:`, err.stack);
     });
 };
 
@@ -244,13 +246,15 @@ const LAST_TIMESTAMP_SQL_SCRIPT = `SELECT
                                     LIMIT 1;`;
 
 exports.getTimestampOfLastMessageInThread = (parentMessageTs) => {
+  console.log(`\nENTERING DBAPIUTIL.getTimestampOfLastMessageInThread`);
+  console.log(`DBAPIUTIL.getMessageHistoryFor: Looking up last message timestamp in Slack thread ${parentMessageTs}.`);
   const pgDatabaseClient = new Client({
     connectionString: process.env.DATABASE_URL,
   });
   return pgDatabaseClient.connect()
     .then(() => {
       return pgDatabaseClient.query(LAST_TIMESTAMP_SQL_SCRIPT, [parentMessageTs]).then(result => {
-        if (process.env.NODE_ENV !== "test") console.log("No error from PostgreSQL last timestamp in thread lookup");
+        console.log(`DBAPIUTIL.getMessageHistoryFor: Successfully looked up last timestamp in thread.`);
         pgDatabaseClient.end();
         // Just in case nobody said anything while the user was at a channel.
         if (result.rows.length > 0) {
@@ -260,11 +264,11 @@ exports.getTimestampOfLastMessageInThread = (parentMessageTs) => {
         }
       })
       .catch(err => {
-        console.log("Error from PostgreSQL last timestamp in thread lookup", err);
+        console.log(`DBAPIUTIL.getMessageHistoryFor: ERROR from PostgreSQL last timestamp in thread lookup:`, err);
         pgDatabaseClient.end();
       });
     })
     .catch(err => {
-      console.error('PostgreSQL database connection error for last timestamp in thread lookup', err.stack);
+      console.log(`DBAPIUTIL.getTimestampOfLastMessageInThread: ERROR connecting to PostgreSQL database:`, err.stack);
     });
 };
