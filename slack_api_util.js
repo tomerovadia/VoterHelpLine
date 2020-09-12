@@ -5,7 +5,9 @@ const DbApiUtil = require('./db_api_util');
 const SlackApiUtil = require('./slack_api_util');
 
 const sendMessage = (message, options, databaseMessageEntry = null, userInfo = null) => {
+  console.log(`\nENTERING SLACKAPIUTIL.sendMessage`);
   if (databaseMessageEntry) {
+    console.log(`SLACKAPIUTIL.sendMessage: This Slack message send will log to DB (databaseMessageEntry is not null).`);
     // Copies a few fields from userInfo to databaseMessageEntry.
     DbApiUtil.updateDbMessageEntryWithUserInfo(userInfo, databaseMessageEntry);
     databaseMessageEntry.slackChannel = options.channel;
@@ -25,7 +27,11 @@ const sendMessage = (message, options, databaseMessageEntry = null, userInfo = n
       "Authorization": `Bearer ${process.env.SLACK_BOT_ACCESS_TOKEN}`,
     },
   }).then(response => {
-    if (process.env.NODE_ENV !== "test") console.log(`\n\nSuccessfully sent message to Slack: ${message}`);
+    console.log(`SLACKAPIUTIL.sendMessage: Successfully sent Slack message,
+                  response.data.message.ts: ${response.data.message.ts},
+                  message: ${message},
+                  channel: ${options.channel},
+                  thread_ts: ${options.parentMessageTs}\n`);
     if (databaseMessageEntry) {
       databaseMessageEntry.successfullySent = true;
       databaseMessageEntry.slackMessageTs = response.data.message.ts;
@@ -33,7 +39,12 @@ const sendMessage = (message, options, databaseMessageEntry = null, userInfo = n
     }
     return response;
   }).catch(error => {
-    console.log(error);
+    console.log(`SLACKAPIUTIL.sendMessage: ERROR in sending Slack message,
+                  response.data.message.ts: ${response.data.message.ts},
+                  message: ${message},
+                  channel: ${options.channel},
+                  thread_ts: ${options.parentMessageTs}`);
+    console.log(`TWILIOAPIUTIL.sendMessage: ERROR in sending Slack message. Error data from Slack: ${error.error}`);
     if (databaseMessageEntry) {
       databaseMessageEntry.successfullySent = false;
       databaseMessageEntry.slackError = error.error;
