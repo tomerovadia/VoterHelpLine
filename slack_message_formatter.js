@@ -1,3 +1,5 @@
+const logDebug = process.env.NODE_ENV !== "test";
+
 const getMessageSender = (messageObject, userId) => {
   switch (messageObject.direction) {
     case "INBOUND":
@@ -8,13 +10,14 @@ const getMessageSender = (messageObject, userId) => {
       }
       return `${messageObject.originating_slack_user_name}:`;
     default:
-      console.log("Error getting message sender: message is either INBOUND nor OUTBOUND");
+      if (logDebug) console.log("SLACKMESSAGEFORMATTER.formatMessageHistory: Error getting message sender: message is either INBOUND nor OUTBOUND");
   }
 
   return sender;
 };
 
 exports.formatMessageHistory = (messageObjects, userId) => {
+  if (logDebug) console.log("\nENTERING SLACKMESSAGEFORMATTER.formatMessageHistory");
   const formattedMessages = messageObjects.map(messageObject => {
     const timeSinceEpochSecs = Date.parse(messageObject.timestamp) / 1000;
     // See https://api.slack.com/reference/surfaces/formatting#visual-styles
