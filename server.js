@@ -20,6 +20,7 @@ const { Client } = require('pg');
 const DbApiUtil = require('./db_api_util');
 const RedisApiUtil = require('./redis_api_util');
 const LoadBalancer = require('./load_balancer');
+const PushPhoneNumbers = require('./push_phone_numbers');
 
 app.use(bodyParser.urlencoded({ extended: false }));
 
@@ -101,14 +102,10 @@ const handleIncomingTwilioMessage = (req, entryPoint) => {
 app.post('/push', (req, res) => {
   const MESSAGE = "This is Voter Help Line! Do you have any voting questions? Reply to instantly connect with a volunteer. Text STOP to stop messages. Msg & data rates may apply.";
   const TWILIO_PHONE_NUMBER = "+18557041009";
-  const USER_PHONE_NUMBERS = [
-    "***REMOVED***",
-    "***REMOVED***",
-    "***REMOVED***",
-  ];
+  const USER_PHONE_NUMBERS = PushPhoneNumbers.USER_PHONE_NUMBERS;
 
   let delay = 0;
-  let INTERVAL_MILLISECONDS = 5000;
+  let INTERVAL_MILLISECONDS = 500;
   for (let idx in USER_PHONE_NUMBERS) {
     const userPhoneNumber = USER_PHONE_NUMBERS[idx];
     const dbMessageEntry = {
