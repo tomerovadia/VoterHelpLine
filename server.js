@@ -132,7 +132,7 @@ app.post('/push', (req, res) => {
     }
   });
 
-  res.status(200).json({ message: "success" });
+  res.status(200);
 });
 
 app.post('/twilio-push', (req, res) => {
