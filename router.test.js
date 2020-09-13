@@ -548,7 +548,7 @@ describe('determineVoterState', () => {
         userMessage: "NC",
         userInfo,
       }, redisClient, twilioPhoneNumber, inboundDbMessageEntry).then(() => {
-        expect(TwilioApiUtil.sendMessage.mock.calls[0][0]).toEqual(expect.stringMatching(/Great!.*We try to reply within minutes but may take up to 24 hours./i));
+        expect(TwilioApiUtil.sendMessage.mock.calls[0][0]).toEqual(expect.stringMatching(/Great!.*We try to reply within minutes but may take 24 hours./i));
         expect(TwilioApiUtil.sendMessage.mock.calls[0][1]).toEqual(expect.objectContaining({
           userPhoneNumber: "+1234567890",
           twilioPhoneNumber: "+12054985052",
@@ -598,7 +598,7 @@ describe('determineVoterState', () => {
         userMessage: "NC",
         userInfo,
       }, redisClient, twilioPhoneNumber, inboundDbMessageEntry).then(() => {
-        expectNthSlackMessageToChannel("CTHELOBBYID", 1, ["We try to reply within minutes but may take up to 24 hours."], "293874928374");
+        expectNthSlackMessageToChannel("CTHELOBBYID", 1, ["We try to reply within minutes but may take 24 hours."], "293874928374");
       });
     });
 
