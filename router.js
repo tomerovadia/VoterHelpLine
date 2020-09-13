@@ -212,18 +212,18 @@ const routeVoterToSlackChannel = (userInfo, redisClient, {userId, twilioPhoneNum
       // Error catching for admin command: destination channel not found.
       if (!destinationSlackChannelId) {
         if (logDebug) console.log("ROUTER.routeVoterToSlackChannel: destinationSlackChannelId not found. Did you forget to add it to slackPodChannelIds in Redis? Or if this is an admin action, did the admin type it wrong?");
-        return SlackApiUtil.sendMessage(`*Operator:* Slack channel #${destinationSlackChannelName} not found.`,
+        return SlackApiUtil.sendMessage(`*Operator:* Slack channel ${destinationSlackChannelName} not found.`,
                                         {channel: process.env.ADMIN_CONTROL_ROOM_SLACK_CHANNEL_ID, parentMessageTs: adminCommandParams.commandParentMessageTs});
       }
       // TODO: This should probably be a lot later in the routing of the voter.
       if (logDebug) console.log("ROUTER.routeVoterToSlackChannel: Routing of voter should succeed from here on out. Letting the admin (if applicable) know.");
       SlackApiUtil.sendMessage(`*Operator:* Operation successful.`,
                                       {channel: process.env.ADMIN_CONTROL_ROOM_SLACK_CHANNEL_ID, parentMessageTs: adminCommandParams.commandParentMessageTs});
-      SlackApiUtil.sendMessage(`*Operator:* Voter is being routed to *#${destinationSlackChannelName}* by *${adminCommandParams.routingSlackUserName}*.`,
+      SlackApiUtil.sendMessage(`*Operator:* Voter is being routed to *${destinationSlackChannelName}* by *${adminCommandParams.routingSlackUserName}*.`,
                                   {channel: userInfo.activeChannelId, parentMessageTs: userInfo[userInfo.activeChannelId]});
     // Operations for AUTOMATED route of voter.
     } else {
-      SlackApiUtil.sendMessage(`*Operator:* Routing voter to *#${destinationSlackChannelName}*.`,
+      SlackApiUtil.sendMessage(`*Operator:* Routing voter to *${destinationSlackChannelName}*.`,
                                   {channel: userInfo.activeChannelId, parentMessageTs: userInfo[userInfo.activeChannelId]});
     }
 
@@ -232,7 +232,7 @@ const routeVoterToSlackChannel = (userInfo, redisClient, {userId, twilioPhoneNum
       if (logDebug) console.log(`ROUTER.routeVoterToSlackChannel: Creating a new thread in this channel (${destinationSlackChannelId}), since voter hasn't been here.`);
       let parentMessageText = `<!channel> New ${userInfo.stateName} voter!\n*User ID:* ${userId}\n*Connected via:* ${twilioPhoneNumber} (${userInfo.entryPoint})`;
       if (adminCommandParams) {
-        parentMessageText = `<!channel> Voter routed from *#${adminCommandParams.previousSlackChannelName}* by *${adminCommandParams.routingSlackUserName}*\n*User ID:* ${userId}\n*Connected via:* ${twilioPhoneNumber} (${userInfo.entryPoint})`;
+        parentMessageText = `<!channel> Voter routed from *${adminCommandParams.previousSlackChannelName}* by *${adminCommandParams.routingSlackUserName}*\n*User ID:* ${userId}\n*Connected via:* ${twilioPhoneNumber} (${userInfo.entryPoint})`;
       }
       // TODO: Catch if this channel doesn't exist (should only be possible if Redis isn't kept up-to-date).
       // Consider fetching slackChannelIds from Slack instead.
@@ -254,8 +254,8 @@ const routeVoterToSlackChannel = (userInfo, redisClient, {userId, twilioPhoneNum
         });
     // If this user HAS been to the destination channel, use the same thread info.
     } else {
-      if (logDebug) console.log(`ROUTER.routeVoterToSlackChannel: Returning voter back to *#${destinationSlackChannelName}* from *#${adminCommandParams.previousSlackChannelName}*. Voter has been here before.`);
-      SlackApiUtil.sendMessage(`*Operator:* Voter *${userId}* was routed from *#${adminCommandParams.previousSlackChannelName}* back to this channel by *${adminCommandParams.routingSlackUserName}*. See their thread with *${twilioPhoneNumber}* above.`,
+      if (logDebug) console.log(`ROUTER.routeVoterToSlackChannel: Returning voter back to *${destinationSlackChannelName}* from *${adminCommandParams.previousSlackChannelName}*. Voter has been here before.`);
+      SlackApiUtil.sendMessage(`*Operator:* Voter *${userId}* was routed from *${adminCommandParams.previousSlackChannelName}* back to this channel by *${adminCommandParams.routingSlackUserName}*. See their thread with *${twilioPhoneNumber}* above.`,
         {channel: destinationSlackChannelId});
         return DbApiUtil.getTimestampOfLastMessageInThread(userInfo[destinationSlackChannelId]).then(timestampOfLastMessageInThread => {
           if (logDebug) console.log(`timestampOfLastMessageInThread: ${timestampOfLastMessageInThread}`);
@@ -451,7 +451,7 @@ exports.handleSlackVoterThreadMessage = (req, redisClient, redisData, originatin
                                     outboundDbMessageEntry);
       // Slack message is from inactive Slack thread.
       } else {
-        SlackApiUtil.sendMessage(`*Operator:* Your message was not relayed, as this thread is inactive. The voter's active thread is in #${userInfo.activeChannelName}.`,
+        SlackApiUtil.sendMessage(`*Operator:* Your message was not relayed, as this thread is inactive. The voter's active thread is in ${userInfo.activeChannelName}.`,
                                       {channel: reqBody.event.channel, parentMessageTs: reqBody.event.thread_ts});
       }
     });
@@ -476,7 +476,7 @@ exports.handleSlackAdminCommand = (reqBody, redisClient, originatingSlackUserNam
         // Voter already in destination slack channel (error).
         if (userInfo.activeChannelName === adminCommandArgs.destinationSlackChannelName) {
           if (logDebug) console.log("Router.handleSlackAdminCommand: Voter is already active in destination Slack channel.");
-          SlackApiUtil.sendMessage(`*Operator:* Voter's thread in #${userInfo.activeChannelName} is already the active thread.`,
+          SlackApiUtil.sendMessage(`*Operator:* Voter's thread in ${userInfo.activeChannelName} is already the active thread.`,
                                           {channel: process.env.ADMIN_CONTROL_ROOM_SLACK_CHANNEL_ID, parentMessageTs: reqBody.event.ts});
         } else {
           const adminCommandParams = {
