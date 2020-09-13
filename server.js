@@ -53,7 +53,7 @@ const handleIncomingTwilioMessage = (req, entryPoint) => {
     userPhoneNumber,
     twilioPhoneNumber,
     twilioMessageSid: req.body.SmsMessageSid,
-    // ADD ENTRY_POINT
+    entryPoint: LoadBalancer.PUSH_ENTRY_POINT,
   });
 
   const redisHashKey = `${userId}:${twilioPhoneNumber}`;
@@ -100,20 +100,25 @@ const handleIncomingTwilioMessage = (req, entryPoint) => {
 };
 
 app.post('/push', (req, res) => {
-  const MESSAGE = "This is Voter Help Line! Do you have any voting questions? Reply to instantly connect with a volunteer. Text STOP to stop messages. Msg & data rates may apply.";
   const TWILIO_PHONE_NUMBER = "+18557041009";
   const USER_PHONE_NUMBERS = PushPhoneNumbers.USER_PHONE_NUMBERS;
 
   let delay = 0;
-  let INTERVAL_MILLISECONDS = 500;
+  let INTERVAL_MILLISECONDS = 2000;
   for (let idx in USER_PHONE_NUMBERS) {
     const userPhoneNumber = USER_PHONE_NUMBERS[idx];
+    console.log(`Sending push message to phone number: ${userPhoneNumber}`)
+
+    const MD5 = new Hashes.MD5;
+    const userId = MD5.hex(userPhoneNumber);
+
     const dbMessageEntry = {
       direction: "OUTBOUND",
       automated: true,
-      // ADD ENTRY POINT
+      userId,
+      entryPoint: LoadBalancer.PUSH_ENTRY_POINT,
     };
-    setTimeout(TwilioApiUtil.sendMessage, delay, MESSAGE,
+    setTimeout(TwilioApiUtil.sendMessage, delay, Router.PUSH_BROADCAST_MESSAGE,
                 {twilioPhoneNumber: TWILIO_PHONE_NUMBER, userPhoneNumber},
                 dbMessageEntry);
     delay += INTERVAL_MILLISECONDS;
@@ -222,6 +227,8 @@ app.post('/slack', upload.array(), (req, res) => {
     if (SlackApiUtil.authenticateConnectionToSlack(req.body.token)) {
       console.log("SERVER POST /slack: Slack-Node authentication successful.");
       res.status(200).json({ challenge: req.body.challenge });
+    } else {
+      res.status(401);
     }
   }
 });
