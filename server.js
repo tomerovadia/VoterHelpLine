@@ -20,7 +20,6 @@ const { Client } = require('pg');
 const DbApiUtil = require('./db_api_util');
 const RedisApiUtil = require('./redis_api_util');
 const LoadBalancer = require('./load_balancer');
-const PushPhoneNumbers = require('./push_phone_numbers');
 
 app.use(bodyParser.urlencoded({ extended: false }));
 
@@ -101,28 +100,36 @@ const handleIncomingTwilioMessage = (req, entryPoint) => {
 
 app.post('/push', (req, res) => {
   const TWILIO_PHONE_NUMBER = "+18557041009";
-  const USER_PHONE_NUMBERS = PushPhoneNumbers.USER_PHONE_NUMBERS;
+  const redisUserPhoneNumbersKey = "userPhoneNumbers";
+  return redisClient.lrangeAsync(redisUserPhoneNumbersKey, 0, 1000).then((userPhoneNumbers, err) => {
+    if (!userPhoneNumbers) {
+      console.log(err);
+      return;
+    }
+    console.log("userPhoneNumbers:");
+    console.log(userPhoneNumbers);
+    let delay = 0;
+    let INTERVAL_MILLISECONDS = 2000;
+    for (let idx in userPhoneNumbers) {
+      const userPhoneNumber = userPhoneNumbers[idx];
+      console.log(`Sending push message to phone number: ${userPhoneNumber}`)
 
-  let delay = 0;
-  let INTERVAL_MILLISECONDS = 2000;
-  for (let idx in USER_PHONE_NUMBERS) {
-    const userPhoneNumber = USER_PHONE_NUMBERS[idx];
-    console.log(`Sending push message to phone number: ${userPhoneNumber}`)
+      const MD5 = new Hashes.MD5;
+      const userId = MD5.hex(userPhoneNumber);
 
-    const MD5 = new Hashes.MD5;
-    const userId = MD5.hex(userPhoneNumber);
+      const dbMessageEntry = {
+        direction: "OUTBOUND",
+        automated: true,
+        userId,
+        entryPoint: LoadBalancer.PUSH_ENTRY_POINT,
+      };
+      setTimeout(TwilioApiUtil.sendMessage, delay, Router.PUSH_BROADCAST_MESSAGE,
+                  {twilioPhoneNumber: TWILIO_PHONE_NUMBER, userPhoneNumber},
+                  dbMessageEntry);
+      delay += INTERVAL_MILLISECONDS;
+    }
+  });
 
-    const dbMessageEntry = {
-      direction: "OUTBOUND",
-      automated: true,
-      userId,
-      entryPoint: LoadBalancer.PUSH_ENTRY_POINT,
-    };
-    setTimeout(TwilioApiUtil.sendMessage, delay, Router.PUSH_BROADCAST_MESSAGE,
-                {twilioPhoneNumber: TWILIO_PHONE_NUMBER, userPhoneNumber},
-                dbMessageEntry);
-    delay += INTERVAL_MILLISECONDS;
-  }
   res.status(200).json({ message: "success" });
 });
 
