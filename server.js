@@ -99,7 +99,7 @@ const handleIncomingTwilioMessage = (req, entryPoint) => {
 };
 
 app.post('/push', (req, res) => {
-  res.status(200);
+  res.sendStatus(200);
   const TWILIO_PHONE_NUMBER = "+18557041009";
   const MESSAGE = "This is Voter Help Line! We sent you an absentee ballot request form. Did you receive it? Text STOP to stop messages. Msg & data rates may apply."
 
