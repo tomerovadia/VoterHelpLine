@@ -8,7 +8,7 @@ exports.logMessageToDb = (databaseMessageEntry) => {
 
   pgDatabaseClient.connect()
     .then(() => {
-      pgDatabaseClient.query("INSERT INTO messages (message, direction, automated, successfully_sent, from_phone_number, user_id, to_phone_number, originating_slack_user_id, slack_channel, slack_parent_message_ts, twilio_message_sid, slack_message_ts, slack_error, twilio_error, twilio_send_timestamp, twilio_receive_timestamp, slack_send_timestamp, slack_receive_timestamp, confirmed_disclaimer, is_demo, last_voter_message_secs_from_epoch, unprocessed_message, slack_retry_num, slack_retry_reason, originating_slack_user_name) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25);", [
+      pgDatabaseClient.query("INSERT INTO messages (message, direction, automated, successfully_sent, from_phone_number, user_id, to_phone_number, originating_slack_user_id, slack_channel, slack_parent_message_ts, twilio_message_sid, slack_message_ts, slack_error, twilio_error, twilio_send_timestamp, twilio_receive_timestamp, slack_send_timestamp, slack_receive_timestamp, confirmed_disclaimer, is_demo, last_voter_message_secs_from_epoch, unprocessed_message, slack_retry_num, slack_retry_reason, originating_slack_user_name, entry_point) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26);", [
         databaseMessageEntry.message,
         databaseMessageEntry.direction,
         databaseMessageEntry.automated,
@@ -33,7 +33,8 @@ exports.logMessageToDb = (databaseMessageEntry) => {
         databaseMessageEntry.unprocessedMessage,
         databaseMessageEntry.slackRetryNum,
         databaseMessageEntry.slackRetryReason,
-        databaseMessageEntry.originatingSlackUserName
+        databaseMessageEntry.originatingSlackUserName,
+        databaseMessageEntry.entryPoint
       ], (err, res) => {
         if (err) {
           console.log(`DBAPIUTIL.logMessageToDb: ERROR from PostgreSQL database insert:`, err);
@@ -47,12 +48,14 @@ exports.logMessageToDb = (databaseMessageEntry) => {
 };
 
 // Populates immediately available info into the DB entry upon receiving a message from Twilio.
-exports.populateIncomingDbMessageTwilioEntry = ({userMessage, userPhoneNumber, twilioPhoneNumber, twilioMessageSid}) => {
+exports.populateIncomingDbMessageTwilioEntry = ({userMessage, userPhoneNumber, twilioPhoneNumber, twilioMessageSid, entryPoint}) => {
   return {
     message: userMessage,
     // Only for Slack incoming
     unprocessedMessage: null,
     direction: "INBOUND",
+    // To be filled later
+    entryPoint,
     automated: null,
     // To be updated later
     successfullySent: false,
@@ -97,10 +100,12 @@ exports.populateIncomingDbMessageTwilioEntry = ({userMessage, userPhoneNumber, t
 };
 
 // Populates immediately available info into the DB entry upon receiving a message from Slack.
-exports.populateIncomingDbMessageSlackEntry = ({unprocessedMessage, originatingSlackUserId, slackChannel, slackParentMessageTs, slackMessageTs, slackRetryNum, slackRetryReason, originatingSlackUserName}) => {
+exports.populateIncomingDbMessageSlackEntry = ({unprocessedMessage, originatingSlackUserId, slackChannel, slackParentMessageTs, slackMessageTs, slackRetryNum, slackRetryReason, originatingSlackUserName, entryPoint}) => {
   return {
     unprocessedMessage,
     direction: "OUTBOUND",
+    // To be filled later
+    entryPoint: null,
     automated: false,
 
     // To be filled later
@@ -147,6 +152,7 @@ exports.updateDbMessageEntryWithUserInfo = (userInfo, dbMessageEntry) => {
   dbMessageEntry.confirmedDisclaimer = userInfo.confirmedDisclaimer;
   dbMessageEntry.isDemo = userInfo.isDemo;
   dbMessageEntry.lastVoterMessageSecsFromEpoch = userInfo.lastVoterMessageSecsFromEpoch;
+  dbMessageEntry.entryPoint = userInfo.entryPoint;
 };
 
 // Populates a DB entry with available info right before it is passed to TwilioApiUtil for additional info and writing to DB.
@@ -156,6 +162,7 @@ exports.populateAutomatedDbMessageEntry = (userInfo) => {
     // Only for incoming Slack messages.
     unprocessedMessage: null,
     direction: "OUTBOUND",
+    entryPoint: userInfo.entryPoint,
     automated: true,
 
     // To be filled later
