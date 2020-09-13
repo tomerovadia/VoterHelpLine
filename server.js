@@ -100,6 +100,8 @@ const handleIncomingTwilioMessage = (req, entryPoint) => {
 
 app.post('/push', (req, res) => {
   const TWILIO_PHONE_NUMBER = "+18557041009";
+  const MESSAGE = "This is Voter Help Line! We sent you an absentee ballot request form. Did you receive it? Text STOP to stop messages. Msg & data rates may apply."
+
   const redisUserPhoneNumbersKey = "userPhoneNumbers";
   return redisClient.lrangeAsync(redisUserPhoneNumbersKey, 0, 1000).then((userPhoneNumbers, err) => {
     if (!userPhoneNumbers) {
@@ -123,7 +125,7 @@ app.post('/push', (req, res) => {
         userId,
         entryPoint: LoadBalancer.PUSH_ENTRY_POINT,
       };
-      setTimeout(TwilioApiUtil.sendMessage, delay, Router.PUSH_BROADCAST_MESSAGE,
+      setTimeout(TwilioApiUtil.sendMessage, delay, MESSAGE,
                   {twilioPhoneNumber: TWILIO_PHONE_NUMBER, userPhoneNumber},
                   dbMessageEntry);
       delay += INTERVAL_MILLISECONDS;

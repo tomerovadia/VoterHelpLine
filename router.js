@@ -15,8 +15,6 @@ const AdminUtil = require('./admin_util');
 const MessageParser = require('./message_parser');
 
 const MINS_BEFORE_WELCOME_BACK_MESSAGE = 60;
-const PUSH_BROADCAST_MESSAGE = "This is Voter Help Line! We sent you an absentee ballot request form. Did you receive it? Text STOP to stop messages. Msg & data rates may apply.";
-exports.PUSH_BROADCAST_MESSAGE = PUSH_BROADCAST_MESSAGE;
 
 const logDebug = process.env.NODE_ENV !== "test";
 
