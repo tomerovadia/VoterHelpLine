@@ -39,6 +39,7 @@ const introduceNewVoterToSlackChannel = ({userInfo, userMessage}, redisClient, t
     {
       channel: slackChannelName,
     }).then(response => {
+      console.log(response);
       if (logDebug) console.log(`ROUTER.introduceNewVoterToSlackChannel: Successfully announced new voter via new thread in ${slackChannelName},
                     response.data.channel: ${response.data.channel},
                     response.data.ts: ${response.data.ts}`);
