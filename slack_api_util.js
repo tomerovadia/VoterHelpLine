@@ -39,11 +39,11 @@ const sendMessage = (message, options, databaseMessageEntry = null, userInfo = n
     }
     return response;
   }).catch(error => {
-    console.log(`SLACKAPIUTIL.sendMessage: ERROR in sending Slack message,
+    console.log('\x1b[41m%s\x1b[1m\x1b[0m', `SLACKAPIUTIL.sendMessage: ERROR in sending Slack message,
                   message: ${message},
                   channel: ${options.channel},
                   thread_ts: ${options.parentMessageTs}`);
-    console.log(`TWILIOAPIUTIL.sendMessage: ERROR in sending Slack message. Error data from Slack: ${error.error}`);
+    console.log('\x1b[41m%s\x1b[1m\x1b[0m', `SLACKAPIUTIL.sendMessage: ERROR in sending Slack message. Error data from Slack: ${error.error}`);
     if (databaseMessageEntry) {
       databaseMessageEntry.successfullySent = false;
       databaseMessageEntry.slackError = error.error;
