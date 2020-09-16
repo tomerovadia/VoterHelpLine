@@ -27,6 +27,7 @@ const sendMessage = (message, options, databaseMessageEntry = null, userInfo = n
       "Authorization": `Bearer ${process.env.SLACK_BOT_ACCESS_TOKEN}`,
     },
   }).then(response => {
+    console.log(response);
     console.log(`SLACKAPIUTIL.sendMessage: Successfully sent Slack message,
                   response.data.message.ts: ${response.data.message.ts},
                   message: ${message},
