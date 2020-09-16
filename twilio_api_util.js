@@ -33,7 +33,6 @@ exports.sendMessage = (message, options, databaseMessageEntry) => {
     })
     .catch(error => {
       console.log('\x1b[41m%s\x1b[1m\x1b[0m', `TWILIOAPIUTIL.sendMessage: ERROR in sending Twilio message,
-                    response.sid: ${response.sid},
                     message: ${message},
                     from: ${options.twilioPhoneNumber},
                     to: ${options.userPhoneNumber}`);
