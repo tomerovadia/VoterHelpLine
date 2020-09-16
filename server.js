@@ -159,8 +159,9 @@ app.post('/twilio-pull', (req, res) => {
 
 const passesAuth = (req) => {
   const requestTimestamp = req.header('X-Slack-Request-Timestamp');
-  if (!requestTimestamp ||
-         Math.abs((new Date().getTime() / 1000) - requestTimestamp) > 60 * 5) {
+  if (!requestTimestamp
+         || Math.abs((new Date().getTime() / 1000) - requestTimestamp) > 60 * 5
+         || !process.env.SLACK_SIGNING_SECRET) {
     console.log('Fails auth');
     return false;
   }
@@ -199,15 +200,16 @@ app.post('/slack', upload.array(), (req, res) => {
       return;
     }
     res.sendStatus(200);
+
+    if (!reqBody || !reqBody.event) {
+      console.log('\x1b[41m%s\x1b[1m\x1b[0m', `SERVER POST /slack: Issue with Slack reqBody: ${reqBody}.`);
+      return;
+    }
+
     if (reqBody.event.type === "message"
         && reqBody.event.user != process.env.SLACK_BOT_USER_ID) {
       console.log(`SERVER POST /slack: Slack event listener caught non-bot Slack message from ${reqBody.event.user}.`);
       const redisHashKey = `${reqBody.event.channel}:${reqBody.event.thread_ts}`;
-
-      if (typeof redisHashKey !== string) {
-        console.log('\x1b[41m%s\x1b[1m\x1b[0m', `SERVER POST /slack: Invalid Redis key ${redisHashKey}.`);
-        return;
-      }
 
       // Pass Slack message to Twilio
       RedisApiUtil.getHash(redisClient, redisHashKey).then(redisData => {
