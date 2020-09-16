@@ -204,6 +204,11 @@ app.post('/slack', upload.array(), (req, res) => {
       console.log(`SERVER POST /slack: Slack event listener caught non-bot Slack message from ${reqBody.event.user}.`);
       const redisHashKey = `${reqBody.event.channel}:${reqBody.event.thread_ts}`;
 
+      if (typeof redisHashKey !== string) {
+        console.log('\x1b[41m%s\x1b[1m\x1b[0m', `SERVER POST /slack: Invalid Redis key ${redisHashKey}.`);
+        return;
+      }
+
       // Pass Slack message to Twilio
       RedisApiUtil.getHash(redisClient, redisHashKey).then(redisData => {
         if (redisData != null) {
