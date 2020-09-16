@@ -87,6 +87,8 @@ const introduceNewVoterToSlackChannel = ({userInfo, userMessage}, redisClient, t
       if (logDebug) console.log(`ROUTER.introduceNewVoterToSlackChannel: Writing updated Slack-to-Twilio redisData to Redis.`);
       return RedisApiUtil.setHash(redisClient, `${response.data.channel}:${response.data.ts}`,
                           {userPhoneNumber: userInfo.userPhoneNumber, twilioPhoneNumber});
+    }).catch(err => {
+      if (logDebug) console.log('\x1b[41m%s\x1b[1m\x1b[0m', `ROUTER.introduceNewVoterToSlackChannel (${userInfo.userId}): ERROR sending first Slack message: ${err}`);
     });
 };
 
