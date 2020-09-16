@@ -100,11 +100,11 @@ exports.fetchSlackChannelName = (channelId) => {
       if (process.env.NODE_ENV !== "test") console.log(`SlackApiUtil: Successfully revealed Slack channel name (${channelId} -> ${response.data.channel.name})`);
       return response.data.channel.name;
     } else {
-      if (process.env.NODE_ENV !== "test") console.log(`SlackApiUtil: Failed to reveal Slack channel name (${channelId}). Error: ${response.data.error}.`);
+      if (process.env.NODE_ENV !== "test") console.log('\x1b[41m%s\x1b[1m\x1b[0m', `SlackApiUtil: Failed to reveal Slack channel name (${channelId}). Error: ${response.data.error}.`);
       return null;
     }
   }).catch(error => {
-    if (process.env.NODE_ENV !== "test") console.log(`SlackApiUtil: Failed to reveal Slack channel name (${channelId}). Error: ${error}.`);
+    if (process.env.NODE_ENV !== "test") console.log('\x1b[41m%s\x1b[1m\x1b[0m', `SlackApiUtil: Failed to reveal Slack channel name (${channelId}). Error: ${error}.`);
     return error;
   });
 };
@@ -121,11 +121,11 @@ exports.fetchSlackUserName = (userId) => {
       if (process.env.NODE_ENV !== "test") console.log(`SlackApiUtil: Successfully revealed Slack user name (${userId} -> ${response.data.user.real_name})`);
       return response.data.user.real_name;
     } else {
-      if (process.env.NODE_ENV !== "test") console.log(`SlackApiUtil: Failed to reveal Slack user name (${userId}). Error: ${response.data.error}.`);
+      if (process.env.NODE_ENV !== "test") console.log('\x1b[41m%s\x1b[1m\x1b[0m', `SlackApiUtil: Failed to reveal Slack user name (${userId}). Error: ${response.data.error}.`);
       return null;
     }
   }).catch(error => {
-    if (process.env.NODE_ENV !== "test") console.log(`SlackApiUtil: Failed to reveal Slack user name (${userId}). Error: ${error}.`);
+    if (process.env.NODE_ENV !== "test") console.log('\x1b[41m%s\x1b[1m\x1b[0m', `SlackApiUtil: Failed to reveal Slack user name (${userId}). Error: ${error}.`);
     return error;
   });
 };

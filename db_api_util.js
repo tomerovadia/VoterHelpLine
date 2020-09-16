@@ -37,14 +37,14 @@ exports.logMessageToDb = (databaseMessageEntry) => {
         databaseMessageEntry.entryPoint
       ], (err, res) => {
         if (err) {
-          console.log(`DBAPIUTIL.logMessageToDb: ERROR from PostgreSQL database insert:`, err);
+          console.log('\x1b[41m%s\x1b[1m\x1b[0m', `DBAPIUTIL.logMessageToDb: ERROR from PostgreSQL database insert:`, err);
         } else {
           console.log(`DBAPIUTIL.logMessageToDb: Successfully inserted into PostgreSQL database.`);
         }
         pgDatabaseClient.end();
       });
     })
-    .catch(err => console.log(`DBAPIUTIL.logMessageToDb: ERROR connecting to PostgreSQL database:`, err.stack));
+    .catch(err => console.log('\x1b[41m%s\x1b[1m\x1b[0m', `DBAPIUTIL.logMessageToDb: ERROR connecting to PostgreSQL database:`, err.stack));
 };
 
 // Populates immediately available info into the DB entry upon receiving a message from Twilio.
@@ -235,12 +235,12 @@ exports.getMessageHistoryFor = (userId, timestampSince) => {
         return result.rows;
       })
       .catch(err => {
-        console.log(`DBAPIUTIL.getMessageHistoryFor: ERROR from PostgreSQL message history lookup:`, err);
+        console.log('\x1b[41m%s\x1b[1m\x1b[0m', `DBAPIUTIL.getMessageHistoryFor: ERROR from PostgreSQL message history lookup:`, err);
         pgDatabaseClient.end();
       });
     })
     .catch(err => {
-      console.log(`DBAPIUTIL.getMessageHistoryFor: ERROR connecting to PostgreSQL database:`, err.stack);
+      console.log('\x1b[41m%s\x1b[1m\x1b[0m', `DBAPIUTIL.getMessageHistoryFor: ERROR connecting to PostgreSQL database:`, err.stack);
     });
 };
 
@@ -271,11 +271,11 @@ exports.getTimestampOfLastMessageInThread = (parentMessageTs) => {
         }
       })
       .catch(err => {
-        console.log(`DBAPIUTIL.getMessageHistoryFor: ERROR from PostgreSQL last timestamp in thread lookup:`, err);
+        console.log('\x1b[41m%s\x1b[1m\x1b[0m', `DBAPIUTIL.getMessageHistoryFor: ERROR from PostgreSQL last timestamp in thread lookup:`, err);
         pgDatabaseClient.end();
       });
     })
     .catch(err => {
-      console.log(`DBAPIUTIL.getTimestampOfLastMessageInThread: ERROR connecting to PostgreSQL database:`, err.stack);
+      console.log('\x1b[41m%s\x1b[1m\x1b[0m', `DBAPIUTIL.getTimestampOfLastMessageInThread: ERROR connecting to PostgreSQL database:`, err.stack);
     });
 };

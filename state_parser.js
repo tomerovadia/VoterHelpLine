@@ -1,6 +1,7 @@
-const stateConstants = require('./state_constants');
+const StateConstants = require('./state_constants');
 
 exports.determineState = (userMessage) => {
+  const stateConstants = StateConstants.getStateConstants();
   for (key in stateConstants) {
     const abbrev = key;
     const stateName = stateConstants[key];
