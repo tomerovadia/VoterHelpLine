@@ -40,7 +40,6 @@ const sendMessage = (message, options, databaseMessageEntry = null, userInfo = n
     return response;
   }).catch(error => {
     console.log(`SLACKAPIUTIL.sendMessage: ERROR in sending Slack message,
-                  response.data.message.ts: ${response.data.message.ts},
                   message: ${message},
                   channel: ${options.channel},
                   thread_ts: ${options.parentMessageTs}`);
