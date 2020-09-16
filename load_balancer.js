@@ -47,11 +47,11 @@ exports.selectSlackChannel = (redisClient, entryPoint, stateName, isDemo = false
   if (logDebug) console.log(`LOADBALANCER.selectSlackChannel: Determined openPodsKey: ${openPodsKey}`);
 
   return redisClient.getAsync(voterCounterKey).then((numVoters, err) => {
-    if (err || !numVoters) if (logDebug) console.log(`LOADBALANCER.selectSlackChannel: ERROR finding voterCounterKey ${voterCounterKey} in Redis: err || !numVoters`);
+    if (err || !numVoters) if (logDebug) console.log('\x1b[41m%s\x1b[1m\x1b[0m', `LOADBALANCER.selectSlackChannel: ERROR finding voterCounterKey ${voterCounterKey} in Redis: err || !numVoters`);
     if (logDebug) console.log(`LOADBALANCER.selectSlackChannel: Successfully found numVoters with voterCounterKey ${voterCounterKey} in Redis: ${numVoters}`);
     return redisClient.lrangeAsync(openPodsKey, 0, 1000 /* max # of pods */).then((openPods, err) => {
       if (err || !openPods) {
-        if (logDebug) console.log(`LOADBALANCER.selectSlackChannel: ERROR finding openPodsKey ${openPodsKey} in Redis: err || !openPods`);
+        if (logDebug) console.log('\x1b[41m%s\x1b[1m\x1b[0m', `LOADBALANCER.selectSlackChannel: ERROR finding openPodsKey ${openPodsKey} in Redis: err || !openPods`);
         return null;
       }
       if (logDebug) console.log(`LOADBALANCER.selectSlackChannel: Successfully found openPods with openPodsKey ${openPodsKey} in Redis: ${JSON.stringify(openPods)}`);
@@ -70,9 +70,9 @@ exports.selectSlackChannel = (redisClient, entryPoint, stateName, isDemo = false
       if (logDebug) console.log(`Exiting LOADBALANCER.selectSlackChannel with return value: ${selectedChannelName}`);
       return new Promise(resolve => resolve(selectedChannelName));
     }).catch(err => {
-      if (logDebug) console.log("LoadBalancer: Error selecting a channel:", err);
+      if (logDebug) console.log('\x1b[41m%s\x1b[1m\x1b[0m', "LoadBalancer: Error selecting a channel:", err);
     });
   }).catch(err => {
-    if (logDebug) console.log("LoadBalancer: Error selecting a channel:", err);
+    if (logDebug) console.log('\x1b[41m%s\x1b[1m\x1b[0m', "LoadBalancer: Error selecting a channel:", err);
   });
 };

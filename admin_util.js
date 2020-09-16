@@ -1,6 +1,12 @@
 const MessageParser = require('./message_parser');
 
-const VALID_COMMANDS = ["ROUTE_VOTER"];
+const ROUTE_VOTER = "ROUTE_VOTER";
+const FIND_VOTER = "FIND_VOTER";
+const RESET_VOTER = "RESET_VOTER";
+const VALID_COMMANDS = [ROUTE_VOTER, FIND_VOTER, RESET_VOTER];
+exports.ROUTE_VOTER = ROUTE_VOTER;
+exports.FIND_VOTER = FIND_VOTER;
+exports.RESET_VOTER = RESET_VOTER;
 
 exports.parseAdminSlackMessage = (message) => {
   let adminCommandParams = {};
@@ -31,4 +37,12 @@ exports.parseAdminSlackMessage = (message) => {
     twilioPhoneNumber: parsedTwilioPhoneNumber ? parsedTwilioPhoneNumber : words[3],
     destinationSlackChannelName: words[4],
   };
+};
+
+exports.findVoter = () => {
+  
+};
+
+exports.resetVoter = () => {
+
 };

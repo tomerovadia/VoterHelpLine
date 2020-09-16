@@ -32,13 +32,13 @@ exports.sendMessage = (message, options, databaseMessageEntry) => {
       }
     })
     .catch(error => {
-      console.log(`TWILIOAPIUTIL.sendMessage: ERROR in sending Twilio message,
+      console.log('\x1b[41m%s\x1b[1m\x1b[0m', `TWILIOAPIUTIL.sendMessage: ERROR in sending Twilio message,
                     response.sid: ${response.sid},
                     message: ${message},
                     from: ${options.twilioPhoneNumber},
                     to: ${options.userPhoneNumber}`);
       const twilioError = `Status: ${error.status ? error.status : ""}, Message:${error.message ? error.message : ""}, Code: ${error.code ? error.code : ""}, More Info: ${error.more_info ? error.more_info : ""}`;
-      console.log(`TWILIOAPIUTIL.sendMessage: ERROR in sending Twilio message. Error data from Twilio: ${twilioError}`);
+      console.log('\x1b[41m%s\x1b[1m\x1b[0m', `TWILIOAPIUTIL.sendMessage: ERROR in sending Twilio message. Error data from Twilio: ${twilioError}`);
       if (databaseMessageEntry) {
         // TODO: populate twilioMessageSid, which exists even for unsuccessful sends
         // Not sure how to find it.

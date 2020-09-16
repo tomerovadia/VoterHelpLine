@@ -15,7 +15,7 @@ exports.setHash = (redisClient, key, hash) => {
   for (const field in hash) {
     let value = hash[field];
     promise = redisClient.hsetAsync(key, field, value).catch(err => {
-      if (logDebug) console.log(`REDISAPIUTIL.setHash: ERROR calling hsetAsync`, err);
+      if (logDebug) console.log('\x1b[41m%s\x1b[1m\x1b[0m', `REDISAPIUTIL.setHash: ERROR calling hsetAsync`, err);
     });
   }
   return promise;
@@ -40,6 +40,6 @@ exports.getHash = (redisClient, key) => {
     }
     return new Promise(resolve => resolve(hash));
   }).catch(err => {
-    if (logDebug) console.log(`REDISAPIUTIL.setHash: ERROR calling hgetallAsync`, err);
+    if (logDebug) console.log('\x1b[41m%s\x1b[1m\x1b[0m', `REDISAPIUTIL.setHash: ERROR calling hgetallAsync`, err);
   });
 };

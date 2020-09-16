@@ -10,7 +10,7 @@ const getMessageSender = (messageObject, userId) => {
       }
       return `${messageObject.originating_slack_user_name}:`;
     default:
-      if (logDebug) console.log("SLACKMESSAGEFORMATTER.formatMessageHistory: Error getting message sender: message is either INBOUND nor OUTBOUND");
+      if (logDebug) console.log('\x1b[41m%s\x1b[1m\x1b[0m', "SLACKMESSAGEFORMATTER.formatMessageHistory: Error getting message sender: message is either INBOUND nor OUTBOUND");
   }
 
   return sender;

@@ -23,7 +23,7 @@ const introduceNewVoterToSlackChannel = ({userInfo, userMessage}, redisClient, t
   userInfo.lastVoterMessageSecsFromEpoch = Math.round(Date.now() / 1000);
   if (logDebug) console.log(`ROUTER.introduceNewVoterToSlackChannel: Updating lastVoterMessageSecsFromEpoch to ${userInfo.lastVoterMessageSecsFromEpoch}`);
 
-  const welcomeMessage = MessageConstants.WELCOME_AND_DISCLAIMER;
+  const welcomeMessage = MessageConstants.WELCOME_AND_DISCLAIMER();
   if (entryPoint === LoadBalancer.PULL_ENTRY_POINT) {
     if (logDebug) console.log(`ROUTER.introduceNewVoterToSlackChannel: Entry point is PULL, so sending automated welcome to voter.`);
     // Welcome the voter
@@ -126,11 +126,11 @@ exports.handleNewVoter = (userOptions, redisClient, twilioPhoneNumber, inboundDb
         slackChannelName = selectedChannelName;
       } else {
         // If LoadBalancer didn't find a Slack channel, then  #lobby remains as fallback.
-        if (logDebug) console.log(`ROUTER.handleNewVoter (${userInfo.userId}): ERROR LoadBalancer did not find a Slack channel for new PUSH voter. Using #lobby as fallback.`);
+        if (logDebug) console.log('\x1b[41m%s\x1b[1m\x1b[0m', `ROUTER.handleNewVoter (${userInfo.userId}): ERROR LoadBalancer did not find a Slack channel for new PUSH voter. Using #lobby as fallback.`);
       }
       return introduceNewVoterToSlackChannel({userInfo, userMessage}, redisClient, twilioPhoneNumber, inboundDbMessageEntry, entryPoint, slackChannelName);
     }).catch(err => {
-      if (logDebug) console.log(`ROUTER.handleNewVoter (${userInfo.userId}): ERROR in LoadBalancer.selectSlackChannel for new PUSH voter: ${err}`);
+      if (logDebug) console.log('\x1b[41m%s\x1b[1m\x1b[0m', `ROUTER.handleNewVoter (${userInfo.userId}): ERROR in LoadBalancer.selectSlackChannel for new PUSH voter: ${err}`);
     });
   }
 
@@ -151,7 +151,7 @@ const postUserMessageHistoryToSlack = (userId, timestampOfLastMessageInThread, m
     return SlackApiUtil.sendMessage(`*Operator:* ${messageHistoryContextText}\n\n${formattedMessageHistory}`,
                                       {parentMessageTs: destinationSlackParentMessageTs, channel: destinationSlackChannelId});
   }).catch((err) => {
-    if (logDebug) console.log("ROUTER.postUserMessageHistoryToSlack: ERROR fetching messageHistory of user from Postgres.", err);
+    if (logDebug) console.log('\x1b[41m%s\x1b[1m\x1b[0m', "ROUTER.postUserMessageHistoryToSlack: ERROR fetching messageHistory of user from Postgres.", err);
   });
 };
 
@@ -201,6 +201,8 @@ const routeVoterToSlackChannel = (userInfo, redisClient, {userId, twilioPhoneNum
   if (logDebug) console.log("\nENTERING ROUTER.routeVoterToSlackChannel");
   const userPhoneNumber = userInfo.userPhoneNumber;
 
+  // TODO: Consider doing this fetch within handleSlackAdminCommand, especially
+  // when adding new commands that require fetching a Slack channel ID.
   return RedisApiUtil.getHash(redisClient, "slackPodChannelIds").then(slackChannelIds => {
     const destinationSlackChannelId = slackChannelIds[destinationSlackChannelName];
     if (logDebug) console.log(`ROUTER.routeVoterToSlackChannel: Determined destination Slack channel ID: ${destinationSlackChannelId}`);
@@ -263,14 +265,14 @@ const routeVoterToSlackChannel = (userInfo, redisClient, {userId, twilioPhoneNum
                                             {destinationSlackChannelName, destinationSlackChannelId, destinationSlackParentMessageTs: userInfo[destinationSlackChannelId]},
                                             timestampOfLastMessageInThread);
         }).catch(err => {
-          if (logDebug) console.log("ROUTER.routeVoterToSlackChannel: ERROR sending voter back to channel", err);
+          if (logDebug) console.log('\x1b[41m%s\x1b[1m\x1b[0m', "ROUTER.routeVoterToSlackChannel: ERROR sending voter back to channel", err);
         });
       }).catch(err => {
-        if (logDebug) console.log("ROUTER.routeVoterToSlackChannel: ERROR in DbApiUtil.getTimestampOfLastMessageInThread", err);
+        if (logDebug) console.log('\x1b[41m%s\x1b[1m\x1b[0m', "ROUTER.routeVoterToSlackChannel: ERROR in DbApiUtil.getTimestampOfLastMessageInThread", err);
       });
     }
   }).catch(err => {
-    if (logDebug) console.log("ROUTER.routeVoterToSlackChannel: ERROR retrieving slackPodChannelIds key from Redis! This must be manually added!", err);
+    if (logDebug) console.log('\x1b[41m%s\x1b[1m\x1b[0m', '\x1b[41m%s\x1b[1m\x1b[0m', "ROUTER.routeVoterToSlackChannel: ERROR retrieving slackPodChannelIds key from Redis! This must be manually added!", err);
   });
 };
 
@@ -295,10 +297,10 @@ exports.determineVoterState = (userOptions, redisClient, twilioPhoneNumber, inbo
       const stateName = StateParser.determineState(userMessage);
       if (stateName == null) {
         if (logDebug) console.log(`ROUTER.determineVoterState: StateParser could not determine U.S. state of voter from message ${userMessage}`);
-        TwilioApiUtil.sendMessage(MessageConstants.CLARIFY_STATE, {userPhoneNumber, twilioPhoneNumber},
+        TwilioApiUtil.sendMessage(MessageConstants.CLARIFY_STATE(), {userPhoneNumber, twilioPhoneNumber},
           DbApiUtil.populateAutomatedDbMessageEntry(userInfo)
         );
-        SlackApiUtil.sendMessage(`*Automated Message:* ${MessageConstants.CLARIFY_STATE}`,
+        SlackApiUtil.sendMessage(`*Automated Message:* ${MessageConstants.CLARIFY_STATE()}`,
           {parentMessageTs: lobbyParentMessageTs, channel: lobbyChannelId});
 
         if (logDebug) console.log(`ROUTER.determineVoterState: Writing updated userInfo to Redis.`);
@@ -318,7 +320,8 @@ exports.determineVoterState = (userOptions, redisClient, twilioPhoneNumber, inbo
           return SlackApiUtil.sendMessage(`*Automated Message:* ${MessageConstants.STATE_CONFIRMATION(stateName)}`,
                                     {parentMessageTs: lobbyParentMessageTs, channel: lobbyChannelId}).then(() => {
             if (!selectedStateChannelName) {
-              if (logDebug) console.log(`ROUTER.determineVoterState: ERROR in selecting U.S. state channel. Defaulting to #lobby.`);
+              if (logDebug) console.log('\x1b[41m%s\x1b[1m\x1b[0m', `ROUTER.determineVoterState: ERROR in selecting U.S. state channel. Defaulting to #lobby.`);
+              if (logDebug) console.log('\x1b[41m%s\x1b[1m\x1b[0m', 'I am bright red');
               selectedStateChannelName = "#lobby";
             } else {
               if (logDebug) console.log(`ROUTER.determineVoterState: U.S. state channel successfully selected: ${selectedStateChannelName}`);
@@ -326,7 +329,7 @@ exports.determineVoterState = (userOptions, redisClient, twilioPhoneNumber, inbo
             return routeVoterToSlackChannel(userInfo, redisClient, {userId, twilioPhoneNumber, destinationSlackChannelName: selectedStateChannelName});
           });
         }).catch(err => {
-          if (logDebug) console.log(`ROUTER.determineVoterState (${userInfo.userId}): ERROR in LoadBalancer.selectSlackChannel for PULL voter: ${err}`);
+          if (logDebug) console.log('\x1b[41m%s\x1b[1m\x1b[0m', `ROUTER.determineVoterState (${userInfo.userId}): ERROR in LoadBalancer.selectSlackChannel for PULL voter: ${err}`);
         });
       }
     });
@@ -352,10 +355,10 @@ exports.handleDisclaimer = (userOptions, redisClient, twilioPhoneNumber, inbound
       if (cleared) {
         if (logDebug) console.log(`ROUTER.handleDisclaimer: Voter cleared disclaimer with message ${userMessage}.`);
         userInfo.confirmedDisclaimer = true;
-        automatedMessage = MessageConstants.DISCLAIMER_CONFIRMATION_AND_STATE_QUESTION;
+        automatedMessage = MessageConstants.DISCLAIMER_CONFIRMATION_AND_STATE_QUESTION();
       } else {
         if (logDebug) console.log(`ROUTER.handleDisclaimer: Voter did not clear disclaimer with message ${userMessage}.`);
-        automatedMessage = MessageConstants.CLARIFY_DISCLAIMER;
+        automatedMessage = MessageConstants.CLARIFY_DISCLAIMER();
       }
       RedisApiUtil.setHash(redisClient, `${userId}:${twilioPhoneNumber}`, userInfo);
       TwilioApiUtil.sendMessage(automatedMessage, {userPhoneNumber: userOptions.userPhoneNumber, twilioPhoneNumber},
@@ -387,7 +390,7 @@ exports.handleClearedVoter = (userOptions, redisClient, twilioPhoneNumber, inbou
 
       if (nowSecondsEpoch - lastVoterMessageSecsFromEpoch > MINS_BEFORE_WELCOME_BACK_MESSAGE * 60) {
         if (logDebug) console.log(`ROUTER.handleClearedVoter: Seconds since last message from voter > MINS_BEFORE_WELCOME_BACK_MESSAGE (${nowSecondsEpoch - lastVoterMessageSecsFromEpoch} > : ${MINS_BEFORE_WELCOME_BACK_MESSAGE}), sending welcome back message.`);
-        const welcomeBackMessage = MessageConstants.WELCOME_BACK(userInfo.stateName);
+        const welcomeBackMessage = MessageConstants.WELCOME_BACK();
         TwilioApiUtil.sendMessage(welcomeBackMessage, {userPhoneNumber: userOptions.userPhoneNumber, twilioPhoneNumber});
         SlackApiUtil.sendMessage(`*Automated Message:* ${welcomeBackMessage}`, activeChannelMessageParams);
       }
@@ -461,34 +464,44 @@ exports.handleSlackAdminCommand = (reqBody, redisClient, originatingSlackUserNam
   const adminCommandArgs = AdminUtil.parseAdminSlackMessage(reqBody.event.text);
   if (logDebug) console.log(`ROUTER.handleSlackAdminCommand: Parsed admin control command params: ${JSON.stringify(adminCommandArgs)}`);
   if (adminCommandArgs) {
-    const redisHashKey = `${adminCommandArgs.userId}:${adminCommandArgs.twilioPhoneNumber}`;
-    if (logDebug) console.log(`ROUTER.handleSlackAdminCommand: Looking up ${redisHashKey} in Redis.`);
-    RedisApiUtil.getHash(redisClient, redisHashKey).then(userInfo => {
-      // This catches invalid userPhoneNumber:twilioPhoneNumber pairs.
-      if (!userInfo) {
-        if (logDebug) console.log("Router.handleSlackAdminCommand: No Redis data found for userId:twilioPhoneNumber pair.");
-        SlackApiUtil.sendMessage(`*Operator:* No record found for user ID (${adminCommandArgs.userId}) and/or Twilio phone number (${adminCommandArgs.twilioPhoneNumber}).`,
-                                        {channel: process.env.ADMIN_CONTROL_ROOM_SLACK_CHANNEL_ID, parentMessageTs: reqBody.event.ts});
-      // userPhoneNumber:twilioPhoneNumber pair found successfully.
-      } else {
-        // Voter already in destination slack channel (error).
-        if (userInfo.activeChannelName === adminCommandArgs.destinationSlackChannelName) {
-          if (logDebug) console.log("Router.handleSlackAdminCommand: Voter is already active in destination Slack channel.");
-          SlackApiUtil.sendMessage(`*Operator:* Voter's thread in ${userInfo.activeChannelName} is already the active thread.`,
-                                          {channel: process.env.ADMIN_CONTROL_ROOM_SLACK_CHANNEL_ID, parentMessageTs: reqBody.event.ts});
-        } else {
-          const adminCommandParams = {
-            commandParentMessageTs: reqBody.event.ts,
-            previousSlackChannelName: userInfo.activeChannelName,
-            routingSlackUserName: originatingSlackUserName,
-          };
-          if (logDebug) console.log(`Router.handleSlackAdminCommand: Routing voter from ${userInfo.activeChannelName} to ${adminCommandArgs.destinationSlackChannelName}.`);
-          routeVoterToSlackChannel(userInfo, redisClient, adminCommandArgs, adminCommandParams);
-        }
-      }
-    }).catch(err => {
-      if (logDebug) console.log(`ROUTER.handleSlackAdminCommand: Did not find userInfo in Redis for key ${redisHashKey}`);
-    });
+
+    switch (adminCommandArgs.command) {
+      case AdminUtil.ROUTE_VOTER:
+        // TODO: Move some of this logic to AdminUtil, so this swith statement
+        // is cleaner.
+        const redisHashKey = `${adminCommandArgs.userId}:${adminCommandArgs.twilioPhoneNumber}`;
+        if (logDebug) console.log(`ROUTER.handleSlackAdminCommand: Looking up ${redisHashKey} in Redis.`);
+        RedisApiUtil.getHash(redisClient, redisHashKey).then(userInfo => {
+          // This catches invalid userPhoneNumber:twilioPhoneNumber pairs.
+          if (!userInfo) {
+            if (logDebug) console.log("Router.handleSlackAdminCommand: No Redis data found for userId:twilioPhoneNumber pair.");
+            SlackApiUtil.sendMessage(`*Operator:* No record found for user ID (${adminCommandArgs.userId}) and/or Twilio phone number (${adminCommandArgs.twilioPhoneNumber}).`,
+                                            {channel: process.env.ADMIN_CONTROL_ROOM_SLACK_CHANNEL_ID, parentMessageTs: reqBody.event.ts});
+          // userPhoneNumber:twilioPhoneNumber pair found successfully.
+          } else {
+            // Voter already in destination slack channel (error).
+            if (userInfo.activeChannelName === adminCommandArgs.destinationSlackChannelName) {
+              if (logDebug) console.log("Router.handleSlackAdminCommand: Voter is already active in destination Slack channel.");
+              SlackApiUtil.sendMessage(`*Operator:* Voter's thread in ${userInfo.activeChannelName} is already the active thread.`,
+                                              {channel: process.env.ADMIN_CONTROL_ROOM_SLACK_CHANNEL_ID, parentMessageTs: reqBody.event.ts});
+            } else {
+              const adminCommandParams = {
+                commandParentMessageTs: reqBody.event.ts,
+                previousSlackChannelName: userInfo.activeChannelName,
+                routingSlackUserName: originatingSlackUserName,
+              };
+              if (logDebug) console.log(`Router.handleSlackAdminCommand: Routing voter from ${userInfo.activeChannelName} to ${adminCommandArgs.destinationSlackChannelName}.`);
+              routeVoterToSlackChannel(userInfo, redisClient, adminCommandArgs, adminCommandParams);
+            }
+          }
+        }).catch(err => {
+          if (logDebug) console.log(`ROUTER.handleSlackAdminCommand: Did not find userInfo in Redis for key ${redisHashKey}`);
+        });
+      case AdminUtil.FIND_VOTER:
+        AdminUtil.findVoter(redisClient, adminCommandArgs.voterIdentifier);
+      case AdminUtil.RESET_VOTER:
+        AdminUtil.resetVoter(redisClient, adminCommandArgs.userId, adminCommandArgs.twilioPhoneNumber);
+    }
   } else {
     SlackApiUtil.sendMessage(`*Operator:* Your command could not be parsed (did you closely follow the required format)?`,
                                     {channel: process.env.ADMIN_CONTROL_ROOM_SLACK_CHANNEL_ID, parentMessageTs: reqBody.event.ts});

@@ -95,7 +95,7 @@ const handleIncomingTwilioMessage = (req, entryPoint) => {
       console.log(`SERVER.handleIncomingTwilioMessage (${userId}): Voter is new to us (Redis returned no userInfo for redisHashKey ${redisHashKey})`);
       Router.handleNewVoter({userPhoneNumber, userMessage, userId}, redisClient, twilioPhoneNumber, inboundDbMessageEntry, entryPoint);
     }
-  }).catch(err => console.log(`SERVER.handleIncomingTwilioMessage (${userId}): ERROR looking up userInfo in Redis with redisHashKey ${redisHashKey}, error: ${err}`));
+  }).catch(err => console.log('\x1b[41m%s\x1b[1m\x1b[0m', `SERVER.handleIncomingTwilioMessage (${userId}): ERROR looking up userInfo in Redis with redisHashKey ${redisHashKey}, error: ${err}`));
 };
 
 app.post('/push', (req, res) => {
@@ -194,7 +194,7 @@ app.post('/slack', upload.array(), (req, res) => {
   if (!req.body.challenge) {
     const reqBody = req.body;
     if(process.env.NODE_ENV !== "development" && !passesAuth(req)) {
-      console.log("SERVER POST /slack: ERROR in authenticating /slack request is from Slack.");
+      console.log('\x1b[41m%s\x1b[1m\x1b[0m', "SERVER POST /slack: ERROR in authenticating /slack request is from Slack.");
       res.sendStatus(401);
       return;
     }
@@ -211,7 +211,7 @@ app.post('/slack', upload.array(), (req, res) => {
           SlackApiUtil.fetchSlackUserName(reqBody.event.user).then(originatingSlackUserName => {
             console.log(`SERVER POST /slack: Successfully determined Slack user name of message sender: ${originatingSlackUserName}, from Slack user ID: ${reqBody.event.user}`);
             Router.handleSlackVoterThreadMessage(req, redisClient, redisData, originatingSlackUserName);
-          }).catch(err => console.log(`SERVER POST /slack: ERROR determining Slack user name from Slack user ID`, err));
+          }).catch(err => console.log('\x1b[41m%s\x1b[1m\x1b[0m', `SERVER POST /slack: ERROR determining Slack user name from Slack user ID`, err));
         } else {
           // Hash doesn't exist (this message is likely outside of a voter thread).
           console.log("SERVER POST /slack: Server received non-bot Slack message OUTSIDE a voter thread. Doing nothing.");
