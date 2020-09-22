@@ -3,6 +3,8 @@ const requireModules = () => {
   StateParser = require('./state_parser');
   TwilioApiUtil = require('./twilio_api_util');
   SlackApiUtil = require('./slack_api_util');
+  SlackInteractionApiUtil = require('./slack_interaction_api_util');
+  SlackBlockUtil = require('./slack_block_util');
   RedisApiUtil = require('./redis_api_util');
   DbApiUtil = require('./db_api_util');
   LoadBalancer = require('./load_balancer');
@@ -13,8 +15,12 @@ const requireModules = () => {
   jest.mock('./state_parser');
 
   SlackApiUtil.sendMessage = jest.fn();
+  SlackApiUtil.fetchSlackMessageBlocks = jest.fn();
+  SlackInteractionApiUtil.replaceSlackMessageBlocks = jest.fn();
   RedisApiUtil.setHash = jest.fn();
   DbApiUtil.getMessageHistoryFor = jest.fn();
+  DbApiUtil.logVoterStatusToDb = jest.fn();
+  SlackBlockUtil.populateDropdownWithLatestVoterStatus = jest.fn();
 };
 
 process.on('unhandledRejection', (reason, p) => {
@@ -490,6 +496,13 @@ describe('determineVoterState', () => {
       // to be to state channel (which sort of makes sense when you think about it).
       SlackApiUtil.sendMessage.mockResolvedValueOnce(lobbySlackMessageResponse).mockResolvedValueOnce(stateSlackMessageResponse);
 
+      // This is necessary so that the nested operations within this function to complete.
+      // An empty array is only okay because this is being left untested.
+      SlackApiUtil.fetchSlackMessageBlocks.mockResolvedValue([]);
+      // This is necessary so that the nested operations within this function to complete, even though the resolved value isn't used.
+      SlackInteractionApiUtil.replaceSlackMessageBlocks.mockResolvedValue(null);
+      SlackBlockUtil.populateDropdownWithLatestVoterStatus.mockResolvedValue(null);
+
       DbApiUtil.getMessageHistoryFor.mockResolvedValue([
         {
           timestamp: '2020-09-06T13:47:50.500Z',
@@ -675,7 +688,6 @@ describe('determineVoterState', () => {
     });
 
     test("Sends demo voters to Slack demo channel independent of normal channel number of voters and open pods", () => {
-      // TOMER
       redisClient.getAsync = jest.fn().mockImplementation((voterCounterKey) => {
         let result;
         switch(voterCounterKey) {
