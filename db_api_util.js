@@ -37,9 +37,9 @@ exports.logMessageToDb = (databaseMessageEntry) => {
         databaseMessageEntry.entryPoint
       ], (err, res) => {
         if (err) {
-          console.log('\x1b[41m%s\x1b[1m\x1b[0m', `DBAPIUTIL.logMessageToDb: ERROR from PostgreSQL database insert:`, err);
+          console.log('\x1b[41m%s\x1b[1m\x1b[0m', `DBAPIUTIL.logMessageToDb: ERROR from PostgreSQL database message insert:`, err);
         } else {
-          console.log(`DBAPIUTIL.logMessageToDb: Successfully inserted into PostgreSQL database.`);
+          console.log(`DBAPIUTIL.logMessageToDb: Successfully inserted message into PostgreSQL database.`);
         }
         pgDatabaseClient.end();
       });
@@ -261,7 +261,7 @@ exports.getTimestampOfLastMessageInThread = (parentMessageTs) => {
   return pgDatabaseClient.connect()
     .then(() => {
       return pgDatabaseClient.query(LAST_TIMESTAMP_SQL_SCRIPT, [parentMessageTs]).then(result => {
-        console.log(`DBAPIUTIL.getMessageHistoryFor: Successfully looked up last timestamp in thread.`);
+        console.log(`DBAPIUTIL.getTimestampOfLastMessageInThread: Successfully looked up last timestamp in thread.`);
         pgDatabaseClient.end();
         // Just in case nobody said anything while the user was at a channel.
         if (result.rows.length > 0) {
@@ -271,11 +271,75 @@ exports.getTimestampOfLastMessageInThread = (parentMessageTs) => {
         }
       })
       .catch(err => {
-        console.log('\x1b[41m%s\x1b[1m\x1b[0m', `DBAPIUTIL.getMessageHistoryFor: ERROR from PostgreSQL last timestamp in thread lookup:`, err);
+        console.log('\x1b[41m%s\x1b[1m\x1b[0m', `DBAPIUTIL.getTimestampOfLastMessageInThread: ERROR from PostgreSQL last timestamp in thread lookup:`, err);
         pgDatabaseClient.end();
       });
     })
     .catch(err => {
       console.log('\x1b[41m%s\x1b[1m\x1b[0m', `DBAPIUTIL.getTimestampOfLastMessageInThread: ERROR connecting to PostgreSQL database:`, err.stack);
+    });
+};
+
+exports.logVoterStatusToDb = (databaseVoterStatusEntry) => {
+  console.log(`\nENTERING DBAPIUTIL.logVoterStatusToDb`);
+  const pgDatabaseClient = new Client({
+    connectionString: process.env.DATABASE_URL,
+  });
+
+  return pgDatabaseClient.connect()
+    .then(() => {
+      pgDatabaseClient.query("INSERT INTO voter_status_updates (user_id, user_phone_number, voter_status, originating_slack_user_name, originating_slack_user_id, originating_slack_channel_name, originating_slack_channel_id, originating_slack_parent_message_ts, action_ts) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9);", [
+        databaseVoterStatusEntry.userId,
+        databaseVoterStatusEntry.userPhoneNumber,
+        databaseVoterStatusEntry.voterStatus,
+        databaseVoterStatusEntry.originatingSlackUserName,
+        databaseVoterStatusEntry.originatingSlackUserId,
+        databaseVoterStatusEntry.originatingSlackChannelName,
+        databaseVoterStatusEntry.originatingSlackChannelId,
+        databaseVoterStatusEntry.originatingSlackParentMessageTs,
+        databaseVoterStatusEntry.actionTs
+      ], (err, res) => {
+        if (err) {
+          console.log('\x1b[41m%s\x1b[1m\x1b[0m', `DBAPIUTIL.logVoterStatusToDb: ERROR from PostgreSQL database voter status insert:`, err);
+        } else {
+          console.log(`DBAPIUTIL.logVoterStatusToDb: Successfully inserted voter status into PostgreSQL database.`);
+        }
+        pgDatabaseClient.end();
+      });
+    })
+    .catch(err => console.log('\x1b[41m%s\x1b[1m\x1b[0m', `DBAPIUTIL.logVoterStatusToDb: ERROR connecting to PostgreSQL database:`, err.stack));
+};
+
+const LAST_VOTER_STATUS_SQL_SCRIPT = `SELECT voter_status
+                                        FROM voter_status_updates
+                                        WHERE user_id = $1
+                                        ORDER BY created_at DESC
+                                        LIMIT 1;`;
+
+exports.getLatestVoterStatus = (userId) => {
+  console.log(`\nENTERING DBAPIUTIL.getLatest`);
+  console.log(`DBAPIUTIL.getLatestVoterStatus: Looking up last voter status for userId: ${userId}.`);
+  const pgDatabaseClient = new Client({
+    connectionString: process.env.DATABASE_URL,
+  });
+  return pgDatabaseClient.connect()
+    .then(() => {
+      return pgDatabaseClient.query(LAST_VOTER_STATUS_SQL_SCRIPT, [userId]).then(result => {
+        console.log(`DBAPIUTIL.getLatestVoterStatus: Successfully looked up last voter status.`);
+        pgDatabaseClient.end();
+        if (result.rows.length > 0) {
+          return result.rows[0].voter_status;
+        } else {
+          console.log('\x1b[41m%s\x1b[1m\x1b[0m', `DBAPIUTIL.getLatestVoterStatus: No voter status for user`);
+          return null;
+        }
+      })
+      .catch(err => {
+        console.log('\x1b[41m%s\x1b[1m\x1b[0m', `DBAPIUTIL.getLatestVoterStatus: ERROR from PostgreSQL last voter status lookup:`, err);
+        pgDatabaseClient.end();
+      });
+    })
+    .catch(err => {
+      console.log('\x1b[41m%s\x1b[1m\x1b[0m', `DBAPIUTIL.getLatestVoterStatus: ERROR connecting to PostgreSQL database:`, err.stack);
     });
 };
