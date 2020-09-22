@@ -43,3 +43,34 @@ exports.getHash = (redisClient, key) => {
     if (logDebug) console.log('\x1b[41m%s\x1b[1m\x1b[0m', `REDISAPIUTIL.setHash: ERROR calling hgetallAsync`, err);
   });
 };
+
+exports.getHashField = (redisClient, key, field) => {
+  if (logDebug) console.log(`\nENTERING REDISAPIUTIL.getHashField`);
+  let parsedValue;
+  return redisClient.hgetAsync(key, field).then(value => {
+    if (value != null) {
+      switch(fieldTypes[field]) {
+        case "boolean":
+          parsedValue = hash[field] === "true";
+          break;
+        case "integer":
+          parsedValue = parseInt(hash[field]);
+          break;
+        default:
+          parsedValue = value;
+      }
+    }
+    return new Promise(resolve => resolve(parsedValue));
+  }).catch(err => {
+    if (logDebug) console.log('\x1b[41m%s\x1b[1m\x1b[0m', `REDISAPIUTIL.getHashField: ERROR calling hgetAsync`, err);
+  });
+};
+
+exports.deleteHashField = (redisClient, key, field) => {
+  if (logDebug) console.log(`\nENTERING REDISAPIUTIL.deleteHashField`);
+  return redisClient.hdelAsync(key, field).then(value => {
+    return new Promise(resolve => resolve(value));
+  }).catch(err => {
+    if (logDebug) console.log('\x1b[41m%s\x1b[1m\x1b[0m', `REDISAPIUTIL.deleteHashField: ERROR calling hdelAsync`, err);
+  });
+};

@@ -23,7 +23,7 @@ exports.getPushPhoneNumberState = (twilioPhoneNumber) => {
     default:
       return null;
   }
-}
+};
 
 exports.selectSlackChannel = (redisClient, entryPoint, stateName, isDemo = false) => {
   if (logDebug) console.log("\n ENTERING LOADBALANCER.selectSlackChannel");
