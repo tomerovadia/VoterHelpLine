@@ -21,7 +21,7 @@ const { Client } = require('pg');
 const DbApiUtil = require('./db_api_util');
 const RedisApiUtil = require('./redis_api_util');
 const LoadBalancer = require('./load_balancer');
-const SlackUtil = require('./slacK_util');
+const SlackUtil = require('./slack_util');
 const SlackInteractionHandler = require('./slack_interaction_handler');
 const SlackBlockUtil = require('./slack_block_util');
 
