@@ -22,6 +22,7 @@ const DbApiUtil = require('./db_api_util');
 const RedisApiUtil = require('./redis_api_util');
 const LoadBalancer = require('./load_balancer');
 const SlackUtil = require('./slack_util');
+const TwilioUtil = require('./twilio_util');
 const SlackInteractionHandler = require('./slack_interaction_handler');
 const SlackBlockUtil = require('./slack_block_util');
 
@@ -78,6 +79,7 @@ app.post('/push', (req, res) => {
 
 const handleIncomingTwilioMessage = (req, entryPoint) => {
   console.log("\nEntering SERVER.handleIncomingTwilioMessage");
+
   const userPhoneNumber = req.body.From;
 
   RedisApiUtil.getHashField(redisClient, "twilioBlockedUserPhoneNumbers", userPhoneNumber).then(isBlocked => {
@@ -153,10 +155,17 @@ app.post('/twilio-push', (req, res) => {
   console.log("******************************************************************************************************");
   console.log("Entering SERVER POST /twilio-push");
   const twiml = new MessagingResponse();
-  handleIncomingTwilioMessage(req, LoadBalancer.PUSH_ENTRY_POINT);
 
-  res.writeHead(200, {'Content-Type': 'text/xml'});
-  res.end(twiml.toString());
+  if(TwilioUtil.passesAuth(req)) {
+    console.log("SERVER.handleIncomingTwilioMessage: Passes Twilio auth.");
+    handleIncomingTwilioMessage(req, LoadBalancer.PUSH_ENTRY_POINT)
+    res.writeHead(200, {'Content-Type': 'text/xml'});
+    res.end(twiml.toString());
+  } else {
+    console.log('\x1b[41m%s\x1b[1m\x1b[0m', "SERVER.handleIncomingTwilioMessage: ERROR authenticating /twilio-push request is from Twilio.");
+    res.writeHead(401, {'Content-Type': 'text/xml'});
+    res.end(twiml.toString());
+  }
 });
 
 
@@ -165,10 +174,17 @@ app.post('/twilio-pull', (req, res) => {
   console.log("******************************************************************************************************");
   console.log("Entering SERVER POST /twilio-pull");
   const twiml = new MessagingResponse();
-  handleIncomingTwilioMessage(req, LoadBalancer.PULL_ENTRY_POINT);
 
-  res.writeHead(200, {'Content-Type': 'text/xml'});
-  res.end(twiml.toString());
+  if(TwilioUtil.passesAuth(req)) {
+    console.log("SERVER.handleIncomingTwilioMessage: Passes Twilio auth.");
+    handleIncomingTwilioMessage(req, LoadBalancer.PULL_ENTRY_POINT)
+    res.writeHead(200, {'Content-Type': 'text/xml'});
+    res.end(twiml.toString());
+  } else {
+    console.log('\x1b[41m%s\x1b[1m\x1b[0m', "SERVER.handleIncomingTwilioMessage: ERROR authenticating /twilio-pull request is from Twilio.");
+    res.writeHead(401, {'Content-Type': 'text/xml'});
+    res.end(twiml.toString());
+  }
 });
 
 const isRetry = (req) => {
