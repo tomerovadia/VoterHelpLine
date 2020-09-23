@@ -288,7 +288,7 @@ exports.logVoterStatusToDb = (databaseVoterStatusEntry) => {
 
   return pgDatabaseClient.connect()
     .then(() => {
-      pgDatabaseClient.query("INSERT INTO voter_status_updates (user_id, user_phone_number, voter_status, originating_slack_user_name, originating_slack_user_id, originating_slack_channel_name, originating_slack_channel_id, originating_slack_parent_message_ts, action_ts) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9);", [
+      pgDatabaseClient.query("INSERT INTO voter_status_updates (user_id, user_phone_number, voter_status, originating_slack_user_name, originating_slack_user_id, originating_slack_channel_name, originating_slack_channel_id, originating_slack_parent_message_ts, action_ts, twilio_phone_number, is_demo) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11);", [
         databaseVoterStatusEntry.userId,
         databaseVoterStatusEntry.userPhoneNumber,
         databaseVoterStatusEntry.voterStatus,
@@ -297,7 +297,9 @@ exports.logVoterStatusToDb = (databaseVoterStatusEntry) => {
         databaseVoterStatusEntry.originatingSlackChannelName,
         databaseVoterStatusEntry.originatingSlackChannelId,
         databaseVoterStatusEntry.originatingSlackParentMessageTs,
-        databaseVoterStatusEntry.actionTs
+        databaseVoterStatusEntry.actionTs,
+        databaseVoterStatusEntry.twilioPhoneNumber,
+        databaseVoterStatusEntry.isDemo
       ], (err, res) => {
         if (err) {
           console.log('\x1b[41m%s\x1b[1m\x1b[0m', `DBAPIUTIL.logVoterStatusToDb: ERROR from PostgreSQL database voter status insert:`, err);

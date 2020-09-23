@@ -2,8 +2,9 @@ const axios = require('axios');
 const Hashes = require('jshashes'); // v1.0.5
 const DbApiUtil = require('./db_api_util');
 const SlackApiUtil = require('./slack_api_util');
+const LoadBalancer = require('./load_balancer');
 
-exports.handleVoterStatusUpdate = (payload, selectedValue, originatingSlackUserName, originatingSlackChannelName, userPhoneNumber) => {
+exports.handleVoterStatusUpdate = (payload, selectedValue, originatingSlackUserName, originatingSlackChannelName, userPhoneNumber, twilioPhoneNumber) => {
   console.log("\nENTERING SLACKINTERACTIONHANDLER.handleVoterStatusUpdate");
   const MD5 = new Hashes.MD5;
   const userId = MD5.hex(userPhoneNumber);
@@ -16,9 +17,12 @@ exports.handleVoterStatusUpdate = (payload, selectedValue, originatingSlackUserN
   return SlackApiUtil.sendMessage(`*Operator:* Voter status changed to *${selectedValue}* by *${originatingSlackUserName}* at *${specialSlackTimestamp}*.`,
                                     {parentMessageTs: payload.container.thread_ts, channel: payload.channel.id}).then(() => {
     console.log(`SLACKINTERACTIONHANDLER.handleVoterStatusUpdate: Successfully sent message recording voter status change`);
+
     return DbApiUtil.logVoterStatusToDb({
       userId,
       userPhoneNumber,
+      twilioPhoneNumber,
+      isDemo: LoadBalancer.phoneNumbersAreDemo(twilioPhoneNumber, userPhoneNumber),
       voterStatus: selectedValue,
       originatingSlackUserName,
       originatingSlackUserId: payload.user.id,
