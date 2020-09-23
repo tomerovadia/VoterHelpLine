@@ -122,6 +122,7 @@ exports.handleNewVoter = (userOptions, redisClient, twilioPhoneNumber, inboundDb
   DbApiUtil.logVoterStatusToDb({
     userId: userInfo.userId,
     userPhoneNumber: userInfo.userPhoneNumber,
+    twilioPhoneNumber,
     voterStatus: "UNKNOWN",
     originatingSlackUserName: null,
     originatingSlackUserId: null,

@@ -58,7 +58,7 @@ app.post('/push', (req, res) => {
     let INTERVAL_MILLISECONDS = 2000;
     for (let idx in userPhoneNumbers) {
       const userPhoneNumber = userPhoneNumbers[idx];
-      console.log(`Sending push message to phone number: ${userPhoneNumber}`)
+      console.log(`Sending push message to phone number: ${userPhoneNumber}`);
 
       const MD5 = new Hashes.MD5;
       const userId = MD5.hex(userPhoneNumber);
@@ -294,7 +294,7 @@ app.post('/slack-interactivity', (req, res) => {
       RedisApiUtil.getHash(redisClient, redisHashKey).then(redisData => {
         if (Object.keys(SlackBlockUtil.getVoterStatusOptions()).includes(selectedValue)) {
           console.log(`SERVER POST /slack-interactivity: Determined user interaction is a voter status update`);
-          SlackInteractionHandler.handleVoterStatusUpdate(payload, selectedValue, originatingSlackUserName, originatingSlackChannelName, redisData.userPhoneNumber).then(() => {
+          SlackInteractionHandler.handleVoterStatusUpdate(payload, selectedValue, originatingSlackUserName, originatingSlackChannelName, redisData.userPhoneNumber, redisData.twilioPhoneNumber).then(() => {
             res.sendStatus(200);
             if (payload.actions[0].type === "button") {
               const closedVoterPanelText = SlackInteractionHandler.getClosedVoterPanelText(selectedValue, originatingSlackUserName);
@@ -319,7 +319,7 @@ app.post('/slack-interactivity', (req, res) => {
           });
         } else if (selectedValue === "UNDO" && payload.actions[0].type === "button") {
           console.log(`SERVER POST /slack-interactivity: Determined user interaction is UNDO of voter status update`);
-          SlackInteractionHandler.handleVoterStatusUpdate(payload, "UNKNOWN", originatingSlackUserName, originatingSlackChannelName, redisData.userPhoneNumber).then(() => {
+          SlackInteractionHandler.handleVoterStatusUpdate(payload, "UNKNOWN", originatingSlackUserName, originatingSlackChannelName, redisData.userPhoneNumber, redisData.twilioPhoneNumber).then(() => {
             res.sendStatus(200);
             SlackInteractionApiUtil.addBackVoterStatusPanel({
               slackChannelId: payload.channel.id,
