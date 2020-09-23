@@ -283,6 +283,8 @@ app.post('/slack-interactivity', (req, res) => {
     return;
   }
 
+  console.log(req.body.payload);
+
   const payload = JSON.parse(req.body.payload);
   const selectedValue = payload.actions[0].selected_option ? payload.actions[0].selected_option.value : payload.actions[0].value;
   console.log(`SERVER POST /slack-interactivity: Received interaction that selected value: ${selectedValue}`);
@@ -290,7 +292,6 @@ app.post('/slack-interactivity', (req, res) => {
   SlackApiUtil.fetchSlackUserName(payload.user.id).then(originatingSlackUserName => {
     SlackApiUtil.fetchSlackChannelName(payload.channel.id).then(originatingSlackChannelName => {
       const redisHashKey = `${payload.channel.id}:${payload.container.thread_ts}`;
-      // Pass Slack message to Twilio
       RedisApiUtil.getHash(redisClient, redisHashKey).then(redisData => {
         if (Object.keys(SlackBlockUtil.getVoterStatusOptions()).includes(selectedValue)) {
           console.log(`SERVER POST /slack-interactivity: Determined user interaction is a voter status update`);
@@ -312,6 +313,17 @@ app.post('/slack-interactivity', (req, res) => {
                   RedisApiUtil.setHash(redisClient, "twilioBlockedUserPhoneNumbers", {[redisData.userPhoneNumber]: "1"});
                 }
               }
+            // Steps to take if the dropdown was changed.
+            } else {
+              // Take the blocks and replace the initial_option with the new status, so that
+              // even when Slack is refreshed this new status is shown.
+              SlackBlockUtil.populateDropdownWithVoterStatus(payload.message.blocks, selectedValue);
+              // Replace the entire block so that the initial option change persists.
+              SlackInteractionApiUtil.replaceSlackMessageBlocks({
+                  slackChannelId: payload.channel.id,
+                  slackParentMessageTs: payload.container.thread_ts,
+                  newBlocks: payload.message.blocks,
+                });
             }
           }).catch(err => {
             console.log('\x1b[41m%s\x1b[1m\x1b[0m', `SERVER POST /slack-interactivity: ERROR processing voter status update: ${err}`);

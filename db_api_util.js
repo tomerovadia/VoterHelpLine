@@ -318,6 +318,9 @@ const LAST_VOTER_STATUS_SQL_SCRIPT = `SELECT voter_status
                                         ORDER BY created_at DESC
                                         LIMIT 1;`;
 
+// This used to be used to look up the latest voter status when moving a voter
+// from channel to channel, but now instead the voter status is coded into
+// the block initial_option on the front-end, and is copied over with the blocks during the move.
 exports.getLatestVoterStatus = (userId) => {
   console.log(`\nENTERING DBAPIUTIL.getLatest`);
   console.log(`DBAPIUTIL.getLatestVoterStatus: Looking up last voter status for userId: ${userId}.`);
