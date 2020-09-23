@@ -129,6 +129,7 @@ exports.handleNewVoter = (userOptions, redisClient, twilioPhoneNumber, inboundDb
     originatingSlackChannelName: null,
     originatingSlackChannelId: null,
     originatingSlackParentMessageTs: null,
+    isDemo: userInfo.isDemo,
   });
 
   let slackChannelName = "lobby";
