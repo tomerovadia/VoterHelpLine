@@ -292,27 +292,23 @@ exports.replaceVoterPanelBlocks = (oldBlocks, replacementBlocks) => {
   return newBlocks;
 };
 
-exports.populateDropdownWithLatestVoterStatus = (blocks, userId) => {
+// This function mutates the blocks input.
+exports.populateDropdownWithVoterStatus = (blocks, voterStatus) => {
   const voterStatusOptions = getVoterStatusOptions();
-  return DbApiUtil.getLatestVoterStatus(userId).then(latestVoterStatus => {
-    for (let i in blocks) {
-      const block = blocks[i];
-      if (block.type === "actions") {
-        const elements = block.elements;
-        for (let j in elements) {
-          element = elements[j];
-          if (element.type === "static_select" &&
-                Object.keys(voterStatusOptions).includes(element.initial_option.value)) {
-            console.log("TOMERTOMEROTMER")
-            console.log(latestVoterStatus)
-            console.log(voterStatusOptions)
-            element.initial_option.value = latestVoterStatus;
-            element.initial_option.text.text = voterStatusOptions[latestVoterStatus];
-            // Javascript modifies the blocks by reference, so end but don't return anything.
-            return;
-          }
+  for (let i in blocks) {
+    const block = blocks[i];
+    if (block.type === "actions") {
+      const elements = block.elements;
+      for (let j in elements) {
+        element = elements[j];
+        if (element.type === "static_select" &&
+              Object.keys(voterStatusOptions).includes(element.initial_option.value)) {
+          element.initial_option.value = voterStatus;
+          element.initial_option.text.text = voterStatusOptions[voterStatus];
+          // Javascript modifies the blocks by reference, so end but don't return anything.
+          return;
         }
       }
     }
-  });
+  }
 };

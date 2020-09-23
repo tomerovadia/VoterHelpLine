@@ -50,7 +50,6 @@ exports.getClosedVoterPanelText = (selectedValue, originatingSlackUserName) => {
     case "VOTED":
       return `*Congratulations!* :tada: This voter has been marked as *VOTED* by *${originatingSlackUserName}* as of *${specialSlackTimestamp}*. On to the next one! :ballot_box_with_ballot:`;
     default:
-    //TODO add date that this happened
       return `:no_entry_sign: This voter was marked as *${selectedValue}* by *${originatingSlackUserName}* on *${specialSlackTimestamp}*. :no_entry_sign:`;
   }
 };

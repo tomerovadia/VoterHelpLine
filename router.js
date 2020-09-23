@@ -253,7 +253,7 @@ const routeVoterToSlackChannel = (userInfo, redisClient, {userId, twilioPhoneNum
     // text to be preserved when changing the parent message, and for 2. the other
     // blocks to be transferred to the new thread.
     return SlackApiUtil.fetchSlackMessageBlocks(userInfo.activeChannelId, userInfo[userInfo.activeChannelId]).then(previousParentMessageBlocks => {
-      return SlackBlockUtil.populateDropdownWithLatestVoterStatus(previousParentMessageBlocks, userId).then(() => {
+      // return SlackBlockUtil.populateDropdownWithLatestVoterStatus(previousParentMessageBlocks, userId).then(() => {
         // make deep copy of previousParentMessageBlocks
         const closedVoterPanelMessage = `Voter has been routed to *${destinationSlackChannelName}*.`;
         const closedVoterPanelBlocks = SlackBlockUtil.makeClosedVoterPanelBlocks(closedVoterPanelMessage, false /* include undo button */);
@@ -345,9 +345,9 @@ const routeVoterToSlackChannel = (userInfo, redisClient, {userId, twilioPhoneNum
           }).catch(err => {
             if (logDebug) console.log('\x1b[41m%s\x1b[1m\x1b[0m', "ROUTER.routeVoterToSlackChannel: ERROR updating old thread parent message during channel move: ", err);
           });
-      }).catch(err => {
-        if (logDebug) console.log('\x1b[41m%s\x1b[1m\x1b[0m', "ROUTER.routeVoterToSlackChannel: ERROR retrieving previous active thread parent message text: ", err);
-      });
+      // }).catch(err => {
+      //   if (logDebug) console.log('\x1b[41m%s\x1b[1m\x1b[0m', "ROUTER.routeVoterToSlackChannel: ERROR retrieving previous active thread parent message text: ", err);
+      // });
     }).catch(err => {
       if (logDebug) console.log('\x1b[41m%s\x1b[1m\x1b[0m', "ROUTER.routeVoterToSlackChannel: ERROR retrieving lastest voter status:", err);
     });
