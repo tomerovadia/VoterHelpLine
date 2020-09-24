@@ -33,8 +33,9 @@ exports.addBackVoterStatusPanel = ({slackChannelId, slackParentMessageTs, oldBlo
   console.log("\nENTERING SLACKINTERACTIONAPIUTIL.addBackVoterStatusPanel");
 
   const voterInfoBlock = oldBlocks[0];
-  const newBlocks = [voterInfoBlock];
-  newBlocks.push(SlackBlockUtil.voterPanel);
+  const volunteerDropdownBlock = oldBlocks[1];
+  const newBlocks = [voterInfoBlock, volunteerDropdownBlock];
+  newBlocks.push(SlackBlockUtil.voterStatusPanel);
 
   return replaceSlackMessageBlocks({slackChannelId, slackParentMessageTs, newBlocks});
 };

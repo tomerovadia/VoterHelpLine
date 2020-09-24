@@ -57,7 +57,21 @@ const voterInfoSection = (messageText) => {
 
 exports.voterInfoSection = voterInfoSection;
 
-const voterPanel = {
+const volunteerSelectionPanel = {
+  "type": "actions",
+  "elements": [
+    {
+      "type": "users_select",
+      "placeholder": {
+        "type": "plain_text",
+        "text": "Claim this voter",
+        "emoji": true
+      },
+    }
+  ]
+};
+
+const voterStatusPanel = {
   "type": "actions",
   "elements": [
       {
@@ -208,27 +222,13 @@ const voterPanel = {
   ]
 };
 
-exports.voterPanel = voterPanel;
+exports.voterStatusPanel = voterStatusPanel;
 
 exports.getVoterStatusBlocks = (messageText) => {
   return [
   		voterInfoSection(messageText),
-  		// {
-  		// 	"type": "section",
-  		// 	"text": {
-  		// 		"type": "mrkdwn",
-  		// 		"text": "*Volunteer:*"
-  		// 	},
-  		// 	"accessory": {
-  		// 		"type": "users_select",
-  		// 		"placeholder": {
-  		// 			"type": "plain_text",
-  		// 			"text": "Select a user",
-  		// 			"emoji": true
-  		// 		}
-  		// 	}
-  		// },
-  		voterPanel
+      volunteerSelectionPanel,
+  		voterStatusPanel
   	];
 };
 
@@ -285,7 +285,11 @@ exports.makeClosedVoterPanelBlocks = (messageText, includeUndoButton) => {
 
 exports.replaceVoterPanelBlocks = (oldBlocks, replacementBlocks) => {
   const newBlocks = [];
+  // The first block is the user info.
   newBlocks.push(oldBlocks[0]);
+  // The second block is the volunteer dropdown.
+  newBlocks.push(oldBlocks[1]);
+  // The remaining blocks are the panel.
   for (let idx in replacementBlocks) {
     newBlocks.push(replacementBlocks[idx]);
   }
@@ -293,20 +297,28 @@ exports.replaceVoterPanelBlocks = (oldBlocks, replacementBlocks) => {
 };
 
 // This function mutates the blocks input.
-exports.populateDropdownWithVoterStatus = (blocks, voterStatus) => {
+exports.populateDropdownNewInitialValue = (blocks, newInitialValue) => {
   const voterStatusOptions = getVoterStatusOptions();
+  const isVoterStatusOption = Object.keys(voterStatusOptions).includes(newInitialValue);
   for (let i in blocks) {
     const block = blocks[i];
     if (block.type === "actions") {
       const elements = block.elements;
       for (let j in elements) {
         element = elements[j];
-        if (element.type === "static_select" &&
-              Object.keys(voterStatusOptions).includes(element.initial_option.value)) {
-          element.initial_option.value = voterStatus;
-          element.initial_option.text.text = voterStatusOptions[voterStatus];
-          // Javascript modifies the blocks by reference, so end but don't return anything.
-          return;
+        if (isVoterStatusOption) {
+          if (element.type === "static_select") {
+            element.initial_option.value = newInitialValue;
+            element.initial_option.text.text = voterStatusOptions[newInitialValue];
+            // Javascript modifies the blocks by reference, so end but don't return anything.
+            return;
+          }
+        } else {
+          if (element.type === "users_select") {
+            element.initial_user = newInitialValue;
+            // Javascript modifies the blocks by reference, so end but don't return anything.
+            return;
+          }
         }
       }
     }
