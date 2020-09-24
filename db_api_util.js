@@ -348,3 +348,36 @@ exports.getLatestVoterStatus = (userId) => {
       console.log('\x1b[41m%s\x1b[1m\x1b[0m', `DBAPIUTIL.getLatestVoterStatus: ERROR connecting to PostgreSQL database:`, err.stack);
     });
 };
+
+exports.logVolunteerVoterClaimToDb = (databaseVolunteerVoterClaimEntry) => {
+  console.log(`\nENTERING DBAPIUTIL.logVolunteerVoterClaimToDb`);
+  const pgDatabaseClient = new Client({
+    connectionString: process.env.DATABASE_URL,
+  });
+
+  return pgDatabaseClient.connect()
+    .then(() => {
+      pgDatabaseClient.query("INSERT INTO volunteer_voter_claims (user_id, user_phone_number, twilio_phone_number, is_demo, volunteer_slack_user_name, volunteer_slack_user_id, originating_slack_user_name, originating_slack_user_id, originating_slack_channel_name, originating_slack_channel_id, originating_slack_parent_message_ts, action_ts) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12);", [
+        databaseVolunteerVoterClaimEntry.userId,
+        databaseVolunteerVoterClaimEntry.userPhoneNumber,
+        databaseVolunteerVoterClaimEntry.twilioPhoneNumber,
+        databaseVolunteerVoterClaimEntry.isDemo,
+        databaseVolunteerVoterClaimEntry.volunteerSlackUserName,
+        databaseVolunteerVoterClaimEntry.volunteerSlackUserId,
+        databaseVolunteerVoterClaimEntry.originatingSlackUserName,
+        databaseVolunteerVoterClaimEntry.originatingSlackUserId,
+        databaseVolunteerVoterClaimEntry.originatingSlackChannelName,
+        databaseVolunteerVoterClaimEntry.originatingSlackChannelId,
+        databaseVolunteerVoterClaimEntry.originatingSlackParentMessageTs,
+        databaseVolunteerVoterClaimEntry.actionTs
+      ], (err, res) => {
+        if (err) {
+          console.log('\x1b[41m%s\x1b[1m\x1b[0m', `DBAPIUTIL.logVolunteerVoterClaimToDb: ERROR from PostgreSQL database volunteer voter claim insert:`, err);
+        } else {
+          console.log(`DBAPIUTIL.logVolunteerVoterClaimToDb: Successfully inserted volunteer voter claim into PostgreSQL database.`);
+        }
+        pgDatabaseClient.end();
+      });
+    })
+    .catch(err => console.log('\x1b[41m%s\x1b[1m\x1b[0m', `DBAPIUTIL.logVolunteerVoterClaimToDb: ERROR connecting to PostgreSQL database:`, err.stack));
+};

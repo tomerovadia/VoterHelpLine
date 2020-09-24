@@ -24,7 +24,6 @@ const LoadBalancer = require('./load_balancer');
 const SlackUtil = require('./slack_util');
 const TwilioUtil = require('./twilio_util');
 const SlackInteractionHandler = require('./slack_interaction_handler');
-const SlackBlockUtil = require('./slack_block_util');
 
 const rawBodySaver = (req, res, buf, encoding) => {
   if (buf && buf.length) {
@@ -283,68 +282,31 @@ app.post('/slack-interactivity', (req, res) => {
     return;
   }
 
-  console.log(req.body.payload);
-
   const payload = JSON.parse(req.body.payload);
-  const selectedValue = payload.actions[0].selected_option ? payload.actions[0].selected_option.value : payload.actions[0].value;
-  console.log(`SERVER POST /slack-interactivity: Received interaction that selected value: ${selectedValue}`);
 
   SlackApiUtil.fetchSlackUserName(payload.user.id).then(originatingSlackUserName => {
     SlackApiUtil.fetchSlackChannelName(payload.channel.id).then(originatingSlackChannelName => {
       const redisHashKey = `${payload.channel.id}:${payload.container.thread_ts}`;
       RedisApiUtil.getHash(redisClient, redisHashKey).then(redisData => {
-        if (Object.keys(SlackBlockUtil.getVoterStatusOptions()).includes(selectedValue)) {
-          console.log(`SERVER POST /slack-interactivity: Determined user interaction is a voter status update`);
-          SlackInteractionHandler.handleVoterStatusUpdate(payload, selectedValue, originatingSlackUserName, originatingSlackChannelName, redisData.userPhoneNumber, redisData.twilioPhoneNumber).then(() => {
-            res.sendStatus(200);
-            if (payload.actions[0].type === "button") {
-              const closedVoterPanelText = SlackInteractionHandler.getClosedVoterPanelText(selectedValue, originatingSlackUserName);
-              const closedVoterPanelBlocks = SlackBlockUtil.makeClosedVoterPanelBlocks(closedVoterPanelText, true /* include undo button */);
-              const newParentMessageBlocks = SlackBlockUtil.replaceVoterPanelBlocks(payload.message.blocks, closedVoterPanelBlocks);
-              SlackInteractionApiUtil.replaceSlackMessageBlocks({
-                  slackChannelId: payload.channel.id,
-                  slackParentMessageTs: payload.container.thread_ts,
-                  newBlocks: newParentMessageBlocks,
-                });
-              // Make sure we don't text voters marked as REFUSED or SPAM.
-              if (selectedValue === "REFUSED" || selectedValue === "SPAM") {
-                RedisApiUtil.setHash(redisClient, "slackBlockedUserPhoneNumbers", {[redisData.userPhoneNumber]: "1"});
-                if (selectedValue === "SPAM") {
-                  RedisApiUtil.setHash(redisClient, "twilioBlockedUserPhoneNumbers", {[redisData.userPhoneNumber]: "1"});
-                }
-              }
-            // Steps to take if the dropdown was changed.
-            } else {
-              // Take the blocks and replace the initial_option with the new status, so that
-              // even when Slack is refreshed this new status is shown.
-              SlackBlockUtil.populateDropdownWithVoterStatus(payload.message.blocks, selectedValue);
-              // Replace the entire block so that the initial option change persists.
-              SlackInteractionApiUtil.replaceSlackMessageBlocks({
-                  slackChannelId: payload.channel.id,
-                  slackParentMessageTs: payload.container.thread_ts,
-                  newBlocks: payload.message.blocks,
-                });
-            }
-          }).catch(err => {
-            console.log('\x1b[41m%s\x1b[1m\x1b[0m', `SERVER POST /slack-interactivity: ERROR processing voter status update: ${err}`);
-            res.sendStatus(500);
-          });
-        } else if (selectedValue === "UNDO" && payload.actions[0].type === "button") {
-          console.log(`SERVER POST /slack-interactivity: Determined user interaction is UNDO of voter status update`);
-          SlackInteractionHandler.handleVoterStatusUpdate(payload, "UNKNOWN", originatingSlackUserName, originatingSlackChannelName, redisData.userPhoneNumber, redisData.twilioPhoneNumber).then(() => {
-            res.sendStatus(200);
-            SlackInteractionApiUtil.addBackVoterStatusPanel({
-              slackChannelId: payload.channel.id,
-              slackParentMessageTs: payload.container.thread_ts,
-              oldBlocks: payload.message.blocks,
-            });
-          }).catch(err => {
-            console.log('\x1b[41m%s\x1b[1m\x1b[0m', `SERVER POST /slack-interactivity: ERROR processing volunteer undostatus update: ${err}`);
-            res.sendStatus(500);
-          });
-
-          RedisApiUtil.deleteHashField(redisClient, "slackBlockedUserPhoneNumbers", redisData.userPhoneNumber);
-          RedisApiUtil.deleteHashField(redisClient, "twilioBlockedUserPhoneNumbers", redisData.userPhoneNumber);
+        const selectedVoterStatus = payload.actions[0].selected_option ? payload.actions[0].selected_option.value : payload.actions[0].value;
+        if (selectedVoterStatus) {
+          console.log(`SERVER POST /slack-interactivity: Determined user interaction is a voter status update or undo.`);
+          SlackInteractionHandler.handleVoterStatusUpdate({payload,
+                                                             res,
+                                                             selectedVoterStatus,
+                                                             originatingSlackUserName,
+                                                             originatingSlackChannelName,
+                                                             userPhoneNumber: redisData.userPhoneNumber,
+                                                             twilioPhoneNumber: redisData.twilioPhoneNumber,
+                                                             redisClient});
+        } else if (payload.actions[0].selected_user) {
+          console.log(`SERVER POST /slack-interactivity: Determined user interaction is a volunteer update.`);
+          SlackInteractionHandler.handleVolunteerUpdate({payload,
+                                                           res,
+                                                           originatingSlackUserName,
+                                                           originatingSlackChannelName,
+                                                           userPhoneNumber: redisData.userPhoneNumber,
+                                                           twilioPhoneNumber: redisData.twilioPhoneNumber});
         }
       }).catch(err => {
         console.log('\x1b[41m%s\x1b[1m\x1b[0m', `SERVER POST /slack-interactivity: ERROR fetching Redis data: ${err}`);
