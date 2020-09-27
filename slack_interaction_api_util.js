@@ -1,10 +1,10 @@
 const axios = require('axios');
 const SlackBlockUtil = require('./slack_block_util');
 
-const replaceSlackMessageBlocks = ({slackChannelId, slackParentMessageTs, newBlocks}) => {
+const replaceSlackMessageBlocks = async ({slackChannelId, slackParentMessageTs, newBlocks}) => {
   console.log("\nENTERING SLACKINTERACTIONAPIUTIL.replaceSlackMessageBlocks");
   // Replace voter status panel with message.
-  return axios.post('https://slack.com/api/chat.update', {
+  const response = await axios.post('https://slack.com/api/chat.update', {
     'Content-Type': 'application/json',
     'channel': slackChannelId,
     'token': process.env.SLACK_BOT_ACCESS_TOKEN,
@@ -15,16 +15,13 @@ const replaceSlackMessageBlocks = ({slackChannelId, slackParentMessageTs, newBlo
     'headers': {
       "Authorization": `Bearer ${process.env.SLACK_BOT_ACCESS_TOKEN}`,
     },
-  }).then(response => {
-    if (response.data.ok) {
-      console.log(`SLACKINTERACTIONAPIUTIL.replaceSlackMessageBlock: Successfully replaced Slack message block`);
-    } else {
-      console.log('\x1b[41m%s\x1b[1m\x1b[0m', `SLACKINTERACTIONAPIUTIL.replaceSlackMessageBlock: ERROR in replacing Slack message block: ${response.data.error}`);
-    }
-  }).catch(error => {
-    console.log('\x1b[41m%s\x1b[1m\x1b[0m', `SLACKINTERACTIONAPIUTIL.replaceSlackMessageBlock: ERROR in replacing Slack message block: ${error.data.error}`);
-    return error;
-  });
+  })
+
+  if (response.data.ok) {
+    console.log(`SLACKINTERACTIONAPIUTIL.replaceSlackMessageBlock: Successfully replaced Slack message block`);
+  } else {
+    console.log('\x1b[41m%s\x1b[1m\x1b[0m', `SLACKINTERACTIONAPIUTIL.replaceSlackMessageBlock: ERROR in replacing Slack message block: ${response.data.error}`);
+  }
 };
 
 exports.replaceSlackMessageBlocks = replaceSlackMessageBlocks;
