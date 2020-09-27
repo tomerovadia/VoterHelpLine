@@ -101,7 +101,7 @@ app.post('/push', runAsyncWrapper(async (req, res) => {
   res.sendStatus(200);
 }));
 
-const handleIncomingTwilioMessage = runAsyncWrapper(async (req, entryPoint) => {
+const handleIncomingTwilioMessage = async (req, entryPoint) => {
   console.log("\nEntering SERVER.handleIncomingTwilioMessage");
 
   const userPhoneNumber = req.body.From;
@@ -172,7 +172,7 @@ const handleIncomingTwilioMessage = runAsyncWrapper(async (req, entryPoint) => {
     console.log(`SERVER.handleIncomingTwilioMessage (${userId}): Voter is new to us (Redis returned no userInfo for redisHashKey ${redisHashKey})`);
     await Router.handleNewVoter({userPhoneNumber, userMessage, userId}, redisClient, twilioPhoneNumber, inboundDbMessageEntry, entryPoint);
   }
-});
+};
 
 app.post('/twilio-push', runAsyncWrapper(async (req, res) => {
   console.log("\n\n**************************************************************************************************");
@@ -219,7 +219,6 @@ app.post('/slack', runAsyncWrapper(async (req, res) => {
   console.log("\n\n**************************************************************************************************");
   console.log("******************************************************************************************************");
   console.log("Entering SERVER POST /slack");
-  console.log(JSON.stringify(req.headers));
   res.type('application/json');
 
   if (req.body.challenge) {
@@ -311,7 +310,7 @@ app.post('/slack-interactivity', runAsyncWrapper(async (req, res) => {
   const originatingSlackChannelName = await SlackApiUtil.fetchSlackChannelName(payload.channel.id);
 
   const redisHashKey = `${payload.channel.id}:${payload.container.thread_ts}`;
-  await redisData = RedisApiUtil.getHash(redisClient, redisHashKey);
+  const redisData = await RedisApiUtil.getHash(redisClient, redisHashKey);
 
   const selectedVoterStatus = payload.actions[0].selected_option ? payload.actions[0].selected_option.value : payload.actions[0].value;
   if (selectedVoterStatus) {

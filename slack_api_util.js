@@ -79,7 +79,7 @@ const sendMessage = async (message, options, databaseMessageEntry = null, userIn
 
 exports.sendMessage = sendMessage;
 
-exports.sendMessages = (messages, options) => {
+exports.sendMessages = async (messages, options) => {
   const parentMessageTs = options.parentMessageTs;
   const channel = options.channel;
 
@@ -105,7 +105,7 @@ exports.copyUserInfoToDbMessageEntry = (userInfo, dbMessageEntry) => {
   dbMessageEntry.confirmedDisclaimer = userInfo.lastVoterMessageSecsFromEpoch;
 };
 
-exports.fetchSlackChannelName = (channelId) => {
+exports.fetchSlackChannelName = async (channelId) => {
   const response = await axios.get('https://slack.com/api/conversations.info', {
     params: {
       'Content-Type': 'application/json',
@@ -123,7 +123,7 @@ exports.fetchSlackChannelName = (channelId) => {
   }
 };
 
-exports.fetchSlackUserName = (userId) => {
+exports.fetchSlackUserName = async (userId) => {
   const response = await axios.get('https://slack.com/api/users.info', {
     params: {
       'Content-Type': 'application/json',
@@ -142,7 +142,7 @@ exports.fetchSlackUserName = (userId) => {
 };
 
 // See reference here: https://api.slack.com/messaging/retrieving#individual_messages
-exports.fetchSlackMessageBlocks = (channelId, messageTs) => {
+exports.fetchSlackMessageBlocks = async (channelId, messageTs) => {
   const response = await axios.get('https://slack.com/api/conversations.history', {
     params: {
       'Content-Type': 'application/json',

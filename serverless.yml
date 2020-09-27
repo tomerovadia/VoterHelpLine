@@ -7,19 +7,14 @@ provider:
   # Deploy to staging by default
   stage: staging
 
-  # We use us-west-2 as our AWS region
+  # Set the AWS region
   region: us-west-2
 
   # VPC configuration -- this should match the VPC subnets where you've deployed
   # your Redis and Postgres servers
   vpc:
-    securityGroupIds:
-      - sg-0b5ef250b5091a47f
-    subnetIds:
-      - subnet-069950f6ff78f33e8
-      - subnet-0bf4ec0c0e9438a68
-      - subnet-0240f78baccf786b0
-      - subnet-0ea0877fa5ec34db0
+    securityGroupIds: { 'Fn::Split': [ ",", "${ssm:helpline.common.securityGroups~true}" ] }
+    subnetIds: { 'Fn::Split': [ ",", "${ssm:helpline.common.subnets~true}" ] }
 
   # 30-second timeout by default
   timeout: 30
@@ -47,6 +42,8 @@ provider:
     DEMO_PHONE_NUMBER: ${ssm:helpline.${self:custom.stage}.demo_phone_number~true}
     REDISCLOUD_URL: ${ssm:helpline.${self:custom.stage}.redis_url~true}
     DATABASE_URL: ${ssm:helpline.${self:custom.stage}.database_url~true}
+
+    CONNECTION_POOL_MAX: "2"
 
   # Memory allocated to each lambda function
   memorySize: 512

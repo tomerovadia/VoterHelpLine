@@ -196,7 +196,7 @@ const postUserMessageHistoryToSlack = async (userId, timestampOfLastMessageInThr
 
 // This helper handles all tasks associated with routing a voter to a new
 // channel that require the new channel's thread.
-const await Helper = async (userInfo, redisClient, twilioPhoneNumber,
+const routeVoterToSlackChannelHelper = async (userInfo, redisClient, twilioPhoneNumber,
                                   {destinationSlackChannelName, destinationSlackChannelId, destinationSlackParentMessageTs},
                                   timestampOfLastMessageInThread) => {
   if (logDebug) console.log("\nENTERING ROUTER.routeVoterToSlackChannelHelper");
@@ -389,7 +389,7 @@ const routeVoterToSlackChannel = async (userInfo, redisClient, {userId, twilioPh
   );
 };
 
-exports.determineVoterState = await (userOptions, redisClient, twilioPhoneNumber, inboundDbMessageEntry) => {
+exports.determineVoterState = async (userOptions, redisClient, twilioPhoneNumber, inboundDbMessageEntry) => {
   if (logDebug) console.log("\nENTERING ROUTER.determineVoterState");
   const userInfo = userOptions.userInfo;
   const userPhoneNumber = userOptions.userPhoneNumber;
@@ -437,7 +437,7 @@ exports.determineVoterState = await (userOptions, redisClient, twilioPhoneNumber
   );
 
   // Slack channel name must abide by the rules in this function.
-  const selectedStateChannelName = await LoadBalancer.selectSlackChannel(redisClient, LoadBalancer.PULL_ENTRY_POINT, stateName, userInfo.isDemo);
+  let selectedStateChannelName = await LoadBalancer.selectSlackChannel(redisClient, LoadBalancer.PULL_ENTRY_POINT, stateName, userInfo.isDemo);
 
   await SlackApiUtil.sendMessage(
     `*Automated Message:* ${MessageConstants.STATE_CONFIRMATION(stateName)}`,
@@ -468,7 +468,7 @@ exports.handleDisclaimer = async (userOptions, redisClient, twilioPhoneNumber, i
   if (logDebug) console.log(`ROUTER.handleDisclaimer: Updating lastVoterMessageSecsFromEpoch to ${userInfo.lastVoterMessageSecsFromEpoch}`);
   userInfo.lastVoterMessageSecsFromEpoch = Math.round(Date.now() / 1000);
 
-  await response = SlackApiUtil.sendMessage(`*${userId.substring(0,5)}:* ${userMessage}`, slackLobbyMessageParams, inboundDbMessageEntry, userInfo);
+  const response = await SlackApiUtil.sendMessage(`*${userId.substring(0,5)}:* ${userMessage}`, slackLobbyMessageParams, inboundDbMessageEntry, userInfo);
 
   const userMessageNoPunctuation = userOptions.userMessage.replace(/[.,?\/#!$%\^&\*;:{}=\-_`~()]/g, '');
   const cleared = userMessageNoPunctuation.toLowerCase().trim() == "agree";

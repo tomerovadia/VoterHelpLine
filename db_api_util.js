@@ -2,7 +2,7 @@ const { Pool } = require('pg');
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  max: Number(process.env.CONNECTION_POOL_MAX) || 20;
+  max: Number(process.env.CONNECTION_POOL_MAX || 20),
 });
 
 exports.logMessageToDb = async (databaseMessageEntry) => {
@@ -244,9 +244,6 @@ const LAST_TIMESTAMP_SQL_SCRIPT = `SELECT
 exports.getTimestampOfLastMessageInThread = async (parentMessageTs) => {
   console.log(`\nENTERING DBAPIUTIL.getTimestampOfLastMessageInThread`);
   console.log(`DBAPIUTIL.getMessageHistoryFor: Looking up last message timestamp in Slack thread ${parentMessageTs}.`);
-  const pgDatabaseClient = new Client({
-    connectionString: process.env.DATABASE_URL,
-  });
 
   const client = await pool.connect()
   try {
@@ -268,7 +265,7 @@ exports.logVoterStatusToDb = async (databaseVoterStatusEntry) => {
   console.log(`\nENTERING DBAPIUTIL.logVoterStatusToDb`);
   const client = await pool.connect()
   try {
-    await pgDatabaseClient.query("INSERT INTO voter_status_updates (user_id, user_phone_number, voter_status, originating_slack_user_name, originating_slack_user_id, originating_slack_channel_name, originating_slack_channel_id, originating_slack_parent_message_ts, action_ts, twilio_phone_number, is_demo) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11);", [
+    await client.query("INSERT INTO voter_status_updates (user_id, user_phone_number, voter_status, originating_slack_user_name, originating_slack_user_id, originating_slack_channel_name, originating_slack_channel_id, originating_slack_parent_message_ts, action_ts, twilio_phone_number, is_demo) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11);", [
       databaseVoterStatusEntry.userId,
       databaseVoterStatusEntry.userPhoneNumber,
       databaseVoterStatusEntry.voterStatus,
@@ -303,7 +300,7 @@ exports.getLatestVoterStatus = async (userId) => {
   const client = await pool.connect();
 
   try {
-    const result = await pgDatabaseClient.query(LAST_VOTER_STATUS_SQL_SCRIPT, [userId]);
+    const result = await client.query(LAST_VOTER_STATUS_SQL_SCRIPT, [userId]);
 
     console.log(`DBAPIUTIL.getLatestVoterStatus: Successfully looked up last voter status.`);
     if (result.rows.length > 0) {
@@ -323,7 +320,7 @@ exports.logVolunteerVoterClaimToDb = async (databaseVolunteerVoterClaimEntry) =>
   const client = await pool.connect();
 
   try {
-    await pgDatabaseClient.query("INSERT INTO volunteer_voter_claims (user_id, user_phone_number, twilio_phone_number, is_demo, volunteer_slack_user_name, volunteer_slack_user_id, originating_slack_user_name, originating_slack_user_id, originating_slack_channel_name, originating_slack_channel_id, originating_slack_parent_message_ts, action_ts) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12);", [
+    await client.query("INSERT INTO volunteer_voter_claims (user_id, user_phone_number, twilio_phone_number, is_demo, volunteer_slack_user_name, volunteer_slack_user_id, originating_slack_user_name, originating_slack_user_id, originating_slack_channel_name, originating_slack_channel_id, originating_slack_parent_message_ts, action_ts) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12);", [
       databaseVolunteerVoterClaimEntry.userId,
       databaseVolunteerVoterClaimEntry.userPhoneNumber,
       databaseVolunteerVoterClaimEntry.twilioPhoneNumber,
