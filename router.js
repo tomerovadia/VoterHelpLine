@@ -1,7 +1,3 @@
-if (process.env.NODE_ENV === "development" || process.env.NODE_ENV === "test") {
-  require('dotenv').config();
-}
-
 const Sentry = require('@sentry/node');
 
 const MessageConstants = require('./message_constants');
