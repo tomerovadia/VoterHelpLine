@@ -25,6 +25,7 @@ const LoadBalancer = require('./load_balancer');
 const SlackUtil = require('./slack_util');
 const TwilioUtil = require('./twilio_util');
 const SlackInteractionHandler = require('./slack_interaction_handler');
+const { default: Axios } = require('axios');
 
 const rawBodySaver = (req, res, buf, encoding) => {
   if (buf && buf.length) {
@@ -346,6 +347,70 @@ app.get("/debug-sentry", runAsyncWrapper(async function mainHandler(req, res) {
 app.get("/debug-success", runAsyncWrapper(async function mainHandler(req, res) {
   await new Promise(resolve => setTimeout(resolve, 100));
 
+  res.sendStatus(200);
+}));
+
+function testHTTP() {
+  const axios = require('axios');
+
+  return new Promise(resolve => {
+    console.log("START testHTTP")
+    setTimeout(() => {
+      console.log("TIMEOUT testHTTP")
+      resolve();
+    }, 3000);
+
+    axios.get("https://google.com").then(res => {
+      console.log("PASS testHttp", res.status);
+    }).catch(err => {
+      console.log("FAIL testHttp", err);
+    }).then(resolve);
+  });
+}
+
+function testRedis() {
+  return new Promise(resolve => {
+    console.log("START testRedis")
+    setTimeout(() => {
+      console.log("TIMEOUT testRedis")
+      resolve();
+    }, 3000);
+
+    redisClient.pingAsync().then(res => {
+      console.log("PASS testRedis", res);
+    }).catch(err => {
+      console.log("FAIL testRedis", err);
+    }).then(resolve);
+  });
+}
+
+function testPostgres() {
+  const { Pool } = require('pg');
+
+  const pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    max: Number(process.env.CONNECTION_POOL_MAX || 20),
+  });
+
+  return new Promise(resolve => {
+    console.log("START testPostgres")
+    setTimeout(() => {
+      console.log("TIMEOUT testPostgres")
+      resolve();
+    }, 3000);
+
+    pool.connect().then(client => {
+      return client.query("SELECT 1");
+    }).then(res => {
+      console.log("PASS testPostgres", res);
+    }).catch(err => {
+      console.log("FAIL testPostgres", err);
+    }).then(resolve);
+  });
+}
+
+app.get("/debug-connect", runAsyncWrapper(async function mainHandler(req, res) {
+  await Promise.all([testHTTP(), testRedis(), testPostgres()]);
   res.sendStatus(200);
 }));
 
