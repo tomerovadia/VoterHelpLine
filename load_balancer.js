@@ -54,7 +54,7 @@ exports.selectSlackChannel = async (redisClient, entryPoint, stateName, isDemo =
 
   if (logDebug) console.log(`LOADBALANCER.selectSlackChannel: Successfully found numVoters with voterCounterKey ${voterCounterKey} in Redis: ${numVoters}`);
 
-  const openPods = redisClient.lrangeAsync(openPodsKey, 0, 1000 /* max # of pods */);
+  const openPods = await redisClient.lrangeAsync(openPodsKey, 0, 1000 /* max # of pods */);
   if (!openPods) {
     if (logDebug) console.log('\x1b[41m%s\x1b[1m\x1b[0m', `LOADBALANCER.selectSlackChannel: ERROR finding openPodsKey ${openPodsKey} in Redis: err || !openPods`);
     return null;

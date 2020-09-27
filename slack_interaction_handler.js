@@ -142,7 +142,7 @@ exports.handleVoterStatusUpdate = async ({
   }
 };
 
-exports.handleVolunteerUpdate = ({
+exports.handleVolunteerUpdate = async ({
   payload,
   res,
   originatingSlackUserName,

@@ -38,6 +38,7 @@ const expectNthSlackMessageToChannel = (channel, n, messageParts, parentMessageT
   let channelMessageNum = -1;
   for (let i = 0; i < SlackApiUtil.sendMessage.mock.calls.length; i++) {
     const slackMessageParams = SlackApiUtil.sendMessage.mock.calls[i][1];
+    console.log(slackMessageParams, channel)
     if (slackMessageParams.channel == channel) {
       channelMessageNum++;
       if (channelMessageNum == n) {
