@@ -74,10 +74,10 @@ exports.parseSlackCommand = (message) => {
   }
 };
 
-exports.findVoter = () => {
+exports.findVoter = async () => {
 
 };
 
-exports.resetVoter = () => {
+exports.resetVoter = async () => {
 
 };
