@@ -1,4 +1,5 @@
 const { Pool } = require('pg');
+const logger = require('./logger');
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -37,7 +38,7 @@ exports.logMessageToDb = async (databaseMessageEntry) => {
       databaseMessageEntry.entryPoint
     ]);
 
-    console.log(`DBAPIUTIL.logMessageToDb: Successfully inserted message into PostgreSQL database.`);
+    logger.info(`DBAPIUTIL.logMessageToDb: Successfully inserted message into PostgreSQL database.`);
   } finally {
     // Make sure to release the client before any error handling,
     // just in case the error handling itself throws an error.
@@ -220,13 +221,13 @@ const MESSAGE_HISTORY_SQL_SCRIPT = `SELECT
                                   ORDER BY timestamp ASC;`;
 
 exports.getMessageHistoryFor = async (userId, timestampSince) => {
-  console.log(`\nENTERING DBAPIUTIL.getMessageHistoryFor`);
-  console.log(`DBAPIUTIL.getMessageHistoryFor: Looking up user:${userId}, message history since timestamp: ${timestampSince}.`);
+  logger.info(`ENTERING DBAPIUTIL.getMessageHistoryFor`);
+  logger.info(`DBAPIUTIL.getMessageHistoryFor: Looking up user:${userId}, message history since timestamp: ${timestampSince}.`);
 
   const client = await pool.connect()
   try {
     const result = await client.query(MESSAGE_HISTORY_SQL_SCRIPT, [userId, timestampSince]);
-    console.log(`DBAPIUTIL.getMessageHistoryFor: Successfully looked up message history in PostgreSQL.`);
+    logger.info(`DBAPIUTIL.getMessageHistoryFor: Successfully looked up message history in PostgreSQL.`);
     return result.rows;
   } finally {
     client.release()
@@ -242,13 +243,13 @@ const LAST_TIMESTAMP_SQL_SCRIPT = `SELECT
                                     LIMIT 1;`;
 
 exports.getTimestampOfLastMessageInThread = async (parentMessageTs) => {
-  console.log(`\nENTERING DBAPIUTIL.getTimestampOfLastMessageInThread`);
-  console.log(`DBAPIUTIL.getMessageHistoryFor: Looking up last message timestamp in Slack thread ${parentMessageTs}.`);
+  logger.info(`ENTERING DBAPIUTIL.getTimestampOfLastMessageInThread`);
+  logger.info(`DBAPIUTIL.getMessageHistoryFor: Looking up last message timestamp in Slack thread ${parentMessageTs}.`);
 
   const client = await pool.connect()
   try {
     const result = await client.query(LAST_TIMESTAMP_SQL_SCRIPT, [parentMessageTs]);
-    console.log(`DBAPIUTIL.getTimestampOfLastMessageInThread: Successfully looked up last timestamp in thread.`);
+    logger.info(`DBAPIUTIL.getTimestampOfLastMessageInThread: Successfully looked up last timestamp in thread.`);
 
     // Just in case nobody said anything while the user was at a channel.
     if (result.rows.length > 0) {
@@ -262,7 +263,7 @@ exports.getTimestampOfLastMessageInThread = async (parentMessageTs) => {
 };
 
 exports.logVoterStatusToDb = async (databaseVoterStatusEntry) => {
-  console.log(`\nENTERING DBAPIUTIL.logVoterStatusToDb`);
+  logger.info(`ENTERING DBAPIUTIL.logVoterStatusToDb`);
   const client = await pool.connect()
   try {
     await client.query("INSERT INTO voter_status_updates (user_id, user_phone_number, voter_status, originating_slack_user_name, originating_slack_user_id, originating_slack_channel_name, originating_slack_channel_id, originating_slack_parent_message_ts, action_ts, twilio_phone_number, is_demo) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11);", [
@@ -279,7 +280,7 @@ exports.logVoterStatusToDb = async (databaseVoterStatusEntry) => {
       databaseVoterStatusEntry.isDemo
     ]);
 
-    console.log(`DBAPIUTIL.logVoterStatusToDb: Successfully inserted voter status into PostgreSQL database.`);
+    logger.info(`DBAPIUTIL.logVoterStatusToDb: Successfully inserted voter status into PostgreSQL database.`);
   } finally {
     client.release()
   }
@@ -295,18 +296,18 @@ const LAST_VOTER_STATUS_SQL_SCRIPT = `SELECT voter_status
 // from channel to channel, but now instead the voter status is coded into
 // the block initial_option on the front-end, and is copied over with the blocks during the move.
 exports.getLatestVoterStatus = async (userId) => {
-  console.log(`\nENTERING DBAPIUTIL.getLatest`);
-  console.log(`DBAPIUTIL.getLatestVoterStatus: Looking up last voter status for userId: ${userId}.`);
+  logger.info(`ENTERING DBAPIUTIL.getLatest`);
+  logger.info(`DBAPIUTIL.getLatestVoterStatus: Looking up last voter status for userId: ${userId}.`);
   const client = await pool.connect();
 
   try {
     const result = await client.query(LAST_VOTER_STATUS_SQL_SCRIPT, [userId]);
 
-    console.log(`DBAPIUTIL.getLatestVoterStatus: Successfully looked up last voter status.`);
+    logger.info(`DBAPIUTIL.getLatestVoterStatus: Successfully looked up last voter status.`);
     if (result.rows.length > 0) {
       return result.rows[0].voter_status;
     } else {
-      console.log('\x1b[41m%s\x1b[1m\x1b[0m', `DBAPIUTIL.getLatestVoterStatus: No voter status for user`);
+      logger.error(`DBAPIUTIL.getLatestVoterStatus: No voter status for user`);
       return null;
     }
   } finally {
@@ -315,7 +316,7 @@ exports.getLatestVoterStatus = async (userId) => {
 };
 
 exports.logVolunteerVoterClaimToDb = async (databaseVolunteerVoterClaimEntry) => {
-  console.log(`\nENTERING DBAPIUTIL.logVolunteerVoterClaimToDb`);
+  logger.info(`ENTERING DBAPIUTIL.logVolunteerVoterClaimToDb`);
 
   const client = await pool.connect();
 
@@ -335,7 +336,7 @@ exports.logVolunteerVoterClaimToDb = async (databaseVolunteerVoterClaimEntry) =>
       databaseVolunteerVoterClaimEntry.actionTs
     ]);
 
-    console.log(`DBAPIUTIL.logVolunteerVoterClaimToDb: Successfully inserted volunteer voter claim into PostgreSQL database.`);
+    logger.info(`DBAPIUTIL.logVolunteerVoterClaimToDb: Successfully inserted volunteer voter claim into PostgreSQL database.`);
   } finally {
     client.release()
   }

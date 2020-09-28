@@ -1,11 +1,12 @@
 const crypto = require('crypto');
+const logger = require('./logger');
 
 exports.passesAuth = (req) => {
   const requestTimestamp = req.header('X-Slack-Request-Timestamp');
   if (!requestTimestamp
          || Math.abs((new Date().getTime() / 1000) - requestTimestamp) > 60 * 5
          || !process.env.SLACK_SIGNING_SECRET) {
-    console.log('\x1b[41m%s\x1b[1m\x1b[0m', 'ERROR Fails auth');
+    logger.error('ERROR Fails auth');
     return false;
   }
 
@@ -18,7 +19,7 @@ exports.passesAuth = (req) => {
                                   .digest('hex');
   if (!crypto.timingSafeEqual(Buffer.from(slackSignature, 'utf8'),
                  Buffer.from(req.header('X-Slack-Signature'), 'utf8'))) {
-    console.log('\x1b[41m%s\x1b[1m\x1b[0m', 'ERROR Fails auth');
+    logger.error('ERROR Fails auth');
     return false;
   }
 

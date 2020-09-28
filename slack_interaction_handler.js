@@ -6,9 +6,10 @@ const LoadBalancer = require('./load_balancer');
 const SlackBlockUtil = require('./slack_block_util');
 const SlackInteractionApiUtil = require('./slack_interaction_api_util');
 const RedisApiUtil = require('./redis_api_util');
+const logger = require('./logger');
 
 const getClosedVoterPanelText = (selectedVoterStatus, originatingSlackUserName) => {
-  console.log("\nENTERING SLACKINTERACTIONAPIUTIL.getClosedVoterPanelText");
+  logger.info("ENTERING SLACKINTERACTIONAPIUTIL.getClosedVoterPanelText");
   const timeSinceEpochSecs = Date.parse(new Date()) / 1000;
   // See https://api.slack.com/reference/surfaces/formatting#visual-styles
   const specialSlackTimestamp = `<!date^${timeSinceEpochSecs}^{date_num} {time_secs}|${new Date()}>`;
@@ -31,7 +32,7 @@ const handleVoterStatusUpdateHelper = async ({
   twilioPhoneNumber,
   redisClient
 }) => {
-  console.log("\nENTERING SLACKINTERACTIONHANDLER.handleVoterStatusUpdate");
+  logger.info("ENTERING SLACKINTERACTIONHANDLER.handleVoterStatusUpdate");
   const MD5 = new Hashes.MD5;
   const userId = MD5.hex(userPhoneNumber);
 
@@ -45,7 +46,7 @@ const handleVoterStatusUpdateHelper = async ({
     {parentMessageTs: payload.container.thread_ts, channel: payload.channel.id},
   )
 
-  console.log(`SLACKINTERACTIONHANDLER.handleVoterStatusUpdate: Successfully sent message recording voter status change`);
+  logger.info(`SLACKINTERACTIONHANDLER.handleVoterStatusUpdate: Successfully sent message recording voter status change`);
 
   await DbApiUtil.logVoterStatusToDb({
     userId,
@@ -74,7 +75,7 @@ exports.handleVoterStatusUpdate = async ({
 }) => {
   // Interaction is selection of a new voter status, from either dropdown selection or button press.
   if (Object.keys(SlackBlockUtil.getVoterStatusOptions()).includes(selectedVoterStatus)) {
-    console.log(`SLACKINTERACTIONHANDLER.handleVoterStatusUpdate: Determined user interaction is a voter status update`);
+    logger.info(`SLACKINTERACTIONHANDLER.handleVoterStatusUpdate: Determined user interaction is a voter status update`);
     await handleVoterStatusUpdateHelper({
       payload,
       res,
@@ -119,7 +120,7 @@ exports.handleVoterStatusUpdate = async ({
       });
     }
   } else if (selectedVoterStatus === "UNDO" && payload.actions[0].type === "button") {
-    console.log(`SLACKINTERACTIONHANDLER.handleVoterStatusUpdate: Determined user interaction is UNDO of voter status update`);
+    logger.info(`SLACKINTERACTIONHANDLER.handleVoterStatusUpdate: Determined user interaction is UNDO of voter status update`);
     await handleVoterStatusUpdateHelper({
       payload,
       selectedVoterStatus: "UNKNOWN",
@@ -150,7 +151,7 @@ exports.handleVolunteerUpdate = async ({
   userPhoneNumber,
   twilioPhoneNumber,
 }) => {
-  console.log(`SLACKINTERACTIONHANDLER.handleVolunteerUpdate: Determined user interaction is a volunteer update`);
+  logger.info(`SLACKINTERACTIONHANDLER.handleVolunteerUpdate: Determined user interaction is a volunteer update`);
   const selectedVolunteerSlackUserName = await SlackApiUtil.fetchSlackUserName(payload.actions[0].selected_user);
   const MD5 = new Hashes.MD5;
   const userId = MD5.hex(userPhoneNumber);
@@ -165,7 +166,7 @@ exports.handleVolunteerUpdate = async ({
     { parentMessageTs: payload.container.thread_ts, channel: payload.channel.id },
   );
 
-  console.log(`SLACKINTERACTIONHANDLER.handleVoterStatusUpdate: Successfully sent message recording voter status change`);
+  logger.info(`SLACKINTERACTIONHANDLER.handleVoterStatusUpdate: Successfully sent message recording voter status change`);
 
   await DbApiUtil.logVolunteerVoterClaimToDb({
     userId,

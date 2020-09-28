@@ -12,7 +12,8 @@ if (process.env.SENTRY_DSN) {
 
 const app = require('./app').app;
 const http = require('http').createServer(app);
+const logger = require('./logger');
 
 http.listen(process.env.PORT || 8080, function() {
-  console.log('listening on *:8080');
+  logger.info('listening on *:8080');
 });

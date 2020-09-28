@@ -1,4 +1,4 @@
-const logDebug = process.env.NODE_ENV !== "test";
+const logger = require('./logger');
 
 const fieldTypes = {
   // Not necessary (is default)
@@ -10,7 +10,7 @@ const fieldTypes = {
 };
 
 exports.setHash = (redisClient, key, hash) => {
-  if (logDebug) console.log(`\nENTERING REDISAPIUTIL.setHash`);
+  logger.debug(`ENTERING REDISAPIUTIL.setHash`);
 
   return Promise.all(Object.keys(hash).map(field => {
     const value = hash[field];
@@ -20,7 +20,7 @@ exports.setHash = (redisClient, key, hash) => {
 };
 
 exports.getHash = async (redisClient, key) => {
-  if (logDebug) console.log(`\nENTERING REDISAPIUTIL.getHash`);
+  logger.debug(`ENTERING REDISAPIUTIL.getHash`);
   const hash = await redisClient.hgetallAsync(key);
   if (hash != null) {
     for (let field in hash) {
@@ -41,7 +41,7 @@ exports.getHash = async (redisClient, key) => {
 };
 
 exports.getHashField = async (redisClient, key, field) => {
-  if (logDebug) console.log(`\nENTERING REDISAPIUTIL.getHashField`);
+  logger.debug(`ENTERING REDISAPIUTIL.getHashField`);
 
   const value = await redisClient.hgetAsync(key, field);
   if (value != null) {
@@ -59,7 +59,7 @@ exports.getHashField = async (redisClient, key, field) => {
 };
 
 exports.deleteHashField = (redisClient, key, field) => {
-  if (logDebug) console.log(`\nENTERING REDISAPIUTIL.deleteHashField`);
+  logger.debug(`ENTERING REDISAPIUTIL.deleteHashField`);
 
   return redisClient.hdelAsync(key, field);
 };
