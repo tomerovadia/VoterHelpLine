@@ -44,6 +44,7 @@ provider:
     DATABASE_URL: ${ssm:helpline.${self:custom.stage}.database_url~true}
 
     CONNECTION_POOL_MAX: "2"
+    LOG_FORMAT: json
 
   # Memory allocated to each lambda function
   memorySize: 512

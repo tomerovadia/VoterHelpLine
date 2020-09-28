@@ -2,11 +2,12 @@ const axios = require('axios');
 const Hashes = require('jshashes') // v1.0.5
 const DbApiUtil = require('./db_api_util');
 const SlackApiUtil = require('./slack_api_util');
+const logger = require('./logger');
 
 const sendMessage = async (message, options, databaseMessageEntry = null, userInfo = null) => {
-  console.log(`\nENTERING SLACKAPIUTIL.sendMessage`);
+  logger.info(`ENTERING SLACKAPIUTIL.sendMessage`);
   if (databaseMessageEntry) {
-    console.log(`SLACKAPIUTIL.sendMessage: This Slack message send will log to DB (databaseMessageEntry is not null).`);
+    logger.info(`SLACKAPIUTIL.sendMessage: This Slack message send will log to DB (databaseMessageEntry is not null).`);
     // Copies a few fields from userInfo to databaseMessageEntry.
     DbApiUtil.updateDbMessageEntryWithUserInfo(userInfo, databaseMessageEntry);
     databaseMessageEntry.slackChannel = options.channel;
@@ -31,11 +32,11 @@ const sendMessage = async (message, options, databaseMessageEntry = null, userIn
     );
 
     if (!response.data.ok) {
-      console.log('\x1b[41m%s\x1b[1m\x1b[0m', `SLACKAPIUTIL.sendMessage: ERROR in sending Slack message: ${response.data.error}`);
+      logger.error(`SLACKAPIUTIL.sendMessage: ERROR in sending Slack message: ${response.data.error}`);
       return;
     }
 
-    console.log(`SLACKAPIUTIL.sendMessage: Successfully sent Slack message,
+    logger.info(`SLACKAPIUTIL.sendMessage: Successfully sent Slack message,
                   response.data.message.ts: ${response.data.message.ts},
                   message: ${message},
                   channel: ${options.channel},
@@ -48,18 +49,18 @@ const sendMessage = async (message, options, databaseMessageEntry = null, userIn
       try {
         await DbApiUtil.logMessageToDb(databaseMessageEntry);
       } catch (error) {
-        console.log(`SLACKAPIUTIL.sendMessage: failed to log message send success to DB`);
+        logger.info(`SLACKAPIUTIL.sendMessage: failed to log message send success to DB`);
         Sentry.captureException(error);
       }
     }
 
     return response;
   } catch (error) {
-    console.log('\x1b[41m%s\x1b[1m\x1b[0m', `SLACKAPIUTIL.sendMessage: ERROR in sending Slack message,
+    logger.error(`SLACKAPIUTIL.sendMessage: ERROR in sending Slack message,
                   message: ${message},
                   channel: ${options.channel},
                   thread_ts: ${options.parentMessageTs}`);
-    console.log('\x1b[41m%s\x1b[1m\x1b[0m', `SLACKAPIUTIL.sendMessage: ERROR in sending Slack message. Error data from Slack: ${error}`);
+    logger.error(`SLACKAPIUTIL.sendMessage: ERROR in sending Slack message. Error data from Slack: ${error}`);
     Sentry.captureException(error);
     if (databaseMessageEntry) {
       databaseMessageEntry.successfullySent = false;
@@ -68,7 +69,7 @@ const sendMessage = async (message, options, databaseMessageEntry = null, userIn
       try {
         await DbApiUtil.logMessageToDb(databaseMessageEntry);
       } catch (error) {
-        console.log(`SLACKAPIUTIL.sendMessage: failed to log message send failure to DB`);
+        logger.info(`SLACKAPIUTIL.sendMessage: failed to log message send failure to DB`);
         Sentry.captureException(error);
       }
     }
@@ -91,10 +92,10 @@ exports.sendMessages = async (messages, options) => {
 exports.authenticateConnectionToSlack = (token) => {
   const MD5 = new Hashes.MD5;
   if(MD5.hex(token) == process.env.SLACK_AUTH_TOKEN_HASH){
-    console.log("token verified");
+    logger.info("token verified");
     return true;
   } else {
-    console.log("token unauthorized");
+    logger.info("token unauthorized");
     return false;
   }
 };
@@ -115,10 +116,10 @@ exports.fetchSlackChannelName = async (channelId) => {
   });
 
   if (response.data.ok) {
-    if (process.env.NODE_ENV !== "test") console.log(`SLACKAPIUTIL.fetchSlackChannelName: Successfully revealed Slack channel name (${channelId} -> ${response.data.channel.name})`);
+    if (process.env.NODE_ENV !== "test") logger.info(`SLACKAPIUTIL.fetchSlackChannelName: Successfully revealed Slack channel name (${channelId} -> ${response.data.channel.name})`);
     return response.data.channel.name;
   } else {
-    if (process.env.NODE_ENV !== "test") console.log('\x1b[41m%s\x1b[1m\x1b[0m', `SLACKAPIUTIL.fetchSlackChannelName: Failed to reveal Slack channel name (${channelId}). Error: ${response.data.error}.`);
+    if (process.env.NODE_ENV !== "test") logger.error(`SLACKAPIUTIL.fetchSlackChannelName: Failed to reveal Slack channel name (${channelId}). Error: ${response.data.error}.`);
     return null;
   }
 };
@@ -133,10 +134,10 @@ exports.fetchSlackUserName = async (userId) => {
   });
 
   if (response.data.ok) {
-    if (process.env.NODE_ENV !== "test") console.log(`SLACKAPIUTIL.fetchSlackUserName: Successfully revealed Slack user name (${userId} -> ${response.data.user.real_name})`);
+    if (process.env.NODE_ENV !== "test") logger.info(`SLACKAPIUTIL.fetchSlackUserName: Successfully revealed Slack user name (${userId} -> ${response.data.user.real_name})`);
     return response.data.user.real_name;
   } else {
-    if (process.env.NODE_ENV !== "test") console.log('\x1b[41m%s\x1b[1m\x1b[0m', `SLACKAPIUTIL.fetchSlackUserName: Failed to reveal Slack user name (${userId}). Error: ${response.data.error}.`);
+    if (process.env.NODE_ENV !== "test") logger.error(`SLACKAPIUTIL.fetchSlackUserName: Failed to reveal Slack user name (${userId}). Error: ${response.data.error}.`);
     return null;
   }
 };
@@ -154,10 +155,10 @@ exports.fetchSlackMessageBlocks = async (channelId, messageTs) => {
   });
 
   if (response.data.ok) {
-    if (process.env.NODE_ENV !== "test") console.log(`SLACKAPIUTIL.fetchSlackMessageFirstBlockText: Successfully revealed Slack message text (${messageTs} -> ${response.data.messages[0].blocks[0].text.text})`);
+    if (process.env.NODE_ENV !== "test") logger.info(`SLACKAPIUTIL.fetchSlackMessageFirstBlockText: Successfully revealed Slack message text (${messageTs} -> ${response.data.messages[0].blocks[0].text.text})`);
     return response.data.messages[0].blocks;
   } else {
-    if (process.env.NODE_ENV !== "test") console.log('\x1b[41m%s\x1b[1m\x1b[0m', `SLACKAPIUTIL.fetchSlackMessageFirstBlockText: Failed to reveal Slack message text (${messageTs}). Error: ${response.data.error}.`);
+    if (process.env.NODE_ENV !== "test") logger.error(`SLACKAPIUTIL.fetchSlackMessageFirstBlockText: Failed to reveal Slack message text (${messageTs}). Error: ${response.data.error}.`);
     return null;
   }
 };
