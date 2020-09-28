@@ -1,4 +1,4 @@
-if (process.env.NODE_ENV === "development" || process.env.NODE_ENV === "test") {
+if (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test') {
   require('dotenv').config();
 }
 
@@ -14,6 +14,6 @@ const app = require('./app').app;
 const http = require('http').createServer(app);
 const logger = require('./logger');
 
-http.listen(process.env.PORT || 8080, function() {
+http.listen(process.env.PORT || 8080, function () {
   logger.info('listening on *:8080');
 });

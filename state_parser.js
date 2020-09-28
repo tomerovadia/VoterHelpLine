@@ -2,12 +2,15 @@ const StateConstants = require('./state_constants');
 
 exports.determineState = (userMessage) => {
   const stateConstants = StateConstants.getStateConstants();
-  for (key in stateConstants) {
+  for (const key in stateConstants) {
     const abbrev = key;
     const stateName = stateConstants[key];
-    const userMessageNoPunctuation = userMessage.replace(/[.,?\/#!$%\^&\*;:{}=\-_`~()]/g, '');
+    const userMessageNoPunctuation = userMessage.replace(
+      /[.,?/#!$%^&*;:{}=\-_`~()]/g,
+      ''
+    );
 
-    const stateWords = stateName.split(" ");
+    const stateWords = stateName.split(' ');
     let nameRegEx = null;
     let abbrevNameRegEx = null;
 
@@ -35,13 +38,16 @@ exports.determineState = (userMessage) => {
     //    4) match in the middle and have a space both before and after ("ok WI please").
     const abbrevRegEx = new RegExp(`(\\s|^)${abbrev}(\\s|$)`, 'i');
 
-    const abbrevMatch = abbrevRegEx.test(userMessageNoPunctuation) ||
-                         abbrevExactRegEx.test(userMessageNoPunctuation);
+    const abbrevMatch =
+      abbrevRegEx.test(userMessageNoPunctuation) ||
+      abbrevExactRegEx.test(userMessageNoPunctuation);
 
     const nameMatch = nameRegEx.test(userMessageNoPunctuation);
 
     // For abbreviated names (e.g. n.carolina).
-    const abbrevNameMatch = abbrevNameRegEx ? abbrevNameRegEx.test(userMessageNoPunctuation) : false;
+    const abbrevNameMatch = abbrevNameRegEx
+      ? abbrevNameRegEx.test(userMessageNoPunctuation)
+      : false;
 
     if (abbrevMatch || nameMatch || abbrevNameMatch) {
       return stateName;
@@ -49,4 +55,4 @@ exports.determineState = (userMessage) => {
   }
 
   return null;
-}
+};

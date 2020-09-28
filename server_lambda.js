@@ -1,13 +1,13 @@
-const awsServerlessExpress = require('aws-serverless-express')
+const awsServerlessExpress = require('aws-serverless-express');
 const app = require('./app').app;
-const server = awsServerlessExpress.createServer(app)
+const server = awsServerlessExpress.createServer(app);
 
 const handler = (event, context) => {
   return awsServerlessExpress.proxy(server, event, context, 'PROMISE').promise;
-}
+};
 
 if (process.env.SENTRY_DSN) {
-  const Sentry = require("@sentry/serverless");
+  const Sentry = require('@sentry/serverless');
 
   Sentry.init({
     dsn: process.env.SENTRY_DSN,
@@ -17,4 +17,3 @@ if (process.env.SENTRY_DSN) {
 } else {
   exports.handler = handler;
 }
-

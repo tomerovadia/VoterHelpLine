@@ -4,13 +4,18 @@ const logger = require('./logger');
 
 let twilioClient;
 if (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN) {
-  twilioClient = require('twilio')(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+  twilioClient = require('twilio')(
+    process.env.TWILIO_ACCOUNT_SID,
+    process.env.TWILIO_AUTH_TOKEN
+  );
 }
 
 exports.sendMessage = async (message, options, databaseMessageEntry) => {
   logger.info(`ENTERING TWILIOAPIUTIL.sendMessage`);
   if (databaseMessageEntry) {
-    logger.info(`TWILIOAPIUTIL.sendMessage: This Twilio message send will log to DB (databaseMessageEntry is not null).`);
+    logger.info(
+      `TWILIOAPIUTIL.sendMessage: This Twilio message send will log to DB (databaseMessageEntry is not null).`
+    );
     databaseMessageEntry.message = message;
     databaseMessageEntry.fromPhoneNumber = options.twilioPhoneNumber;
     databaseMessageEntry.toPhoneNumber = options.userPhoneNumber;
@@ -37,7 +42,9 @@ exports.sendMessage = async (message, options, databaseMessageEntry) => {
       try {
         await DbApiUtil.logMessageToDb(databaseMessageEntry);
       } catch (error) {
-        logger.info('TWILIOAPIUTIL.sendMessage: failed to log message send success to DB');
+        logger.info(
+          'TWILIOAPIUTIL.sendMessage: failed to log message send success to DB'
+        );
         Sentry.captureException(error);
       }
     }
@@ -46,8 +53,14 @@ exports.sendMessage = async (message, options, databaseMessageEntry) => {
                   message: ${message},
                   from: ${options.twilioPhoneNumber},
                   to: ${options.userPhoneNumber}`);
-    const twilioError = `Status: ${error.status ? error.status : ""}, Message:${error.message ? error.message : ""}, Code: ${error.code ? error.code : ""}, More Info: ${error.more_info ? error.more_info : ""}`;
-    logger.error(`TWILIOAPIUTIL.sendMessage: ERROR in sending Twilio message. Error data from Twilio: ${twilioError}`);
+    const twilioError = `Status: ${error.status ? error.status : ''}, Message:${
+      error.message ? error.message : ''
+    }, Code: ${error.code ? error.code : ''}, More Info: ${
+      error.more_info ? error.more_info : ''
+    }`;
+    logger.error(
+      `TWILIOAPIUTIL.sendMessage: ERROR in sending Twilio message. Error data from Twilio: ${twilioError}`
+    );
     Sentry.captureException(error);
 
     if (databaseMessageEntry) {
@@ -59,7 +72,9 @@ exports.sendMessage = async (message, options, databaseMessageEntry) => {
       try {
         await DbApiUtil.logMessageToDb(databaseMessageEntry);
       } catch (error) {
-        logger.info('TWILIOAPIUTIL.sendMessage: failed to log message send failure to DB');
+        logger.info(
+          'TWILIOAPIUTIL.sendMessage: failed to log message send failure to DB'
+        );
         Sentry.captureException(error);
       }
     }

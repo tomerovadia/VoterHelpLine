@@ -2,7 +2,7 @@
 # the Postgres and Redis servers you need.
 #
 # It does NOT run the app server for you.
-version: "3"
+version: '3'
 services:
   postgres:
     image: postgres:alpine
