@@ -1,9 +1,9 @@
 const MessageParser = require('./message_parser');
 
-const ROUTE_VOTER = "ROUTE_VOTER";
-const UPDATE_VOTER_STATUS = "UPDATE_VOTER_STATUS";
-const FIND_VOTER = "FIND_VOTER";
-const RESET_VOTER = "RESET_VOTER";
+const ROUTE_VOTER = 'ROUTE_VOTER';
+const UPDATE_VOTER_STATUS = 'UPDATE_VOTER_STATUS';
+const FIND_VOTER = 'FIND_VOTER';
+const RESET_VOTER = 'RESET_VOTER';
 const VALID_COMMANDS = [ROUTE_VOTER, UPDATE_VOTER_STATUS];
 exports.ROUTE_VOTER = ROUTE_VOTER;
 exports.FIND_VOTER = FIND_VOTER;
@@ -11,13 +11,37 @@ exports.RESET_VOTER = RESET_VOTER;
 
 const getValidVoterStatuses = () => {
   switch (process.env.CLIENT_ORGANIZATION) {
-    case "VOTER_HELP_LINE":
-      return ["UNKNOWN", "NO_APPLICATION", "APPLICATION_REQUESTED", "APPLICATION_RECEIVED", "BALLOT_REQUESTED", "BALLOT_RECEIVED", "VOTED"];
-    case "VOTE_FROM_HOME_2020":
-      return ["UNKNOWN", "NO_APPLICATION", "APPLICATION_REQUESTED", "APPLICATION_RECEIVED", "BALLOT_REQUESTED", "BALLOT_RECEIVED", "VOTED"];
+    case 'VOTER_HELP_LINE':
+      return [
+        'UNKNOWN',
+        'NO_APPLICATION',
+        'APPLICATION_REQUESTED',
+        'APPLICATION_RECEIVED',
+        'BALLOT_REQUESTED',
+        'BALLOT_RECEIVED',
+        'VOTED',
+      ];
+    case 'VOTE_FROM_HOME_2020':
+      return [
+        'UNKNOWN',
+        'NO_APPLICATION',
+        'APPLICATION_REQUESTED',
+        'APPLICATION_RECEIVED',
+        'BALLOT_REQUESTED',
+        'BALLOT_RECEIVED',
+        'VOTED',
+      ];
     default:
-      return ["UNKNOWN", "NO_APPLICATION", "APPLICATION_REQUESTED", "APPLICATION_RECEIVED", "BALLOT_REQUESTED", "BALLOT_RECEIVED", "VOTED"];
-    }
+      return [
+        'UNKNOWN',
+        'NO_APPLICATION',
+        'APPLICATION_REQUESTED',
+        'APPLICATION_RECEIVED',
+        'BALLOT_REQUESTED',
+        'BALLOT_RECEIVED',
+        'VOTED',
+      ];
+  }
 };
 
 const compileRouteVoterCommandArgs = (words) => {
@@ -35,7 +59,9 @@ const compileRouteVoterCommandArgs = (words) => {
     // Ternary is necessary because MessageParser returns null if unchanged,
     // which is necessary for its other use case (to know if a message was modified
     // so the DB write can indicate this).
-    twilioPhoneNumber: parsedTwilioPhoneNumber ? parsedTwilioPhoneNumber : words[3],
+    twilioPhoneNumber: parsedTwilioPhoneNumber
+      ? parsedTwilioPhoneNumber
+      : words[3],
     destinationSlackChannelName: words[4],
   };
 };
@@ -56,14 +82,16 @@ exports.parseSlackCommand = (message) => {
   const words = message.split(/\s+/);
 
   // Rules for all commands.
-  if (words[0] != `<@${process.env.SLACK_BOT_USER_ID}>`
-      || !VALID_COMMANDS.includes(words[1])) {
+  if (
+    words[0] != `<@${process.env.SLACK_BOT_USER_ID}>` ||
+    !VALID_COMMANDS.includes(words[1])
+  ) {
     return null;
   }
 
   const command = words[1];
 
-  switch(command) {
+  switch (command) {
     case ROUTE_VOTER:
       return compileRouteVoterCommandArgs(words);
     case UPDATE_VOTER_STATUS:
@@ -74,10 +102,6 @@ exports.parseSlackCommand = (message) => {
   }
 };
 
-exports.findVoter = async () => {
+exports.findVoter = async () => {};
 
-};
-
-exports.resetVoter = async () => {
-
-};
+exports.resetVoter = async () => {};
