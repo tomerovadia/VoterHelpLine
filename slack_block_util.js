@@ -1,4 +1,5 @@
 const DbApiUtil = require('./db_api_util');
+const logger = require('./logger');
 
 getVoterStatusOptions = () => {
   switch (process.env.CLIENT_ORGANIZATION) {
@@ -233,7 +234,7 @@ exports.getVoterStatusBlocks = (messageText) => {
 };
 
 exports.makeClosedVoterPanelBlocks = (messageText, includeUndoButton) => {
-  console.log("\nENTERING SLACKINTERACTIONAPIUTIL.getClosedVoterStatusPanel");
+  logger.info("ENTERING SLACKINTERACTIONAPIUTIL.getClosedVoterStatusPanel");
 
   const blocks = [];
 
