@@ -7,52 +7,63 @@ const pool = new Pool({
 });
 
 exports.logMessageToDb = async (databaseMessageEntry) => {
-  const client = await pool.connect()
+  const client = await pool.connect();
   try {
-    await client.query("INSERT INTO messages (message, direction, automated, successfully_sent, from_phone_number, user_id, to_phone_number, originating_slack_user_id, slack_channel, slack_parent_message_ts, twilio_message_sid, slack_message_ts, slack_error, twilio_error, twilio_send_timestamp, twilio_receive_timestamp, slack_send_timestamp, slack_receive_timestamp, confirmed_disclaimer, is_demo, last_voter_message_secs_from_epoch, unprocessed_message, slack_retry_num, slack_retry_reason, originating_slack_user_name, entry_point) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26);", [
-      databaseMessageEntry.message,
-      databaseMessageEntry.direction,
-      databaseMessageEntry.automated,
-      databaseMessageEntry.successfullySent,
-      databaseMessageEntry.fromPhoneNumber,
-      databaseMessageEntry.userId,
-      databaseMessageEntry.toPhoneNumber,
-      databaseMessageEntry.originatingSlackUserId,
-      databaseMessageEntry.slackChannel,
-      databaseMessageEntry.slackParentMessageTs,
-      databaseMessageEntry.twilioMessageSid,
-      databaseMessageEntry.slackMessageTs,
-      databaseMessageEntry.slackError,
-      databaseMessageEntry.twilioError,
-      databaseMessageEntry.twilioSendTimestamp,
-      databaseMessageEntry.twilioReceiveTimestamp,
-      databaseMessageEntry.slackSendTimestamp,
-      databaseMessageEntry.slackReceiveTimestamp,
-      databaseMessageEntry.confirmedDisclaimer,
-      databaseMessageEntry.isDemo,
-      databaseMessageEntry.lastVoterMessageSecsFromEpoch,
-      databaseMessageEntry.unprocessedMessage,
-      databaseMessageEntry.slackRetryNum,
-      databaseMessageEntry.slackRetryReason,
-      databaseMessageEntry.originatingSlackUserName,
-      databaseMessageEntry.entryPoint
-    ]);
+    await client.query(
+      'INSERT INTO messages (message, direction, automated, successfully_sent, from_phone_number, user_id, to_phone_number, originating_slack_user_id, slack_channel, slack_parent_message_ts, twilio_message_sid, slack_message_ts, slack_error, twilio_error, twilio_send_timestamp, twilio_receive_timestamp, slack_send_timestamp, slack_receive_timestamp, confirmed_disclaimer, is_demo, last_voter_message_secs_from_epoch, unprocessed_message, slack_retry_num, slack_retry_reason, originating_slack_user_name, entry_point) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26);',
+      [
+        databaseMessageEntry.message,
+        databaseMessageEntry.direction,
+        databaseMessageEntry.automated,
+        databaseMessageEntry.successfullySent,
+        databaseMessageEntry.fromPhoneNumber,
+        databaseMessageEntry.userId,
+        databaseMessageEntry.toPhoneNumber,
+        databaseMessageEntry.originatingSlackUserId,
+        databaseMessageEntry.slackChannel,
+        databaseMessageEntry.slackParentMessageTs,
+        databaseMessageEntry.twilioMessageSid,
+        databaseMessageEntry.slackMessageTs,
+        databaseMessageEntry.slackError,
+        databaseMessageEntry.twilioError,
+        databaseMessageEntry.twilioSendTimestamp,
+        databaseMessageEntry.twilioReceiveTimestamp,
+        databaseMessageEntry.slackSendTimestamp,
+        databaseMessageEntry.slackReceiveTimestamp,
+        databaseMessageEntry.confirmedDisclaimer,
+        databaseMessageEntry.isDemo,
+        databaseMessageEntry.lastVoterMessageSecsFromEpoch,
+        databaseMessageEntry.unprocessedMessage,
+        databaseMessageEntry.slackRetryNum,
+        databaseMessageEntry.slackRetryReason,
+        databaseMessageEntry.originatingSlackUserName,
+        databaseMessageEntry.entryPoint,
+      ]
+    );
 
-    logger.info(`DBAPIUTIL.logMessageToDb: Successfully inserted message into PostgreSQL database.`);
+    logger.info(
+      `DBAPIUTIL.logMessageToDb: Successfully inserted message into PostgreSQL database.`
+    );
   } finally {
     // Make sure to release the client before any error handling,
     // just in case the error handling itself throws an error.
-    client.release()
+    client.release();
   }
 };
 
 // Populates immediately available info into the DB entry upon receiving a message from Twilio.
-exports.populateIncomingDbMessageTwilioEntry = ({userMessage, userPhoneNumber, twilioPhoneNumber, twilioMessageSid, entryPoint}) => {
+exports.populateIncomingDbMessageTwilioEntry = ({
+  userMessage,
+  userPhoneNumber,
+  twilioPhoneNumber,
+  twilioMessageSid,
+  entryPoint,
+}) => {
   return {
     message: userMessage,
     // Only for Slack incoming
     unprocessedMessage: null,
-    direction: "INBOUND",
+    direction: 'INBOUND',
     // To be filled later
     entryPoint,
     automated: null,
@@ -99,10 +110,21 @@ exports.populateIncomingDbMessageTwilioEntry = ({userMessage, userPhoneNumber, t
 };
 
 // Populates immediately available info into the DB entry upon receiving a message from Slack.
-exports.populateIncomingDbMessageSlackEntry = ({unprocessedMessage, originatingSlackUserId, slackChannel, slackParentMessageTs, slackMessageTs, slackRetryNum, slackRetryReason, originatingSlackUserName, entryPoint}) => {
+exports.populateIncomingDbMessageSlackEntry = ({
+  unprocessedMessage,
+  originatingSlackUserId,
+  slackChannel,
+  slackParentMessageTs,
+  slackMessageTs,
+  slackRetryNum,
+  slackRetryReason,
+  originatingSlackUserName,
+  // eslint-disable-next-line no-unused-vars
+  entryPoint,
+}) => {
   return {
     unprocessedMessage,
-    direction: "OUTBOUND",
+    direction: 'OUTBOUND',
     // To be filled later
     entryPoint: null,
     automated: false,
@@ -150,7 +172,8 @@ exports.updateDbMessageEntryWithUserInfo = (userInfo, dbMessageEntry) => {
   dbMessageEntry.userId = userInfo.userId;
   dbMessageEntry.confirmedDisclaimer = userInfo.confirmedDisclaimer;
   dbMessageEntry.isDemo = userInfo.isDemo;
-  dbMessageEntry.lastVoterMessageSecsFromEpoch = userInfo.lastVoterMessageSecsFromEpoch;
+  dbMessageEntry.lastVoterMessageSecsFromEpoch =
+    userInfo.lastVoterMessageSecsFromEpoch;
   dbMessageEntry.entryPoint = userInfo.entryPoint;
 };
 
@@ -160,7 +183,7 @@ exports.populateAutomatedDbMessageEntry = (userInfo) => {
     message: null,
     // Only for incoming Slack messages.
     unprocessedMessage: null,
-    direction: "OUTBOUND",
+    direction: 'OUTBOUND',
     entryPoint: userInfo.entryPoint,
     automated: true,
 
@@ -222,15 +245,22 @@ const MESSAGE_HISTORY_SQL_SCRIPT = `SELECT
 
 exports.getMessageHistoryFor = async (userId, timestampSince) => {
   logger.info(`ENTERING DBAPIUTIL.getMessageHistoryFor`);
-  logger.info(`DBAPIUTIL.getMessageHistoryFor: Looking up user:${userId}, message history since timestamp: ${timestampSince}.`);
+  logger.info(
+    `DBAPIUTIL.getMessageHistoryFor: Looking up user:${userId}, message history since timestamp: ${timestampSince}.`
+  );
 
-  const client = await pool.connect()
+  const client = await pool.connect();
   try {
-    const result = await client.query(MESSAGE_HISTORY_SQL_SCRIPT, [userId, timestampSince]);
-    logger.info(`DBAPIUTIL.getMessageHistoryFor: Successfully looked up message history in PostgreSQL.`);
+    const result = await client.query(MESSAGE_HISTORY_SQL_SCRIPT, [
+      userId,
+      timestampSince,
+    ]);
+    logger.info(
+      `DBAPIUTIL.getMessageHistoryFor: Successfully looked up message history in PostgreSQL.`
+    );
     return result.rows;
   } finally {
-    client.release()
+    client.release();
   }
 };
 
@@ -244,45 +274,56 @@ const LAST_TIMESTAMP_SQL_SCRIPT = `SELECT
 
 exports.getTimestampOfLastMessageInThread = async (parentMessageTs) => {
   logger.info(`ENTERING DBAPIUTIL.getTimestampOfLastMessageInThread`);
-  logger.info(`DBAPIUTIL.getMessageHistoryFor: Looking up last message timestamp in Slack thread ${parentMessageTs}.`);
+  logger.info(
+    `DBAPIUTIL.getMessageHistoryFor: Looking up last message timestamp in Slack thread ${parentMessageTs}.`
+  );
 
-  const client = await pool.connect()
+  const client = await pool.connect();
   try {
-    const result = await client.query(LAST_TIMESTAMP_SQL_SCRIPT, [parentMessageTs]);
-    logger.info(`DBAPIUTIL.getTimestampOfLastMessageInThread: Successfully looked up last timestamp in thread.`);
+    const result = await client.query(LAST_TIMESTAMP_SQL_SCRIPT, [
+      parentMessageTs,
+    ]);
+    logger.info(
+      `DBAPIUTIL.getTimestampOfLastMessageInThread: Successfully looked up last timestamp in thread.`
+    );
 
     // Just in case nobody said anything while the user was at a channel.
     if (result.rows.length > 0) {
       return result.rows[0].timestamp;
     } else {
-      return "1990-01-01 10:00:00.000";
+      return '1990-01-01 10:00:00.000';
     }
   } finally {
-    client.release()
+    client.release();
   }
 };
 
 exports.logVoterStatusToDb = async (databaseVoterStatusEntry) => {
   logger.info(`ENTERING DBAPIUTIL.logVoterStatusToDb`);
-  const client = await pool.connect()
+  const client = await pool.connect();
   try {
-    await client.query("INSERT INTO voter_status_updates (user_id, user_phone_number, voter_status, originating_slack_user_name, originating_slack_user_id, originating_slack_channel_name, originating_slack_channel_id, originating_slack_parent_message_ts, action_ts, twilio_phone_number, is_demo) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11);", [
-      databaseVoterStatusEntry.userId,
-      databaseVoterStatusEntry.userPhoneNumber,
-      databaseVoterStatusEntry.voterStatus,
-      databaseVoterStatusEntry.originatingSlackUserName,
-      databaseVoterStatusEntry.originatingSlackUserId,
-      databaseVoterStatusEntry.originatingSlackChannelName,
-      databaseVoterStatusEntry.originatingSlackChannelId,
-      databaseVoterStatusEntry.originatingSlackParentMessageTs,
-      databaseVoterStatusEntry.actionTs,
-      databaseVoterStatusEntry.twilioPhoneNumber,
-      databaseVoterStatusEntry.isDemo
-    ]);
+    await client.query(
+      'INSERT INTO voter_status_updates (user_id, user_phone_number, voter_status, originating_slack_user_name, originating_slack_user_id, originating_slack_channel_name, originating_slack_channel_id, originating_slack_parent_message_ts, action_ts, twilio_phone_number, is_demo) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11);',
+      [
+        databaseVoterStatusEntry.userId,
+        databaseVoterStatusEntry.userPhoneNumber,
+        databaseVoterStatusEntry.voterStatus,
+        databaseVoterStatusEntry.originatingSlackUserName,
+        databaseVoterStatusEntry.originatingSlackUserId,
+        databaseVoterStatusEntry.originatingSlackChannelName,
+        databaseVoterStatusEntry.originatingSlackChannelId,
+        databaseVoterStatusEntry.originatingSlackParentMessageTs,
+        databaseVoterStatusEntry.actionTs,
+        databaseVoterStatusEntry.twilioPhoneNumber,
+        databaseVoterStatusEntry.isDemo,
+      ]
+    );
 
-    logger.info(`DBAPIUTIL.logVoterStatusToDb: Successfully inserted voter status into PostgreSQL database.`);
+    logger.info(
+      `DBAPIUTIL.logVoterStatusToDb: Successfully inserted voter status into PostgreSQL database.`
+    );
   } finally {
-    client.release()
+    client.release();
   }
 };
 
@@ -297,13 +338,17 @@ const LAST_VOTER_STATUS_SQL_SCRIPT = `SELECT voter_status
 // the block initial_option on the front-end, and is copied over with the blocks during the move.
 exports.getLatestVoterStatus = async (userId) => {
   logger.info(`ENTERING DBAPIUTIL.getLatest`);
-  logger.info(`DBAPIUTIL.getLatestVoterStatus: Looking up last voter status for userId: ${userId}.`);
+  logger.info(
+    `DBAPIUTIL.getLatestVoterStatus: Looking up last voter status for userId: ${userId}.`
+  );
   const client = await pool.connect();
 
   try {
     const result = await client.query(LAST_VOTER_STATUS_SQL_SCRIPT, [userId]);
 
-    logger.info(`DBAPIUTIL.getLatestVoterStatus: Successfully looked up last voter status.`);
+    logger.info(
+      `DBAPIUTIL.getLatestVoterStatus: Successfully looked up last voter status.`
+    );
     if (result.rows.length > 0) {
       return result.rows[0].voter_status;
     } else {
@@ -311,33 +356,40 @@ exports.getLatestVoterStatus = async (userId) => {
       return null;
     }
   } finally {
-    client.release()
+    client.release();
   }
 };
 
-exports.logVolunteerVoterClaimToDb = async (databaseVolunteerVoterClaimEntry) => {
+exports.logVolunteerVoterClaimToDb = async (
+  databaseVolunteerVoterClaimEntry
+) => {
   logger.info(`ENTERING DBAPIUTIL.logVolunteerVoterClaimToDb`);
 
   const client = await pool.connect();
 
   try {
-    await client.query("INSERT INTO volunteer_voter_claims (user_id, user_phone_number, twilio_phone_number, is_demo, volunteer_slack_user_name, volunteer_slack_user_id, originating_slack_user_name, originating_slack_user_id, originating_slack_channel_name, originating_slack_channel_id, originating_slack_parent_message_ts, action_ts) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12);", [
-      databaseVolunteerVoterClaimEntry.userId,
-      databaseVolunteerVoterClaimEntry.userPhoneNumber,
-      databaseVolunteerVoterClaimEntry.twilioPhoneNumber,
-      databaseVolunteerVoterClaimEntry.isDemo,
-      databaseVolunteerVoterClaimEntry.volunteerSlackUserName,
-      databaseVolunteerVoterClaimEntry.volunteerSlackUserId,
-      databaseVolunteerVoterClaimEntry.originatingSlackUserName,
-      databaseVolunteerVoterClaimEntry.originatingSlackUserId,
-      databaseVolunteerVoterClaimEntry.originatingSlackChannelName,
-      databaseVolunteerVoterClaimEntry.originatingSlackChannelId,
-      databaseVolunteerVoterClaimEntry.originatingSlackParentMessageTs,
-      databaseVolunteerVoterClaimEntry.actionTs
-    ]);
+    await client.query(
+      'INSERT INTO volunteer_voter_claims (user_id, user_phone_number, twilio_phone_number, is_demo, volunteer_slack_user_name, volunteer_slack_user_id, originating_slack_user_name, originating_slack_user_id, originating_slack_channel_name, originating_slack_channel_id, originating_slack_parent_message_ts, action_ts) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12);',
+      [
+        databaseVolunteerVoterClaimEntry.userId,
+        databaseVolunteerVoterClaimEntry.userPhoneNumber,
+        databaseVolunteerVoterClaimEntry.twilioPhoneNumber,
+        databaseVolunteerVoterClaimEntry.isDemo,
+        databaseVolunteerVoterClaimEntry.volunteerSlackUserName,
+        databaseVolunteerVoterClaimEntry.volunteerSlackUserId,
+        databaseVolunteerVoterClaimEntry.originatingSlackUserName,
+        databaseVolunteerVoterClaimEntry.originatingSlackUserId,
+        databaseVolunteerVoterClaimEntry.originatingSlackChannelName,
+        databaseVolunteerVoterClaimEntry.originatingSlackChannelId,
+        databaseVolunteerVoterClaimEntry.originatingSlackParentMessageTs,
+        databaseVolunteerVoterClaimEntry.actionTs,
+      ]
+    );
 
-    logger.info(`DBAPIUTIL.logVolunteerVoterClaimToDb: Successfully inserted volunteer voter claim into PostgreSQL database.`);
+    logger.info(
+      `DBAPIUTIL.logVolunteerVoterClaimToDb: Successfully inserted volunteer voter claim into PostgreSQL database.`
+    );
   } finally {
-    client.release()
+    client.release();
   }
 };

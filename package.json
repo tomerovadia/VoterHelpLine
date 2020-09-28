@@ -30,7 +30,10 @@
     "develop": "NODE_ENV=development nodemon server.js",
     "heroku-postbuild": "npm install && npm run build",
     "test": "LOG_LEVEL=info DOTENV_CONFIG_PATH=.env.test NODE_ENV=test node -r dotenv/config ./node_modules/.bin/jest",
-    "sls": "serverless"
+    "sls": "serverless",
+    "format:check": "prettier --check --ignore-path .gitignore .",
+    "format:write": "prettier --write --ignore-path .gitignore .",
+    "eslint": "eslint ."
   },
   "browserslist": {
     "production": [
@@ -45,8 +48,11 @@
     ]
   },
   "devDependencies": {
+    "eslint": "^7.10.0",
+    "eslint-config-prettier": "^6.12.0",
     "jest": "^26.0.1",
     "nodemon": "^2.0.4",
+    "prettier": "^2.1.2",
     "redis-mock": "^0.49.0",
     "serverless": "^2.3.0",
     "serverless-domain-manager": "^5.0.0",
