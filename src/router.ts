@@ -207,7 +207,7 @@ export async function handleNewVoter(
     isDemo: userInfo.isDemo || null,
   });
 
-  let slackChannelName = 'lobby';
+  let slackChannelName = userInfo.isDemo ? 'demo-lobby' : 'lobby';
   if (entryPoint === LoadBalancer.PULL_ENTRY_POINT) {
     if (userInfo.isDemo) {
       slackChannelName = 'demo-lobby';

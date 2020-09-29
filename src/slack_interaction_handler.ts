@@ -32,7 +32,7 @@ const getClosedVoterPanelText = (
   originatingSlackUserName: string
 ): string => {
   logger.info('ENTERING SLACKINTERACTIONAPIUTIL.getClosedVoterPanelText');
-  const timeSinceEpochSecs = Date.now() / 1000;
+  const timeSinceEpochSecs = Math.round(Date.now() / 1000);
   // See https://api.slack.com/reference/surfaces/formatting#visual-styles
   const specialSlackTimestamp = `<!date^${timeSinceEpochSecs}^{date_num} {time_secs}|${new Date()}>`;
 
@@ -63,7 +63,7 @@ const handleVoterStatusUpdateHelper = async ({
   const MD5 = new Hashes.MD5();
   const userId = MD5.hex(userPhoneNumber);
 
-  const timeSinceEpochSecs = Date.now() / 1000;
+  const timeSinceEpochSecs = Math.round(Date.now() / 1000);
   // See https://api.slack.com/reference/surfaces/formatting#visual-styles
   const specialSlackTimestamp = `<!date^${timeSinceEpochSecs}^{date_num} {time_secs}|${new Date()}>`;
 
@@ -242,7 +242,7 @@ export async function handleVolunteerUpdate({
   const MD5 = new Hashes.MD5();
   const userId = MD5.hex(userPhoneNumber);
 
-  const timeSinceEpochSecs = Date.now() / 1000;
+  const timeSinceEpochSecs = Math.round(Date.now() / 1000);
   // See https://api.slack.com/reference/surfaces/formatting#visual-styles
   const specialSlackTimestamp = `<!date^${timeSinceEpochSecs}^{date_num} {time_secs}|${new Date()}>`;
 
