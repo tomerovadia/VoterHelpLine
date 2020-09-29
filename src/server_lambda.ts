@@ -17,7 +17,14 @@ if (process.env.SENTRY_DSN) {
     dsn: process.env.SENTRY_DSN,
   });
 
-  handler = Sentry.AWSLambda.wrapHandler(handler);
+  const sentryWrappedHandler = Sentry.AWSLambda.wrapHandler(handler);
+  handler = (event: any, context: any) => {
+    return sentryWrappedHandler(event, context)
+      .then((res) => Sentry.flush().then(() => Promise.resolve(res)))
+      .catch((err: Error) => {
+        Sentry.flush().then(() => Promise.reject(err));
+      });
+  };
 }
 
 export { handler };
