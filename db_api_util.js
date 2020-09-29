@@ -1,50 +1,48 @@
-const { Client } = require('pg');
+const { Pool } = require('pg');
 
-exports.logMessageToDb = (databaseMessageEntry) => {
-  console.log(`\nENTERING DBAPIUTIL.logMessageToDb`);
-  const pgDatabaseClient = new Client({
-    connectionString: process.env.DATABASE_URL,
-  });
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  max: Number(process.env.CONNECTION_POOL_MAX || 20),
+});
 
-  pgDatabaseClient.connect()
-    .then(() => {
-      pgDatabaseClient.query("INSERT INTO messages (message, direction, automated, successfully_sent, from_phone_number, user_id, to_phone_number, originating_slack_user_id, slack_channel, slack_parent_message_ts, twilio_message_sid, slack_message_ts, slack_error, twilio_error, twilio_send_timestamp, twilio_receive_timestamp, slack_send_timestamp, slack_receive_timestamp, confirmed_disclaimer, is_demo, last_voter_message_secs_from_epoch, unprocessed_message, slack_retry_num, slack_retry_reason, originating_slack_user_name, entry_point) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26);", [
-        databaseMessageEntry.message,
-        databaseMessageEntry.direction,
-        databaseMessageEntry.automated,
-        databaseMessageEntry.successfullySent,
-        databaseMessageEntry.fromPhoneNumber,
-        databaseMessageEntry.userId,
-        databaseMessageEntry.toPhoneNumber,
-        databaseMessageEntry.originatingSlackUserId,
-        databaseMessageEntry.slackChannel,
-        databaseMessageEntry.slackParentMessageTs,
-        databaseMessageEntry.twilioMessageSid,
-        databaseMessageEntry.slackMessageTs,
-        databaseMessageEntry.slackError,
-        databaseMessageEntry.twilioError,
-        databaseMessageEntry.twilioSendTimestamp,
-        databaseMessageEntry.twilioReceiveTimestamp,
-        databaseMessageEntry.slackSendTimestamp,
-        databaseMessageEntry.slackReceiveTimestamp,
-        databaseMessageEntry.confirmedDisclaimer,
-        databaseMessageEntry.isDemo,
-        databaseMessageEntry.lastVoterMessageSecsFromEpoch,
-        databaseMessageEntry.unprocessedMessage,
-        databaseMessageEntry.slackRetryNum,
-        databaseMessageEntry.slackRetryReason,
-        databaseMessageEntry.originatingSlackUserName,
-        databaseMessageEntry.entryPoint
-      ], (err, res) => {
-        if (err) {
-          console.log('\x1b[41m%s\x1b[1m\x1b[0m', `DBAPIUTIL.logMessageToDb: ERROR from PostgreSQL database message insert:`, err);
-        } else {
-          console.log(`DBAPIUTIL.logMessageToDb: Successfully inserted message into PostgreSQL database.`);
-        }
-        pgDatabaseClient.end();
-      });
-    })
-    .catch(err => console.log('\x1b[41m%s\x1b[1m\x1b[0m', `DBAPIUTIL.logMessageToDb: ERROR connecting to PostgreSQL database:`, err.stack));
+exports.logMessageToDb = async (databaseMessageEntry) => {
+  const client = await pool.connect()
+  try {
+    await client.query("INSERT INTO messages (message, direction, automated, successfully_sent, from_phone_number, user_id, to_phone_number, originating_slack_user_id, slack_channel, slack_parent_message_ts, twilio_message_sid, slack_message_ts, slack_error, twilio_error, twilio_send_timestamp, twilio_receive_timestamp, slack_send_timestamp, slack_receive_timestamp, confirmed_disclaimer, is_demo, last_voter_message_secs_from_epoch, unprocessed_message, slack_retry_num, slack_retry_reason, originating_slack_user_name, entry_point) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26);", [
+      databaseMessageEntry.message,
+      databaseMessageEntry.direction,
+      databaseMessageEntry.automated,
+      databaseMessageEntry.successfullySent,
+      databaseMessageEntry.fromPhoneNumber,
+      databaseMessageEntry.userId,
+      databaseMessageEntry.toPhoneNumber,
+      databaseMessageEntry.originatingSlackUserId,
+      databaseMessageEntry.slackChannel,
+      databaseMessageEntry.slackParentMessageTs,
+      databaseMessageEntry.twilioMessageSid,
+      databaseMessageEntry.slackMessageTs,
+      databaseMessageEntry.slackError,
+      databaseMessageEntry.twilioError,
+      databaseMessageEntry.twilioSendTimestamp,
+      databaseMessageEntry.twilioReceiveTimestamp,
+      databaseMessageEntry.slackSendTimestamp,
+      databaseMessageEntry.slackReceiveTimestamp,
+      databaseMessageEntry.confirmedDisclaimer,
+      databaseMessageEntry.isDemo,
+      databaseMessageEntry.lastVoterMessageSecsFromEpoch,
+      databaseMessageEntry.unprocessedMessage,
+      databaseMessageEntry.slackRetryNum,
+      databaseMessageEntry.slackRetryReason,
+      databaseMessageEntry.originatingSlackUserName,
+      databaseMessageEntry.entryPoint
+    ]);
+
+    console.log(`DBAPIUTIL.logMessageToDb: Successfully inserted message into PostgreSQL database.`);
+  } finally {
+    // Make sure to release the client before any error handling,
+    // just in case the error handling itself throws an error.
+    client.release()
+  }
 };
 
 // Populates immediately available info into the DB entry upon receiving a message from Twilio.
@@ -221,27 +219,18 @@ const MESSAGE_HISTORY_SQL_SCRIPT = `SELECT
                                         AND (CASE WHEN twilio_receive_timestamp IS NOT NULL THEN twilio_receive_timestamp WHEN slack_receive_timestamp IS NOT NULL THEN slack_receive_timestamp ELSE twilio_send_timestamp END) > $2
                                   ORDER BY timestamp ASC;`;
 
-exports.getMessageHistoryFor = (userId, timestampSince) => {
+exports.getMessageHistoryFor = async (userId, timestampSince) => {
   console.log(`\nENTERING DBAPIUTIL.getMessageHistoryFor`);
   console.log(`DBAPIUTIL.getMessageHistoryFor: Looking up user:${userId}, message history since timestamp: ${timestampSince}.`);
-  const pgDatabaseClient = new Client({
-    connectionString: process.env.DATABASE_URL,
-  });
-  return pgDatabaseClient.connect()
-    .then(() => {
-      return pgDatabaseClient.query(MESSAGE_HISTORY_SQL_SCRIPT, [userId, timestampSince]).then(result => {
-        console.log(`DBAPIUTIL.getMessageHistoryFor: Successfully looked up message historyin PostgreSQL.`);
-        pgDatabaseClient.end();
-        return result.rows;
-      })
-      .catch(err => {
-        console.log('\x1b[41m%s\x1b[1m\x1b[0m', `DBAPIUTIL.getMessageHistoryFor: ERROR from PostgreSQL message history lookup:`, err);
-        pgDatabaseClient.end();
-      });
-    })
-    .catch(err => {
-      console.log('\x1b[41m%s\x1b[1m\x1b[0m', `DBAPIUTIL.getMessageHistoryFor: ERROR connecting to PostgreSQL database:`, err.stack);
-    });
+
+  const client = await pool.connect()
+  try {
+    const result = await client.query(MESSAGE_HISTORY_SQL_SCRIPT, [userId, timestampSince]);
+    console.log(`DBAPIUTIL.getMessageHistoryFor: Successfully looked up message history in PostgreSQL.`);
+    return result.rows;
+  } finally {
+    client.release()
+  }
 };
 
 const LAST_TIMESTAMP_SQL_SCRIPT = `SELECT
@@ -252,64 +241,48 @@ const LAST_TIMESTAMP_SQL_SCRIPT = `SELECT
                                     ORDER BY timestamp DESC
                                     LIMIT 1;`;
 
-exports.getTimestampOfLastMessageInThread = (parentMessageTs) => {
+exports.getTimestampOfLastMessageInThread = async (parentMessageTs) => {
   console.log(`\nENTERING DBAPIUTIL.getTimestampOfLastMessageInThread`);
   console.log(`DBAPIUTIL.getMessageHistoryFor: Looking up last message timestamp in Slack thread ${parentMessageTs}.`);
-  const pgDatabaseClient = new Client({
-    connectionString: process.env.DATABASE_URL,
-  });
-  return pgDatabaseClient.connect()
-    .then(() => {
-      return pgDatabaseClient.query(LAST_TIMESTAMP_SQL_SCRIPT, [parentMessageTs]).then(result => {
-        console.log(`DBAPIUTIL.getTimestampOfLastMessageInThread: Successfully looked up last timestamp in thread.`);
-        pgDatabaseClient.end();
-        // Just in case nobody said anything while the user was at a channel.
-        if (result.rows.length > 0) {
-          return result.rows[0].timestamp;
-        } else {
-          return "1990-01-01 10:00:00.000";
-        }
-      })
-      .catch(err => {
-        console.log('\x1b[41m%s\x1b[1m\x1b[0m', `DBAPIUTIL.getTimestampOfLastMessageInThread: ERROR from PostgreSQL last timestamp in thread lookup:`, err);
-        pgDatabaseClient.end();
-      });
-    })
-    .catch(err => {
-      console.log('\x1b[41m%s\x1b[1m\x1b[0m', `DBAPIUTIL.getTimestampOfLastMessageInThread: ERROR connecting to PostgreSQL database:`, err.stack);
-    });
+
+  const client = await pool.connect()
+  try {
+    const result = await client.query(LAST_TIMESTAMP_SQL_SCRIPT, [parentMessageTs]);
+    console.log(`DBAPIUTIL.getTimestampOfLastMessageInThread: Successfully looked up last timestamp in thread.`);
+
+    // Just in case nobody said anything while the user was at a channel.
+    if (result.rows.length > 0) {
+      return result.rows[0].timestamp;
+    } else {
+      return "1990-01-01 10:00:00.000";
+    }
+  } finally {
+    client.release()
+  }
 };
 
-exports.logVoterStatusToDb = (databaseVoterStatusEntry) => {
+exports.logVoterStatusToDb = async (databaseVoterStatusEntry) => {
   console.log(`\nENTERING DBAPIUTIL.logVoterStatusToDb`);
-  const pgDatabaseClient = new Client({
-    connectionString: process.env.DATABASE_URL,
-  });
+  const client = await pool.connect()
+  try {
+    await client.query("INSERT INTO voter_status_updates (user_id, user_phone_number, voter_status, originating_slack_user_name, originating_slack_user_id, originating_slack_channel_name, originating_slack_channel_id, originating_slack_parent_message_ts, action_ts, twilio_phone_number, is_demo) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11);", [
+      databaseVoterStatusEntry.userId,
+      databaseVoterStatusEntry.userPhoneNumber,
+      databaseVoterStatusEntry.voterStatus,
+      databaseVoterStatusEntry.originatingSlackUserName,
+      databaseVoterStatusEntry.originatingSlackUserId,
+      databaseVoterStatusEntry.originatingSlackChannelName,
+      databaseVoterStatusEntry.originatingSlackChannelId,
+      databaseVoterStatusEntry.originatingSlackParentMessageTs,
+      databaseVoterStatusEntry.actionTs,
+      databaseVoterStatusEntry.twilioPhoneNumber,
+      databaseVoterStatusEntry.isDemo
+    ]);
 
-  return pgDatabaseClient.connect()
-    .then(() => {
-      pgDatabaseClient.query("INSERT INTO voter_status_updates (user_id, user_phone_number, voter_status, originating_slack_user_name, originating_slack_user_id, originating_slack_channel_name, originating_slack_channel_id, originating_slack_parent_message_ts, action_ts, twilio_phone_number, is_demo) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11);", [
-        databaseVoterStatusEntry.userId,
-        databaseVoterStatusEntry.userPhoneNumber,
-        databaseVoterStatusEntry.voterStatus,
-        databaseVoterStatusEntry.originatingSlackUserName,
-        databaseVoterStatusEntry.originatingSlackUserId,
-        databaseVoterStatusEntry.originatingSlackChannelName,
-        databaseVoterStatusEntry.originatingSlackChannelId,
-        databaseVoterStatusEntry.originatingSlackParentMessageTs,
-        databaseVoterStatusEntry.actionTs,
-        databaseVoterStatusEntry.twilioPhoneNumber,
-        databaseVoterStatusEntry.isDemo
-      ], (err, res) => {
-        if (err) {
-          console.log('\x1b[41m%s\x1b[1m\x1b[0m', `DBAPIUTIL.logVoterStatusToDb: ERROR from PostgreSQL database voter status insert:`, err);
-        } else {
-          console.log(`DBAPIUTIL.logVoterStatusToDb: Successfully inserted voter status into PostgreSQL database.`);
-        }
-        pgDatabaseClient.end();
-      });
-    })
-    .catch(err => console.log('\x1b[41m%s\x1b[1m\x1b[0m', `DBAPIUTIL.logVoterStatusToDb: ERROR connecting to PostgreSQL database:`, err.stack));
+    console.log(`DBAPIUTIL.logVoterStatusToDb: Successfully inserted voter status into PostgreSQL database.`);
+  } finally {
+    client.release()
+  }
 };
 
 const LAST_VOTER_STATUS_SQL_SCRIPT = `SELECT voter_status
@@ -321,63 +294,49 @@ const LAST_VOTER_STATUS_SQL_SCRIPT = `SELECT voter_status
 // This used to be used to look up the latest voter status when moving a voter
 // from channel to channel, but now instead the voter status is coded into
 // the block initial_option on the front-end, and is copied over with the blocks during the move.
-exports.getLatestVoterStatus = (userId) => {
+exports.getLatestVoterStatus = async (userId) => {
   console.log(`\nENTERING DBAPIUTIL.getLatest`);
   console.log(`DBAPIUTIL.getLatestVoterStatus: Looking up last voter status for userId: ${userId}.`);
-  const pgDatabaseClient = new Client({
-    connectionString: process.env.DATABASE_URL,
-  });
-  return pgDatabaseClient.connect()
-    .then(() => {
-      return pgDatabaseClient.query(LAST_VOTER_STATUS_SQL_SCRIPT, [userId]).then(result => {
-        console.log(`DBAPIUTIL.getLatestVoterStatus: Successfully looked up last voter status.`);
-        pgDatabaseClient.end();
-        if (result.rows.length > 0) {
-          return result.rows[0].voter_status;
-        } else {
-          console.log('\x1b[41m%s\x1b[1m\x1b[0m', `DBAPIUTIL.getLatestVoterStatus: No voter status for user`);
-          return null;
-        }
-      })
-      .catch(err => {
-        console.log('\x1b[41m%s\x1b[1m\x1b[0m', `DBAPIUTIL.getLatestVoterStatus: ERROR from PostgreSQL last voter status lookup:`, err);
-        pgDatabaseClient.end();
-      });
-    })
-    .catch(err => {
-      console.log('\x1b[41m%s\x1b[1m\x1b[0m', `DBAPIUTIL.getLatestVoterStatus: ERROR connecting to PostgreSQL database:`, err.stack);
-    });
+  const client = await pool.connect();
+
+  try {
+    const result = await client.query(LAST_VOTER_STATUS_SQL_SCRIPT, [userId]);
+
+    console.log(`DBAPIUTIL.getLatestVoterStatus: Successfully looked up last voter status.`);
+    if (result.rows.length > 0) {
+      return result.rows[0].voter_status;
+    } else {
+      console.log('\x1b[41m%s\x1b[1m\x1b[0m', `DBAPIUTIL.getLatestVoterStatus: No voter status for user`);
+      return null;
+    }
+  } finally {
+    client.release()
+  }
 };
 
-exports.logVolunteerVoterClaimToDb = (databaseVolunteerVoterClaimEntry) => {
+exports.logVolunteerVoterClaimToDb = async (databaseVolunteerVoterClaimEntry) => {
   console.log(`\nENTERING DBAPIUTIL.logVolunteerVoterClaimToDb`);
-  const pgDatabaseClient = new Client({
-    connectionString: process.env.DATABASE_URL,
-  });
 
-  return pgDatabaseClient.connect()
-    .then(() => {
-      pgDatabaseClient.query("INSERT INTO volunteer_voter_claims (user_id, user_phone_number, twilio_phone_number, is_demo, volunteer_slack_user_name, volunteer_slack_user_id, originating_slack_user_name, originating_slack_user_id, originating_slack_channel_name, originating_slack_channel_id, originating_slack_parent_message_ts, action_ts) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12);", [
-        databaseVolunteerVoterClaimEntry.userId,
-        databaseVolunteerVoterClaimEntry.userPhoneNumber,
-        databaseVolunteerVoterClaimEntry.twilioPhoneNumber,
-        databaseVolunteerVoterClaimEntry.isDemo,
-        databaseVolunteerVoterClaimEntry.volunteerSlackUserName,
-        databaseVolunteerVoterClaimEntry.volunteerSlackUserId,
-        databaseVolunteerVoterClaimEntry.originatingSlackUserName,
-        databaseVolunteerVoterClaimEntry.originatingSlackUserId,
-        databaseVolunteerVoterClaimEntry.originatingSlackChannelName,
-        databaseVolunteerVoterClaimEntry.originatingSlackChannelId,
-        databaseVolunteerVoterClaimEntry.originatingSlackParentMessageTs,
-        databaseVolunteerVoterClaimEntry.actionTs
-      ], (err, res) => {
-        if (err) {
-          console.log('\x1b[41m%s\x1b[1m\x1b[0m', `DBAPIUTIL.logVolunteerVoterClaimToDb: ERROR from PostgreSQL database volunteer voter claim insert:`, err);
-        } else {
-          console.log(`DBAPIUTIL.logVolunteerVoterClaimToDb: Successfully inserted volunteer voter claim into PostgreSQL database.`);
-        }
-        pgDatabaseClient.end();
-      });
-    })
-    .catch(err => console.log('\x1b[41m%s\x1b[1m\x1b[0m', `DBAPIUTIL.logVolunteerVoterClaimToDb: ERROR connecting to PostgreSQL database:`, err.stack));
+  const client = await pool.connect();
+
+  try {
+    await client.query("INSERT INTO volunteer_voter_claims (user_id, user_phone_number, twilio_phone_number, is_demo, volunteer_slack_user_name, volunteer_slack_user_id, originating_slack_user_name, originating_slack_user_id, originating_slack_channel_name, originating_slack_channel_id, originating_slack_parent_message_ts, action_ts) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12);", [
+      databaseVolunteerVoterClaimEntry.userId,
+      databaseVolunteerVoterClaimEntry.userPhoneNumber,
+      databaseVolunteerVoterClaimEntry.twilioPhoneNumber,
+      databaseVolunteerVoterClaimEntry.isDemo,
+      databaseVolunteerVoterClaimEntry.volunteerSlackUserName,
+      databaseVolunteerVoterClaimEntry.volunteerSlackUserId,
+      databaseVolunteerVoterClaimEntry.originatingSlackUserName,
+      databaseVolunteerVoterClaimEntry.originatingSlackUserId,
+      databaseVolunteerVoterClaimEntry.originatingSlackChannelName,
+      databaseVolunteerVoterClaimEntry.originatingSlackChannelId,
+      databaseVolunteerVoterClaimEntry.originatingSlackParentMessageTs,
+      databaseVolunteerVoterClaimEntry.actionTs
+    ]);
+
+    console.log(`DBAPIUTIL.logVolunteerVoterClaimToDb: Successfully inserted volunteer voter claim into PostgreSQL database.`);
+  } finally {
+    client.release()
+  }
 };
