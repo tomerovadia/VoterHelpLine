@@ -38,6 +38,7 @@ const expectNthSlackMessageToChannel = (channel, n, messageParts, parentMessageT
   let channelMessageNum = -1;
   for (let i = 0; i < SlackApiUtil.sendMessage.mock.calls.length; i++) {
     const slackMessageParams = SlackApiUtil.sendMessage.mock.calls[i][1];
+    console.log(slackMessageParams, channel)
     if (slackMessageParams.channel == channel) {
       channelMessageNum++;
       if (channelMessageNum == n) {
@@ -112,7 +113,7 @@ describe('handleNewVoter', () => {
       userPhoneNumber,
       userMessage: "can you help me vote",
       userId,
-    }, redisClient, "+18556843440", inboundDbMessageEntry).then(() => {
+    }, redisClient, "+18555553440", inboundDbMessageEntry).then(() => {
       expect(SlackApiUtil.sendMessage.mock.calls[0][1].channel).toBe("demo-lobby");
     });
   });
@@ -231,10 +232,10 @@ describe('handleNewVoter', () => {
       userPhoneNumber,
       userMessage: "can you help me vote",
       userId,
-    }, redisClient, "+18556843440", inboundDbMessageEntry).then(() => {
+    }, redisClient, "+18555553440", inboundDbMessageEntry).then(() => {
       for (call of RedisApiUtil.setHash.mock.calls) {
         const key = call[1];
-        if (key == `${userId}:+18556843440`) {
+        if (key == `${userId}:+18555553440`) {
           const value = call[2];
           expect(value).toEqual(expect.objectContaining({isDemo: true}));
         }
