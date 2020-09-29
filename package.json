@@ -10,30 +10,28 @@
     "axios": "^0.19.2",
     "bluebird": "^3.7.2",
     "body-parser": "^1.19.0",
-    "crypto": "^1.0.1",
     "datadog-lambda-js": "^3.29.0",
     "dd-trace": "^0.26.1",
     "dotenv": "^8.2.0",
     "express": "^4.17.1",
-    "jquery": "^3.5.1",
     "jshashes": "^1.0.8",
     "morgan": "^1.10.0",
-    "multer": "^1.4.2",
-    "node-postgres": "^0.6.2",
     "pg": "^8.3.0",
     "redis": "^3.0.2",
+    "source-map-support": "^0.5.19",
     "twilio": "^3.46.0",
     "winston": "^3.3.3"
   },
   "scripts": {
-    "start": "node server.js",
-    "develop": "NODE_ENV=development nodemon server.js",
+    "build": "tsc",
+    "start": "node -r source-map-support/register build/server.js",
+    "develop": "NODE_ENV=development nodemon --watch ./src --exec 'ts-node' --files ./src/server.ts",
     "heroku-postbuild": "npm install && npm run build",
-    "test": "LOG_LEVEL=info DOTENV_CONFIG_PATH=.env.test NODE_ENV=test node -r dotenv/config ./node_modules/.bin/jest",
+    "test": "LOG_LEVEL=info DOTENV_CONFIG_PATH=.env.test NODE_ENV=test node -r dotenv/config ./node_modules/.bin/jest ./src",
     "sls": "serverless",
-    "format:check": "prettier --check --ignore-path .gitignore .",
-    "format:write": "prettier --write --ignore-path .gitignore .",
-    "eslint": "eslint ."
+    "format:check": "prettier --check --ignore-path .gitignore ./src",
+    "format:write": "prettier --write --ignore-path .gitignore ./src",
+    "eslint": "eslint ./src --ext .js,.ts --max-warnings 0"
   },
   "browserslist": {
     "production": [
@@ -48,6 +46,18 @@
     ]
   },
   "devDependencies": {
+    "@babel/core": "^7.11.6",
+    "@babel/preset-env": "^7.11.5",
+    "@babel/preset-typescript": "^7.10.4",
+    "@types/bluebird": "^3.5.32",
+    "@types/express": "^4.17.8",
+    "@types/morgan": "^1.9.1",
+    "@types/node": "^14.11.2",
+    "@types/pg": "^7.14.5",
+    "@types/redis": "^2.8.27",
+    "@types/twilio": "^2.11.0",
+    "@typescript-eslint/eslint-plugin": "^4.3.0",
+    "@typescript-eslint/parser": "^4.3.0",
     "eslint": "^7.10.0",
     "eslint-config-prettier": "^6.12.0",
     "jest": "^26.0.1",
@@ -57,6 +67,9 @@
     "serverless": "^2.3.0",
     "serverless-domain-manager": "^5.0.0",
     "serverless-plugin-datadog": "^2.4.0",
-    "serverless-prune-plugin": "^1.4.3"
+    "serverless-plugin-typescript": "^1.1.9",
+    "serverless-prune-plugin": "^1.4.3",
+    "ts-node": "^9.0.0",
+    "typescript": "^4.0.3"
   }
 }

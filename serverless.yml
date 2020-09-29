@@ -64,6 +64,9 @@ plugins:
   # Custom domains: remove this to use an API Gateway-provided domain instead
   - serverless-domain-manager
 
+  # Compile typescript
+  - serverless-plugin-typescript
+
 custom:
   # The custom domain name to use for the muxer. You can remove this and
   # the serverless-domain-manager plugin to use an API Gateway-provided domain
@@ -100,7 +103,7 @@ custom:
 
 functions:
   app:
-    handler: server_lambda.handler
+    handler: src/server_lambda.handler
     events:
       - http: ANY /
       - http: 'ANY {proxy+}'

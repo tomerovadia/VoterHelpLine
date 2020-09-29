@@ -1,6 +1,7 @@
-const logger = require('./logger');
+import { HistoricalMessage } from './types';
+import logger from './logger';
 
-const getMessageSender = (messageObject, userId) => {
+const getMessageSender = (messageObject: HistoricalMessage, userId: string) => {
   switch (messageObject.direction) {
     case 'INBOUND':
       return `${userId}:`;
@@ -18,7 +19,10 @@ const getMessageSender = (messageObject, userId) => {
   return 'unknown';
 };
 
-exports.formatMessageHistory = (messageObjects, userId) => {
+export function formatMessageHistory(
+  messageObjects: HistoricalMessage[],
+  userId: string
+): string {
   logger.info('ENTERING SLACKMESSAGEFORMATTER.formatMessageHistory');
   const formattedMessages = messageObjects.map((messageObject) => {
     const timeSinceEpochSecs = Date.parse(messageObject.timestamp) / 1000;
@@ -31,4 +35,4 @@ exports.formatMessageHistory = (messageObjects, userId) => {
   });
 
   return formattedMessages.join('\n');
-};
+}

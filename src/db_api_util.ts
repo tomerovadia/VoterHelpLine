@@ -1,12 +1,77 @@
-const { Pool } = require('pg');
-const logger = require('./logger');
-
+import { Pool } from 'pg';
+import logger from './logger';
+import {
+  MessageDirection,
+  EntryPoint,
+  UserInfo,
+  HistoricalMessage,
+} from './types';
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   max: Number(process.env.CONNECTION_POOL_MAX || 20),
 });
 
-exports.logMessageToDb = async (databaseMessageEntry) => {
+export type DatabaseMessageEntry = {
+  message?: string | null;
+  direction: MessageDirection | null;
+  automated: boolean | null;
+  successfullySent?: boolean | null;
+  fromPhoneNumber?: string | null;
+  userId: string | null;
+  toPhoneNumber?: string | null;
+  originatingSlackUserId?: string | null;
+  slackChannel?: string | null;
+  slackParentMessageTs?: number | null;
+  twilioMessageSid?: string | null;
+  slackMessageTs?: number | null;
+  slackError?: string | null;
+  twilioError?: string | null;
+  twilioSendTimestamp?: Date | null;
+  twilioReceiveTimestamp?: Date | null;
+  slackSendTimestamp?: Date | null;
+  slackReceiveTimestamp?: Date | null;
+  confirmedDisclaimer?: boolean | null;
+  isDemo?: boolean | null;
+  lastVoterMessageSecsFromEpoch?: number | null;
+  unprocessedMessage?: string | null;
+  slackRetryNum?: number | null;
+  slackRetryReason?: string | null;
+  originatingSlackUserName?: string | null;
+  entryPoint: EntryPoint | null;
+};
+
+export type DatabaseVoterStatusEntry = {
+  userId: string | null;
+  userPhoneNumber: string | null;
+  voterStatus: string | null;
+  originatingSlackUserName: string | null;
+  originatingSlackUserId: string | null;
+  originatingSlackChannelName: string | null;
+  originatingSlackChannelId: string | null;
+  originatingSlackParentMessageTs: number | null;
+  actionTs?: number | null;
+  twilioPhoneNumber: string | null;
+  isDemo: boolean | null;
+};
+
+export type DatabaseVolunteerVoterClaim = {
+  userId: string | null;
+  userPhoneNumber: string | null;
+  twilioPhoneNumber: string | null;
+  isDemo: boolean | null;
+  volunteerSlackUserName: string | null;
+  volunteerSlackUserId: string | null;
+  originatingSlackUserName: string | null;
+  originatingSlackUserId: string | null;
+  originatingSlackChannelName: string | null;
+  originatingSlackChannelId: string | null;
+  originatingSlackParentMessageTs: number | null;
+  actionTs: number | null;
+};
+
+export async function logMessageToDb(
+  databaseMessageEntry: DatabaseMessageEntry
+): Promise<void> {
   const client = await pool.connect();
   try {
     await client.query(
@@ -49,16 +114,22 @@ exports.logMessageToDb = async (databaseMessageEntry) => {
     // just in case the error handling itself throws an error.
     client.release();
   }
-};
+}
 
 // Populates immediately available info into the DB entry upon receiving a message from Twilio.
-exports.populateIncomingDbMessageTwilioEntry = ({
+export function populateIncomingDbMessageTwilioEntry({
   userMessage,
   userPhoneNumber,
   twilioPhoneNumber,
   twilioMessageSid,
   entryPoint,
-}) => {
+}: {
+  userMessage: string;
+  userPhoneNumber: string;
+  twilioPhoneNumber: string;
+  twilioMessageSid: string;
+  entryPoint: EntryPoint;
+}): DatabaseMessageEntry {
   return {
     message: userMessage,
     // Only for Slack incoming
@@ -107,10 +178,10 @@ exports.populateIncomingDbMessageTwilioEntry = ({
     // To be filled later
     lastVoterMessageSecsFromEpoch: null,
   };
-};
+}
 
 // Populates immediately available info into the DB entry upon receiving a message from Slack.
-exports.populateIncomingDbMessageSlackEntry = ({
+export function populateIncomingDbMessageSlackEntry({
   unprocessedMessage,
   originatingSlackUserId,
   slackChannel,
@@ -119,9 +190,16 @@ exports.populateIncomingDbMessageSlackEntry = ({
   slackRetryNum,
   slackRetryReason,
   originatingSlackUserName,
-  // eslint-disable-next-line no-unused-vars
-  entryPoint,
-}) => {
+}: {
+  unprocessedMessage: string;
+  originatingSlackUserId: string;
+  slackChannel: string;
+  slackParentMessageTs: number;
+  slackMessageTs: number;
+  slackRetryNum?: number;
+  slackRetryReason?: string;
+  originatingSlackUserName: string;
+}): DatabaseMessageEntry {
   return {
     unprocessedMessage,
     direction: 'OUTBOUND',
@@ -165,20 +243,25 @@ exports.populateIncomingDbMessageSlackEntry = ({
     // To be filled later
     lastVoterMessageSecsFromEpoch: null,
   };
-};
+}
 
 // Updates an incoming DB entry right before it is sent with information from the userInfo.
-exports.updateDbMessageEntryWithUserInfo = (userInfo, dbMessageEntry) => {
+export function updateDbMessageEntryWithUserInfo(
+  userInfo: UserInfo,
+  dbMessageEntry: DatabaseMessageEntry
+): void {
   dbMessageEntry.userId = userInfo.userId;
   dbMessageEntry.confirmedDisclaimer = userInfo.confirmedDisclaimer;
   dbMessageEntry.isDemo = userInfo.isDemo;
   dbMessageEntry.lastVoterMessageSecsFromEpoch =
     userInfo.lastVoterMessageSecsFromEpoch;
   dbMessageEntry.entryPoint = userInfo.entryPoint;
-};
+}
 
 // Populates a DB entry with available info right before it is passed to TwilioApiUtil for additional info and writing to DB.
-exports.populateAutomatedDbMessageEntry = (userInfo) => {
+export function populateAutomatedDbMessageEntry(
+  userInfo: UserInfo
+): DatabaseMessageEntry {
   return {
     message: null,
     // Only for incoming Slack messages.
@@ -224,26 +307,38 @@ exports.populateAutomatedDbMessageEntry = (userInfo) => {
     isDemo: userInfo.isDemo,
     lastVoterMessageSecsFromEpoch: userInfo.lastVoterMessageSecsFromEpoch,
   };
-};
+}
 
-const MESSAGE_HISTORY_SQL_SCRIPT = `SELECT
-                                    (CASE
-                                        WHEN twilio_receive_timestamp IS NOT NULL
-                                          THEN twilio_receive_timestamp
-                                        WHEN slack_receive_timestamp IS NOT NULL
-                                          THEN slack_receive_timestamp
-                                        ELSE twilio_send_timestamp
-                                      END) AS timestamp,
-                                    message,
-                                    automated,
-                                    direction,
-                                    originating_slack_user_name
-                                  FROM messages
-                                  WHERE user_id = $1
-                                        AND (CASE WHEN twilio_receive_timestamp IS NOT NULL THEN twilio_receive_timestamp WHEN slack_receive_timestamp IS NOT NULL THEN slack_receive_timestamp ELSE twilio_send_timestamp END) > $2
-                                  ORDER BY timestamp ASC;`;
+const MESSAGE_HISTORY_SQL_SCRIPT = `
+  SELECT
+    (
+      CASE
+        WHEN twilio_receive_timestamp IS NOT NULL
+          THEN twilio_receive_timestamp
+        WHEN slack_receive_timestamp IS NOT NULL
+          THEN slack_receive_timestamp
+        ELSE twilio_send_timestamp
+      END
+    ) AS timestamp,
+    message,
+    automated,
+    direction,
+    originating_slack_user_name
+  FROM messages
+  WHERE user_id = $1
+    AND (
+      CASE
+      WHEN twilio_receive_timestamp IS NOT NULL THEN twilio_receive_timestamp
+      WHEN slack_receive_timestamp IS NOT NULL THEN slack_receive_timestamp
+      ELSE twilio_send_timestamp
+      END
+    ) > $2
+  ORDER BY timestamp ASC;`;
 
-exports.getMessageHistoryFor = async (userId, timestampSince) => {
+export async function getMessageHistoryFor(
+  userId: string,
+  timestampSince: string
+): Promise<HistoricalMessage[]> {
   logger.info(`ENTERING DBAPIUTIL.getMessageHistoryFor`);
   logger.info(
     `DBAPIUTIL.getMessageHistoryFor: Looking up user:${userId}, message history since timestamp: ${timestampSince}.`
@@ -262,17 +357,26 @@ exports.getMessageHistoryFor = async (userId, timestampSince) => {
   } finally {
     client.release();
   }
-};
+}
 
-const LAST_TIMESTAMP_SQL_SCRIPT = `SELECT
-                                    	(CASE WHEN twilio_receive_timestamp IS NOT NULL THEN twilio_receive_timestamp WHEN slack_receive_timestamp IS NOT NULL THEN slack_receive_timestamp ELSE twilio_send_timestamp END) AS timestamp
-                                    FROM messages
-                                    WHERE
-                                    	slack_parent_message_ts = $1
-                                    ORDER BY timestamp DESC
-                                    LIMIT 1;`;
+const LAST_TIMESTAMP_SQL_SCRIPT = `
+  SELECT
+    (
+      CASE
+      WHEN twilio_receive_timestamp IS NOT NULL THEN twilio_receive_timestamp
+      WHEN slack_receive_timestamp IS NOT NULL THEN slack_receive_timestamp
+      ELSE twilio_send_timestamp
+      END
+    ) AS timestamp
+  FROM messages
+  WHERE
+    slack_parent_message_ts = $1
+  ORDER BY timestamp DESC
+  LIMIT 1;`;
 
-exports.getTimestampOfLastMessageInThread = async (parentMessageTs) => {
+export async function getTimestampOfLastMessageInThread(
+  parentMessageTs: number
+): Promise<string> {
   logger.info(`ENTERING DBAPIUTIL.getTimestampOfLastMessageInThread`);
   logger.info(
     `DBAPIUTIL.getMessageHistoryFor: Looking up last message timestamp in Slack thread ${parentMessageTs}.`
@@ -296,9 +400,11 @@ exports.getTimestampOfLastMessageInThread = async (parentMessageTs) => {
   } finally {
     client.release();
   }
-};
+}
 
-exports.logVoterStatusToDb = async (databaseVoterStatusEntry) => {
+export async function logVoterStatusToDb(
+  databaseVoterStatusEntry: DatabaseVoterStatusEntry
+): Promise<void> {
   logger.info(`ENTERING DBAPIUTIL.logVoterStatusToDb`);
   const client = await pool.connect();
   try {
@@ -325,7 +431,7 @@ exports.logVoterStatusToDb = async (databaseVoterStatusEntry) => {
   } finally {
     client.release();
   }
-};
+}
 
 const LAST_VOTER_STATUS_SQL_SCRIPT = `SELECT voter_status
                                         FROM voter_status_updates
@@ -336,7 +442,9 @@ const LAST_VOTER_STATUS_SQL_SCRIPT = `SELECT voter_status
 // This used to be used to look up the latest voter status when moving a voter
 // from channel to channel, but now instead the voter status is coded into
 // the block initial_option on the front-end, and is copied over with the blocks during the move.
-exports.getLatestVoterStatus = async (userId) => {
+export async function getLatestVoterStatus(
+  userId: string
+): Promise<DatabaseVoterStatusEntry | null> {
   logger.info(`ENTERING DBAPIUTIL.getLatest`);
   logger.info(
     `DBAPIUTIL.getLatestVoterStatus: Looking up last voter status for userId: ${userId}.`
@@ -358,11 +466,11 @@ exports.getLatestVoterStatus = async (userId) => {
   } finally {
     client.release();
   }
-};
+}
 
-exports.logVolunteerVoterClaimToDb = async (
-  databaseVolunteerVoterClaimEntry
-) => {
+export async function logVolunteerVoterClaimToDb(
+  databaseVolunteerVoterClaimEntry: DatabaseVolunteerVoterClaim
+): Promise<void> {
   logger.info(`ENTERING DBAPIUTIL.logVolunteerVoterClaimToDb`);
 
   const client = await pool.connect();
@@ -392,4 +500,4 @@ exports.logVolunteerVoterClaimToDb = async (
   } finally {
     client.release();
   }
-};
+}

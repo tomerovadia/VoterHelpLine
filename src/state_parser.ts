@@ -1,7 +1,7 @@
-const StateConstants = require('./state_constants');
+import { getStateConstants } from './state_constants';
 
-exports.determineState = (userMessage) => {
-  const stateConstants = StateConstants.getStateConstants();
+export function determineState(userMessage: string): string | null {
+  const stateConstants = getStateConstants();
   for (const key in stateConstants) {
     const abbrev = key;
     const stateName = stateConstants[key];
@@ -55,4 +55,4 @@ exports.determineState = (userMessage) => {
   }
 
   return null;
-};
+}

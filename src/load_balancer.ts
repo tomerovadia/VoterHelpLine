@@ -1,38 +1,43 @@
-const logger = require('./logger');
+import logger from './logger';
+import { PromisifiedRedisClient } from './redis_client';
+import { EntryPoint } from './types';
 
-const PULL_ENTRY_POINT = 'PULL';
-const PUSH_ENTRY_POINT = 'PUSH';
-exports.PULL_ENTRY_POINT = PULL_ENTRY_POINT;
-exports.PUSH_ENTRY_POINT = PUSH_ENTRY_POINT;
+export const PULL_ENTRY_POINT = 'PULL';
+export const PUSH_ENTRY_POINT = 'PUSH';
 
 // phoneNumbersAreDemo stores hardcoded logic determining whether a pull
 // voter should be considered a demo, based on the twilioPhoneNumber and
 // userPhoneNumber.
-exports.phoneNumbersAreDemo = (twilioPhoneNumber, userPhoneNumber) => {
+export function phoneNumbersAreDemo(
+  twilioPhoneNumber: string,
+  userPhoneNumber: string
+): boolean {
   return (
     twilioPhoneNumber == process.env.DEMO_PHONE_NUMBER ||
     twilioPhoneNumber == process.env.PREVIOUS_DEMO_PHONE_NUMBER ||
     userPhoneNumber == process.env.TESTER_PHONE_NUMBER
   );
-};
+}
 
 // getPushPhoneNumberState stores hardcoded logic determining the U.S. state of
 // a push voter. Each push twilioPhoneNumber should only be used for one U.S. state.
-exports.getPushPhoneNumberState = (twilioPhoneNumber) => {
+export function getPushPhoneNumberState(
+  twilioPhoneNumber: string
+): string | null {
   switch (twilioPhoneNumber) {
     case process.env.PUSH_NC_PHONE_NUMBER:
       return 'North Carolina';
     default:
       return null;
   }
-};
+}
 
-exports.selectSlackChannel = async (
-  redisClient,
-  entryPoint,
-  stateName,
+export async function selectSlackChannel(
+  redisClient: PromisifiedRedisClient,
+  entryPoint: EntryPoint,
+  stateName?: string | null,
   isDemo = false
-) => {
+): Promise<string | null> {
   logger.debug('ENTERING LOADBALANCER.selectSlackChannel');
   logger.debug(
     `LOADBALANCER.selectSlackChannel: LoadBalancer given the following arguments: entryPoint: ${entryPoint}, stateName: ${stateName}, isDemo: ${isDemo}`
@@ -61,10 +66,13 @@ exports.selectSlackChannel = async (
     `LOADBALANCER.selectSlackChannel: Determined openPodsKey: ${openPodsKey}`
   );
 
-  let numVoters = await redisClient.getAsync(voterCounterKey);
-  if (!numVoters) {
+  const numVotersFromRedis = await redisClient.getAsync(voterCounterKey);
+  let numVoters;
+  if (!numVotersFromRedis) {
     logger.debug('No value for voterCounterKey; assuming 0');
     numVoters = 0;
+  } else {
+    numVoters = Number(numVotersFromRedis);
   }
 
   logger.debug(
@@ -89,8 +97,6 @@ exports.selectSlackChannel = async (
     )}`
   );
 
-  numVoters = parseInt(numVoters);
-
   const selectedPodNumber = numVoters % openPods.length;
   logger.debug(
     `LOADBALANCER.selectSlackChannel: selectedPodNumber = numVoters % openPods.length = ${numVoters} % ${openPods.length} = ${selectedPodNumber}`
@@ -112,4 +118,4 @@ exports.selectSlackChannel = async (
     `Exiting LOADBALANCER.selectSlackChannel with return value: ${selectedChannelName}`
   );
   return selectedChannelName;
-};
+}

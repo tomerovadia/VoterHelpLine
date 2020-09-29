@@ -1,16 +1,21 @@
-const Sentry = require('@sentry/node');
-const DbApiUtil = require('./db_api_util');
-const logger = require('./logger');
+import * as Sentry from '@sentry/node';
+import * as DbApiUtil from './db_api_util';
+import logger from './logger';
+import twilio from 'twilio';
 
-let twilioClient;
-if (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN) {
-  twilioClient = require('twilio')(
-    process.env.TWILIO_ACCOUNT_SID,
-    process.env.TWILIO_AUTH_TOKEN
-  );
-}
+const twilioClient = twilio(
+  process.env.TWILIO_ACCOUNT_SID,
+  process.env.TWILIO_AUTH_TOKEN
+);
 
-exports.sendMessage = async (message, options, databaseMessageEntry) => {
+export async function sendMessage(
+  message: string,
+  options: {
+    twilioPhoneNumber: string;
+    userPhoneNumber: string;
+  },
+  databaseMessageEntry?: DbApiUtil.DatabaseMessageEntry
+): Promise<void> {
   logger.info(`ENTERING TWILIOAPIUTIL.sendMessage`);
   if (databaseMessageEntry) {
     logger.info(
@@ -81,4 +86,4 @@ exports.sendMessage = async (message, options, databaseMessageEntry) => {
 
     throw error;
   }
-};
+}

@@ -1,23 +1,47 @@
-const axios = require('axios');
-const Hashes = require('jshashes'); // v1.0.5
-const Sentry = require('@sentry/node');
-const DbApiUtil = require('./db_api_util');
-const SlackApiUtil = require('./slack_api_util');
-const logger = require('./logger');
+import axios from 'axios';
+import Hashes from 'jshashes';
+import * as Sentry from '@sentry/node';
+import * as DbApiUtil from './db_api_util';
+import logger from './logger';
+import { UserInfo } from './types';
+import { SlackBlock } from './slack_block_util';
 
-const sendMessage = async (
-  message,
-  options,
-  databaseMessageEntry = null,
-  userInfo = null
-) => {
+type SlackSendMessageResponse = {
+  data: {
+    channel: string;
+    ts: number;
+  };
+};
+
+type SlackSendMessageOptions = {
+  channel: string;
+  parentMessageTs?: number;
+  blocks?: SlackBlock[];
+};
+
+export async function sendMessage(
+  message: string,
+  options: SlackSendMessageOptions
+): Promise<null | SlackSendMessageResponse>;
+export async function sendMessage(
+  message: string,
+  options: SlackSendMessageOptions,
+  databaseMessageEntry: DbApiUtil.DatabaseMessageEntry,
+  userInfo: UserInfo
+): Promise<null | SlackSendMessageResponse>;
+export async function sendMessage(
+  message: string,
+  options: SlackSendMessageOptions,
+  databaseMessageEntry: DbApiUtil.DatabaseMessageEntry | null = null,
+  userInfo: UserInfo | null = null
+): Promise<null | SlackSendMessageResponse> {
   logger.info(`ENTERING SLACKAPIUTIL.sendMessage`);
   if (databaseMessageEntry) {
     logger.info(
       `SLACKAPIUTIL.sendMessage: This Slack message send will log to DB (databaseMessageEntry is not null).`
     );
     // Copies a few fields from userInfo to databaseMessageEntry.
-    DbApiUtil.updateDbMessageEntryWithUserInfo(userInfo, databaseMessageEntry);
+    DbApiUtil.updateDbMessageEntryWithUserInfo(userInfo!, databaseMessageEntry);
     databaseMessageEntry.slackChannel = options.channel;
     databaseMessageEntry.slackParentMessageTs = options.parentMessageTs;
     databaseMessageEntry.slackSendTimestamp = new Date();
@@ -45,7 +69,7 @@ const sendMessage = async (
       logger.error(
         `SLACKAPIUTIL.sendMessage: ERROR in sending Slack message: ${response.data.error}`
       );
-      return;
+      return null;
     }
 
     logger.info(`SLACKAPIUTIL.sendMessage: Successfully sent Slack message,
@@ -94,20 +118,21 @@ const sendMessage = async (
 
     throw error;
   }
-};
+}
 
-exports.sendMessage = sendMessage;
-
-exports.sendMessages = async (messages, options) => {
+export async function sendMessages(
+  messages: string[],
+  options: SlackSendMessageOptions
+): Promise<void> {
   const parentMessageTs = options.parentMessageTs;
   const channel = options.channel;
 
   for (const message of messages) {
-    await SlackApiUtil.sendMessage(message, { parentMessageTs, channel });
+    await sendMessage(message, { parentMessageTs, channel });
   }
-};
+}
 
-exports.authenticateConnectionToSlack = (token) => {
+export function authenticateConnectionToSlack(token: string): boolean {
   const MD5 = new Hashes.MD5();
   if (MD5.hex(token) == process.env.SLACK_AUTH_TOKEN_HASH) {
     logger.info('token verified');
@@ -116,15 +141,21 @@ exports.authenticateConnectionToSlack = (token) => {
     logger.info('token unauthorized');
     return false;
   }
-};
+}
 
-exports.copyUserInfoToDbMessageEntry = (userInfo, dbMessageEntry) => {
+export function copyUserInfoToDbMessageEntry(
+  userInfo: UserInfo,
+  dbMessageEntry: DbApiUtil.DatabaseMessageEntry
+): void {
   dbMessageEntry.confirmedDisclaimer = userInfo.confirmedDisclaimer;
   dbMessageEntry.isDemo = userInfo.isDemo;
-  dbMessageEntry.confirmedDisclaimer = userInfo.lastVoterMessageSecsFromEpoch;
-};
+  dbMessageEntry.lastVoterMessageSecsFromEpoch =
+    userInfo.lastVoterMessageSecsFromEpoch;
+}
 
-exports.fetchSlackChannelName = async (channelId) => {
+export async function fetchSlackChannelName(
+  channelId: string
+): Promise<string | null> {
   const response = await axios.get('https://slack.com/api/conversations.info', {
     params: {
       'Content-Type': 'application/json',
@@ -146,9 +177,11 @@ exports.fetchSlackChannelName = async (channelId) => {
       );
     return null;
   }
-};
+}
 
-exports.fetchSlackUserName = async (userId) => {
+export async function fetchSlackUserName(
+  userId: string
+): Promise<string | null> {
   const response = await axios.get('https://slack.com/api/users.info', {
     params: {
       'Content-Type': 'application/json',
@@ -170,10 +203,13 @@ exports.fetchSlackUserName = async (userId) => {
       );
     return null;
   }
-};
+}
 
 // See reference here: https://api.slack.com/messaging/retrieving#individual_messages
-exports.fetchSlackMessageBlocks = async (channelId, messageTs) => {
+export async function fetchSlackMessageBlocks(
+  channelId: string,
+  messageTs: number
+): Promise<SlackBlock[] | null> {
   const response = await axios.get(
     'https://slack.com/api/conversations.history',
     {
@@ -200,4 +236,4 @@ exports.fetchSlackMessageBlocks = async (channelId, messageTs) => {
       );
     return null;
   }
-};
+}

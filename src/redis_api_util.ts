@@ -1,6 +1,9 @@
-const logger = require('./logger');
+import logger from './logger';
+import type { PromisifiedRedisClient } from './redis_client';
 
-const fieldTypes = {
+const fieldTypes: {
+  [fieldName: string]: 'string' | 'boolean' | 'integer' | undefined;
+} = {
   // Not necessary (is default)
   userId: 'string',
   isDemo: 'boolean',
@@ -9,7 +12,11 @@ const fieldTypes = {
   lastVoterMessageSecsFromEpoch: 'integer',
 };
 
-exports.setHash = (redisClient, key, hash) => {
+export function setHash(
+  redisClient: PromisifiedRedisClient,
+  key: string,
+  hash: { [k: string]: string | number }
+): Promise<void[]> {
   logger.debug(`ENTERING REDISAPIUTIL.setHash`);
 
   return Promise.all(
@@ -19,13 +26,20 @@ exports.setHash = (redisClient, key, hash) => {
       return redisClient.hsetAsync(key, field, value);
     })
   );
-};
+}
 
-exports.getHash = async (redisClient, key) => {
+export async function getHash(
+  redisClient: PromisifiedRedisClient,
+  key: string
+): Promise<{
+  [k: string]: any;
+}> {
   logger.debug(`ENTERING REDISAPIUTIL.getHash`);
-  const hash = await redisClient.hgetallAsync(key);
+  const hash: {
+    [k: string]: any;
+  } = await redisClient.hgetallAsync(key);
   if (hash != null) {
-    for (let field in hash) {
+    for (const field in hash) {
       switch (fieldTypes[field]) {
         case 'boolean':
           hash[field] = hash[field] === 'true';
@@ -40,9 +54,13 @@ exports.getHash = async (redisClient, key) => {
   }
 
   return hash;
-};
+}
 
-exports.getHashField = async (redisClient, key, field) => {
+export async function getHashField(
+  redisClient: PromisifiedRedisClient,
+  key: string,
+  field: string
+): Promise<any> {
   logger.debug(`ENTERING REDISAPIUTIL.getHashField`);
 
   const value = await redisClient.hgetAsync(key, field);
@@ -56,10 +74,14 @@ exports.getHashField = async (redisClient, key, field) => {
         return value;
     }
   }
-};
+}
 
-exports.deleteHashField = (redisClient, key, field) => {
+export function deleteHashField(
+  redisClient: PromisifiedRedisClient,
+  key: string,
+  field: string
+): Promise<number> {
   logger.debug(`ENTERING REDISAPIUTIL.deleteHashField`);
 
   return redisClient.hdelAsync(key, field);
-};
+}
