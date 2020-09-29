@@ -1,4 +1,4 @@
-exports.getStateConstants = () => {
+export function getStateConstants(): { [stateCode: string]: string } {
   switch (process.env.CLIENT_ORGANIZATION) {
     case 'VOTER_HELP_LINE':
       return {
@@ -19,4 +19,4 @@ exports.getStateConstants = () => {
         OH: 'Ohio',
       };
   }
-};
+}

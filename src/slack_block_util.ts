@@ -1,6 +1,12 @@
-const logger = require('./logger');
+import logger from './logger';
+import type { VoterStatus } from './types';
 
-const getVoterStatusOptions = () => {
+export type SlackBlock = {
+  type: string;
+  [key: string]: any;
+};
+
+export function getVoterStatusOptions(): { [key in VoterStatus]: string } {
   switch (process.env.CLIENT_ORGANIZATION) {
     case 'VOTER_HELP_LINE':
       return {
@@ -39,11 +45,9 @@ const getVoterStatusOptions = () => {
         REFUSED: 'Refused',
       };
   }
-};
+}
 
-exports.getVoterStatusOptions = getVoterStatusOptions;
-
-const voterInfoSection = (messageText) => {
+export function voterInfoSection(messageText: string): SlackBlock {
   return {
     type: 'section',
     text: {
@@ -51,11 +55,9 @@ const voterInfoSection = (messageText) => {
       text: messageText,
     },
   };
-};
+}
 
-exports.voterInfoSection = voterInfoSection;
-
-const volunteerSelectionPanel = {
+const volunteerSelectionPanel: SlackBlock = {
   type: 'actions',
   elements: [
     {
@@ -69,7 +71,7 @@ const volunteerSelectionPanel = {
   ],
 };
 
-const voterStatusPanel = {
+export const voterStatusPanel: SlackBlock = {
   type: 'actions',
   elements: [
     {
@@ -223,17 +225,18 @@ const voterStatusPanel = {
   ],
 };
 
-exports.voterStatusPanel = voterStatusPanel;
-
-exports.getVoterStatusBlocks = (messageText) => {
+export function getVoterStatusBlocks(messageText: string): SlackBlock[] {
   return [
     voterInfoSection(messageText),
     volunteerSelectionPanel,
     voterStatusPanel,
   ];
-};
+}
 
-exports.makeClosedVoterPanelBlocks = (messageText, includeUndoButton) => {
+export function makeClosedVoterPanelBlocks(
+  messageText: string,
+  includeUndoButton: boolean
+): SlackBlock[] {
   logger.info('ENTERING SLACKINTERACTIONAPIUTIL.getClosedVoterStatusPanel');
 
   const blocks = [];
@@ -282,32 +285,38 @@ exports.makeClosedVoterPanelBlocks = (messageText, includeUndoButton) => {
     });
   }
   return blocks;
-};
+}
 
-exports.replaceVoterPanelBlocks = (oldBlocks, replacementBlocks) => {
+export function replaceVoterPanelBlocks(
+  oldBlocks: SlackBlock[],
+  replacementBlocks: SlackBlock[]
+): SlackBlock[] {
   const newBlocks = [];
   // The first block is the user info.
   newBlocks.push(oldBlocks[0]);
   // The second block is the volunteer dropdown.
   newBlocks.push(oldBlocks[1]);
   // The remaining blocks are the panel.
-  for (let idx in replacementBlocks) {
+  for (const idx in replacementBlocks) {
     newBlocks.push(replacementBlocks[idx]);
   }
   return newBlocks;
-};
+}
 
 // This function mutates the blocks input.
-exports.populateDropdownNewInitialValue = (blocks, newInitialValue) => {
+export function populateDropdownNewInitialValue(
+  blocks: SlackBlock[],
+  newInitialValue: VoterStatus
+): void {
   const voterStatusOptions = getVoterStatusOptions();
   const isVoterStatusOption = Object.keys(voterStatusOptions).includes(
     newInitialValue
   );
-  for (let i in blocks) {
+  for (const i in blocks) {
     const block = blocks[i];
     if (block.type === 'actions') {
       const elements = block.elements;
-      for (let j in elements) {
+      for (const j in elements) {
         const element = elements[j];
         if (isVoterStatusOption) {
           if (element.type === 'static_select') {
@@ -327,4 +336,4 @@ exports.populateDropdownNewInitialValue = (blocks, newInitialValue) => {
       }
     }
   }
-};
+}

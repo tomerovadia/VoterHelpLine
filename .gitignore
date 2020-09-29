@@ -1,4 +1,7 @@
 push_phone_numbers.js
+/build
+/.build
+.DS_Store
 
 # Logs
 logs

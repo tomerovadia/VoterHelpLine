@@ -1,4 +1,4 @@
-const winston = require('winston');
+import winston from 'winston';
 
 const printFormat = winston.format.printf((info) => {
   const { timestamp, level, message, stack, ...restObj } = info;
@@ -18,16 +18,9 @@ const logger = winston.createLogger({
   format: winston.format.combine(
     winston.format.errors({ stack: true }),
     winston.format.timestamp(),
-    logFormats[process.env.LOG_FORMAT || 'cli']
+    logFormats[(process.env.LOG_FORMAT as keyof typeof logFormats) || 'cli']
   ),
   transports: [new winston.transports.Console()],
 });
 
-// based on: https://www.digitalocean.com/community/tutorials/how-to-use-winston-to-log-node-js-applications
-logger.stream = {
-  write: function (message) {
-    logger.info(message);
-  },
-};
-
-module.exports = logger;
+export default logger;

@@ -1,11 +1,13 @@
-const Promise = require('bluebird');
-const SlackApiUtil = require('./slack_api_util');
+/* eslint @typescript-eslint/no-floating-promises: off */
 
-exports.demoSlack = () => {
+import Promise from 'bluebird';
+import * as SlackApiUtil from './slack_api_util';
+
+export function demoSlack(): void {
   Promise.delay(5000).then(() => {
     SlackApiUtil.sendMessage('<!channel> Operator: New voter! (4600087425).', {
       channel: '#lobby',
-    }).then((response) => {
+    }).then((response: any) => {
       const parentMessageTs = response.data.ts;
       const channel = response.data.channel;
       SlackApiUtil.sendMessage('Voter 4600087425: Hi can you help me vote?', {
@@ -33,7 +35,7 @@ exports.demoSlack = () => {
                 SlackApiUtil.sendMessage(
                   '@channel Operator: New North Carolina voter! (4600087425).',
                   { channel: '#north-carolina' }
-                ).then((response) => {
+                ).then((response: any) => {
                   const parentMessageTs = response.data.ts;
                   const channel = response.data.channel;
                   SlackApiUtil.sendMessages(
@@ -59,4 +61,4 @@ exports.demoSlack = () => {
       });
     });
   });
-};
+}

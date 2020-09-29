@@ -1,18 +1,38 @@
-const Hashes = require('jshashes'); // v1.0.5
-const DbApiUtil = require('./db_api_util');
-const SlackApiUtil = require('./slack_api_util');
-const LoadBalancer = require('./load_balancer');
-const SlackBlockUtil = require('./slack_block_util');
-const SlackInteractionApiUtil = require('./slack_interaction_api_util');
-const RedisApiUtil = require('./redis_api_util');
-const logger = require('./logger');
+import Hashes from 'jshashes';
+import * as DbApiUtil from './db_api_util';
+import * as SlackApiUtil from './slack_api_util';
+import * as LoadBalancer from './load_balancer';
+import * as SlackBlockUtil from './slack_block_util';
+import * as SlackInteractionApiUtil from './slack_interaction_api_util';
+import * as RedisApiUtil from './redis_api_util';
+import logger from './logger';
+import { VoterStatus } from './types';
+import { PromisifiedRedisClient } from './redis_client';
+
+export type VoterStatusUpdate = VoterStatus | 'UNDO';
+
+type Payload = {
+  container: {
+    thread_ts: number;
+  };
+  channel: {
+    id: string;
+  };
+  actions: SlackBlockUtil.SlackBlock[];
+  user: {
+    id: string;
+  };
+  message: {
+    blocks: SlackBlockUtil.SlackBlock[];
+  };
+};
 
 const getClosedVoterPanelText = (
-  selectedVoterStatus,
-  originatingSlackUserName
-) => {
+  selectedVoterStatus: VoterStatusUpdate,
+  originatingSlackUserName: string
+): string => {
   logger.info('ENTERING SLACKINTERACTIONAPIUTIL.getClosedVoterPanelText');
-  const timeSinceEpochSecs = Date.parse(new Date()) / 1000;
+  const timeSinceEpochSecs = Date.now() / 1000;
   // See https://api.slack.com/reference/surfaces/formatting#visual-styles
   const specialSlackTimestamp = `<!date^${timeSinceEpochSecs}^{date_num} {time_secs}|${new Date()}>`;
 
@@ -26,21 +46,24 @@ const getClosedVoterPanelText = (
 
 const handleVoterStatusUpdateHelper = async ({
   payload,
-  // eslint-disable-next-line no-unused-vars
-  res,
   selectedVoterStatus,
   originatingSlackUserName,
   originatingSlackChannelName,
   userPhoneNumber,
   twilioPhoneNumber,
-  // eslint-disable-next-line no-unused-vars
-  redisClient,
+}: {
+  payload: Payload;
+  selectedVoterStatus: VoterStatusUpdate;
+  originatingSlackUserName: string;
+  originatingSlackChannelName: string;
+  userPhoneNumber: string;
+  twilioPhoneNumber: string;
 }) => {
   logger.info('ENTERING SLACKINTERACTIONHANDLER.handleVoterStatusUpdate');
   const MD5 = new Hashes.MD5();
   const userId = MD5.hex(userPhoneNumber);
 
-  const timeSinceEpochSecs = Date.parse(new Date()) / 1000;
+  const timeSinceEpochSecs = Date.now() / 1000;
   // See https://api.slack.com/reference/surfaces/formatting#visual-styles
   const specialSlackTimestamp = `<!date^${timeSinceEpochSecs}^{date_num} {time_secs}|${new Date()}>`;
 
@@ -75,16 +98,23 @@ const handleVoterStatusUpdateHelper = async ({
   });
 };
 
-exports.handleVoterStatusUpdate = async ({
+export async function handleVoterStatusUpdate({
   payload,
-  res,
   selectedVoterStatus,
   originatingSlackUserName,
   originatingSlackChannelName,
   userPhoneNumber,
   twilioPhoneNumber,
   redisClient,
-}) => {
+}: {
+  payload: Payload;
+  selectedVoterStatus: VoterStatusUpdate;
+  originatingSlackUserName: string;
+  originatingSlackChannelName: string;
+  userPhoneNumber: string;
+  twilioPhoneNumber: string;
+  redisClient: PromisifiedRedisClient;
+}): Promise<void> {
   // Interaction is selection of a new voter status, from either dropdown selection or button press.
   if (
     Object.keys(SlackBlockUtil.getVoterStatusOptions()).includes(
@@ -96,13 +126,11 @@ exports.handleVoterStatusUpdate = async ({
     );
     await handleVoterStatusUpdateHelper({
       payload,
-      res,
       selectedVoterStatus,
       originatingSlackUserName,
       originatingSlackChannelName,
       userPhoneNumber,
       twilioPhoneNumber,
-      redisClient,
     });
 
     if (payload.actions[0].type === 'button') {
@@ -146,7 +174,7 @@ exports.handleVoterStatusUpdate = async ({
       // even when Slack is refreshed this new status is shown.
       SlackBlockUtil.populateDropdownNewInitialValue(
         payload.message.blocks,
-        selectedVoterStatus
+        selectedVoterStatus as VoterStatus
       );
 
       // Replace the entire block so that the initial option change persists.
@@ -170,7 +198,6 @@ exports.handleVoterStatusUpdate = async ({
       originatingSlackChannelName,
       userPhoneNumber,
       twilioPhoneNumber,
-      redisClient,
     });
 
     await SlackInteractionApiUtil.addBackVoterStatusPanel({
@@ -191,17 +218,21 @@ exports.handleVoterStatusUpdate = async ({
       userPhoneNumber
     );
   }
-};
+}
 
-exports.handleVolunteerUpdate = async ({
+export async function handleVolunteerUpdate({
   payload,
-  // eslint-disable-next-line no-unused-vars
-  res,
   originatingSlackUserName,
   originatingSlackChannelName,
   userPhoneNumber,
   twilioPhoneNumber,
-}) => {
+}: {
+  payload: Payload;
+  originatingSlackUserName: string;
+  originatingSlackChannelName: string;
+  userPhoneNumber: string;
+  twilioPhoneNumber: string;
+}): Promise<void> {
   logger.info(
     `SLACKINTERACTIONHANDLER.handleVolunteerUpdate: Determined user interaction is a volunteer update`
   );
@@ -211,7 +242,7 @@ exports.handleVolunteerUpdate = async ({
   const MD5 = new Hashes.MD5();
   const userId = MD5.hex(userPhoneNumber);
 
-  const timeSinceEpochSecs = Date.parse(new Date()) / 1000;
+  const timeSinceEpochSecs = Date.now() / 1000;
   // See https://api.slack.com/reference/surfaces/formatting#visual-styles
   const specialSlackTimestamp = `<!date^${timeSinceEpochSecs}^{date_num} {time_secs}|${new Date()}>`;
 
@@ -259,4 +290,4 @@ exports.handleVolunteerUpdate = async ({
     slackParentMessageTs: payload.container.thread_ts,
     newBlocks: payload.message.blocks,
   });
-};
+}

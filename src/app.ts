@@ -1,41 +1,65 @@
-if (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test') {
-  require('dotenv').config();
-}
+import express from 'express';
+import Hashes from 'jshashes';
+import bodyParser from 'body-parser';
+import twilio from 'twilio';
+import * as Sentry from '@sentry/node';
+import morgan from 'morgan';
+import axios, { AxiosResponse } from 'axios';
+import { Pool } from 'pg';
 
-const express = require('express');
+import * as SlackApiUtil from './slack_api_util';
+import * as TwilioApiUtil from './twilio_api_util';
+import * as Router from './router';
+import * as DbApiUtil from './db_api_util';
+import * as RedisApiUtil from './redis_api_util';
+import * as LoadBalancer from './load_balancer';
+import * as SlackUtil from './slack_util';
+import * as TwilioUtil from './twilio_util';
+import * as SlackInteractionHandler from './slack_interaction_handler';
+import logger from './logger';
+import redisClient from './redis_client';
+import { EntryPoint, Request, UserInfo } from './types';
+
 const app = express();
-const redis = require('redis');
-const bluebird = require('bluebird');
-const SlackApiUtil = require('./slack_api_util');
-const TwilioApiUtil = require('./twilio_api_util');
-const Router = require('./router');
-const Hashes = require('jshashes'); // v1.0.5
-const bodyParser = require('body-parser');
-const MessagingResponse = require('twilio').twiml.MessagingResponse;
-const Sentry = require('@sentry/node');
-const DbApiUtil = require('./db_api_util');
-const RedisApiUtil = require('./redis_api_util');
-const LoadBalancer = require('./load_balancer');
-const SlackUtil = require('./slack_util');
-const TwilioUtil = require('./twilio_util');
-const SlackInteractionHandler = require('./slack_interaction_handler');
-const logger = require('./logger');
-const morgan = require('morgan');
+const MessagingResponse = twilio.twiml.MessagingResponse;
 
-const rawBodySaver = (req, res, buf, encoding) => {
+const rawBodySaver = (
+  req: Request,
+  res: express.Response,
+  buf?: Buffer,
+  encoding?: string
+) => {
   if (buf && buf.length) {
-    req.rawBody = buf.toString(encoding || 'utf8');
+    req.rawBody = buf.toString((encoding as BufferEncoding) || 'utf8');
   }
 };
 
-function runAsyncWrapper(callback) {
-  return function (req, res, next) {
-    callback(req, res, next).catch(next);
+function runAsyncWrapper(
+  callback: (
+    req: Request,
+    res: express.Response,
+    next: express.NextFunction
+  ) => Promise<any>
+) {
+  return function (
+    req: express.Request,
+    res: express.Response,
+    next: express.NextFunction
+  ) {
+    callback(req as Request, res, next).catch(next);
   };
 }
 
 app.use(Sentry.Handlers.requestHandler());
-app.use(morgan('combined', { stream: logger.stream }));
+app.use(
+  morgan('combined', {
+    stream: {
+      write: function (message) {
+        logger.info(message);
+      },
+    },
+  })
+);
 
 app.use(bodyParser.json({ verify: rawBodySaver }));
 app.use(bodyParser.urlencoded({ verify: rawBodySaver, extended: false }));
@@ -47,26 +71,15 @@ app.use(
     },
   })
 );
-
-// Bluebird is supposed to create xxxAsync methods.
-// https://github.com/NodeRedis/node_redis
-bluebird.promisifyAll(redis);
-var redisClient = redis.createClient(process.env.REDISCLOUD_URL);
-
-redisClient.on('error', function (err) {
-  logger.info('Redis client error', err);
-  Sentry.captureException(err);
-});
-
 app.post(
   '/push',
-  runAsyncWrapper(async (req, res) => {
+  runAsyncWrapper(async (req: Request, res: express.Response) => {
     const TWILIO_PHONE_NUMBER = '+18557041009';
     const MESSAGE =
       'This is Voter Help Line! We sent you an absentee ballot request form. Did you receive it? Text STOP to stop messages. Msg & data rates may apply.';
 
     const redisUserPhoneNumbersKey = 'userPhoneNumbers';
-    const userPhoneNumbers = redisClient.lrangeAsync(
+    const userPhoneNumbers = await redisClient.lrangeAsync(
       redisUserPhoneNumbersKey,
       0,
       1000
@@ -80,15 +93,15 @@ app.post(
     logger.info('userPhoneNumbers:');
     logger.info(userPhoneNumbers);
     let delay = 0;
-    let INTERVAL_MILLISECONDS = 2000;
-    for (let idx in userPhoneNumbers) {
+    const INTERVAL_MILLISECONDS = 2000;
+    for (const idx in userPhoneNumbers) {
       const userPhoneNumber = userPhoneNumbers[idx];
       logger.info(`Sending push message to phone number: ${userPhoneNumber}`);
 
       const MD5 = new Hashes.MD5();
       const userId = MD5.hex(userPhoneNumber);
 
-      const dbMessageEntry = {
+      const dbMessageEntry: DbApiUtil.DatabaseMessageEntry = {
         direction: 'OUTBOUND',
         automated: true,
         userId,
@@ -112,12 +125,15 @@ app.post(
   })
 );
 
-const handleIncomingTwilioMessage = async (req, entryPoint) => {
+const handleIncomingTwilioMessage = async (
+  req: Request,
+  entryPoint: EntryPoint
+) => {
   logger.info('Entering SERVER.handleIncomingTwilioMessage');
 
   const userPhoneNumber = req.body.From;
 
-  const isBlocked = RedisApiUtil.getHashField(
+  const isBlocked = await RedisApiUtil.getHashField(
     redisClient,
     'twilioBlockedUserPhoneNumbers',
     userPhoneNumber
@@ -154,7 +170,10 @@ const handleIncomingTwilioMessage = async (req, entryPoint) => {
     `SERVER.handleIncomingTwilioMessage (${userId}): Retrieving userInfo using redisHashKey: ${redisHashKey}`
   );
 
-  const userInfo = await RedisApiUtil.getHash(redisClient, redisHashKey);
+  const userInfo = (await RedisApiUtil.getHash(
+    redisClient,
+    redisHashKey
+  )) as UserInfo;
   logger.info(
     `SERVER.handleIncomingTwilioMessage (${userId}): Successfully received Redis response for userInfo retrieval with redisHashKey ${redisHashKey}, userInfo: ${JSON.stringify(
       userInfo
@@ -352,7 +371,10 @@ app.post(
       const redisHashKey = `${reqBody.event.channel}:${reqBody.event.thread_ts}`;
 
       // Pass Slack message to Twilio
-      const redisData = await RedisApiUtil.getHash(redisClient, redisHashKey);
+      const redisData = (await RedisApiUtil.getHash(
+        redisClient,
+        redisHashKey
+      )) as UserInfo;
       if (redisData != null) {
         logger.info(
           'SERVER POST /slack: Server received non-bot Slack message INSIDE a voter thread.'
@@ -367,6 +389,12 @@ app.post(
           const originatingSlackUserName = await SlackApiUtil.fetchSlackUserName(
             reqBody.event.user
           );
+          if (!originatingSlackUserName) {
+            throw new Error(
+              `Could not get slack user name for slack user ${reqBody.event.user}`
+            );
+          }
+
           logger.info(
             `SERVER POST /slack: Successfully determined Slack user name of message sender: ${originatingSlackUserName}, from Slack user ID: ${reqBody.event.user}`
           );
@@ -402,6 +430,11 @@ app.post(
       const originatingSlackUserName = await SlackApiUtil.fetchSlackUserName(
         reqBody.event.user
       );
+      if (!originatingSlackUserName) {
+        throw new Error(
+          `Could not get slack user name for slack user ${reqBody.event.user}`
+        );
+      }
       logger.info(
         `SERVER POST /slack: Successfully determined Slack user name of bot mentioner: ${originatingSlackUserName}, from Slack user ID: ${reqBody.event.user}`
       );
@@ -461,9 +494,20 @@ app.post(
     const originatingSlackUserName = await SlackApiUtil.fetchSlackUserName(
       payload.user.id
     );
+    if (!originatingSlackUserName) {
+      throw new Error(
+        `Could not get slack user name for slack user ${payload.user.id}`
+      );
+    }
+
     const originatingSlackChannelName = await SlackApiUtil.fetchSlackChannelName(
       payload.channel.id
     );
+    if (!originatingSlackChannelName) {
+      throw new Error(
+        `Could not get slack channel name for slack channel ${payload.channel.id}`
+      );
+    }
 
     const redisHashKey = `${payload.channel.id}:${payload.container.thread_ts}`;
     const redisData = await RedisApiUtil.getHash(redisClient, redisHashKey);
@@ -477,7 +521,6 @@ app.post(
       );
       await SlackInteractionHandler.handleVoterStatusUpdate({
         payload,
-        res,
         selectedVoterStatus,
         originatingSlackUserName,
         originatingSlackChannelName,
@@ -491,7 +534,6 @@ app.post(
       );
       await SlackInteractionHandler.handleVolunteerUpdate({
         payload,
-        res,
         originatingSlackUserName,
         originatingSlackChannelName,
         userPhoneNumber: redisData.userPhoneNumber,
@@ -523,18 +565,16 @@ app.get(
 );
 
 function testHTTP() {
-  const axios = require('axios');
-
-  return new Promise((resolve) => {
+  return new Promise<void>((resolve) => {
     logger.info('START testHTTP');
     setTimeout(() => {
       logger.info('TIMEOUT testHTTP');
       resolve();
     }, 3000);
 
-    axios
+    void axios
       .get('https://google.com')
-      .then((res) => {
+      .then((res: AxiosResponse) => {
         logger.info('PASS testHttp', res.status);
       })
       .catch((err) => {
@@ -545,19 +585,19 @@ function testHTTP() {
 }
 
 function testRedis() {
-  return new Promise((resolve) => {
+  return new Promise<void>((resolve) => {
     logger.info('START testRedis');
     setTimeout(() => {
       logger.info('TIMEOUT testRedis');
       resolve();
     }, 3000);
 
-    redisClient
+    void redisClient
       .pingAsync()
-      .then((res) => {
+      .then((res: any) => {
         logger.info('PASS testRedis', res);
       })
-      .catch((err) => {
+      .catch((err: Error) => {
         logger.info('FAIL testRedis', err);
       })
       .then(resolve);
@@ -565,21 +605,19 @@ function testRedis() {
 }
 
 function testPostgres() {
-  const { Pool } = require('pg');
-
   const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
     max: Number(process.env.CONNECTION_POOL_MAX || 20),
   });
 
-  return new Promise((resolve) => {
+  return new Promise<void>((resolve) => {
     logger.info('START testPostgres');
     setTimeout(() => {
       logger.info('TIMEOUT testPostgres');
       resolve();
     }, 3000);
 
-    pool
+    void pool
       .connect()
       .then((client) => {
         return client.query('SELECT 1');
@@ -604,9 +642,9 @@ app.get(
 
 app.use(Sentry.Handlers.errorHandler());
 
-app.use(function (err, req, res) {
+app.use(function (err: Error, req: express.Request, res: express.Response) {
   logger.error(err);
   res.sendStatus(500);
 });
 
-exports.app = app;
+export { app };

@@ -1,12 +1,16 @@
-const axios = require('axios');
-const SlackBlockUtil = require('./slack_block_util');
-const logger = require('./logger');
+import axios from 'axios';
+import { voterStatusPanel, SlackBlock } from './slack_block_util';
+import logger from './logger';
 
-const replaceSlackMessageBlocks = async ({
+export async function replaceSlackMessageBlocks({
   slackChannelId,
   slackParentMessageTs,
   newBlocks,
-}) => {
+}: {
+  slackChannelId: string;
+  slackParentMessageTs: number;
+  newBlocks: SlackBlock[];
+}): Promise<void> {
   logger.info('ENTERING SLACKINTERACTIONAPIUTIL.replaceSlackMessageBlocks');
   // Replace voter status panel with message.
   const response = await axios.post(
@@ -34,25 +38,27 @@ const replaceSlackMessageBlocks = async ({
       `SLACKINTERACTIONAPIUTIL.replaceSlackMessageBlock: ERROR in replacing Slack message block: ${response.data.error}`
     );
   }
-};
+}
 
-exports.replaceSlackMessageBlocks = replaceSlackMessageBlocks;
-
-exports.addBackVoterStatusPanel = ({
+export function addBackVoterStatusPanel({
   slackChannelId,
   slackParentMessageTs,
   oldBlocks,
-}) => {
+}: {
+  slackChannelId: string;
+  slackParentMessageTs: number;
+  oldBlocks: SlackBlock[];
+}): Promise<void> {
   logger.info('ENTERING SLACKINTERACTIONAPIUTIL.addBackVoterStatusPanel');
 
   const voterInfoBlock = oldBlocks[0];
   const volunteerDropdownBlock = oldBlocks[1];
   const newBlocks = [voterInfoBlock, volunteerDropdownBlock];
-  newBlocks.push(SlackBlockUtil.voterStatusPanel);
+  newBlocks.push(voterStatusPanel);
 
   return replaceSlackMessageBlocks({
     slackChannelId,
     slackParentMessageTs,
     newBlocks,
   });
-};
+}
