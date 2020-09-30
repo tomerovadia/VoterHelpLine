@@ -363,7 +363,8 @@ app.post(
 
     if (
       reqBody.event.type === 'message' &&
-      reqBody.event.user != process.env.SLACK_BOT_USER_ID
+      reqBody.event.user != process.env.SLACK_BOT_USER_ID &&
+      !reqBody.event.hidden
     ) {
       logger.info(
         `SERVER POST /slack: Slack event listener caught non-bot Slack message from ${reqBody.event.user}.`

@@ -324,14 +324,14 @@ const routeVoterToSlackChannelHelper = async (
   // to only retrieve messages since the voter left that thread.
   if (!timestampOfLastMessageInThread) {
     logger.debug(
-      'ROUTER.routeVoterToSlackChannelHelper: Voter HAS been to this channel before.'
+      'ROUTER.routeVoterToSlackChannelHelper: Voter HAS NOT been to this channel before.'
     );
     // If timestamp isn't passed, voter is new to channel. Retrieve full message history.
     timestampOfLastMessageInThread = '1990-01-01 10:00:00.000';
     messageHistoryContextText = "Below is the voter's message history so far.";
   } else {
     logger.debug(
-      'ROUTER.routeVoterToSlackChannelHelper: Voter HAS NOT been to this channel before.'
+      'ROUTER.routeVoterToSlackChannelHelper: Voter HAS been to this channel before.'
     );
   }
 
