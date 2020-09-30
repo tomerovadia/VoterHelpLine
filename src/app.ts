@@ -314,9 +314,9 @@ app.post(
   })
 );
 
-// const isRetry = (req) => {
-//   return 'x-slack-retry-reason' in JSON.stringify(req.headers);
-// };
+const isSlackRetry = (req: Request): boolean => {
+  return 'x-slack-retry-reason' in req.headers;
+};
 
 app.post(
   '/slack',
@@ -363,7 +363,8 @@ app.post(
 
     if (
       reqBody.event.type === 'message' &&
-      reqBody.event.user != process.env.SLACK_BOT_USER_ID
+      reqBody.event.user != process.env.SLACK_BOT_USER_ID &&
+      !reqBody.event.hidden
     ) {
       logger.info(
         `SERVER POST /slack: Slack event listener caught non-bot Slack message from ${reqBody.event.user}.`
@@ -425,7 +426,8 @@ app.post(
     } else if (
       reqBody.event.type === 'app_mention' &&
       // Require that the Slack bot be the (first) user mentioned.
-      reqBody.authed_users[0] === process.env.SLACK_BOT_USER_ID
+      reqBody.authed_users[0] === process.env.SLACK_BOT_USER_ID &&
+      !isSlackRetry(req)
     ) {
       const originatingSlackUserName = await SlackApiUtil.fetchSlackUserName(
         reqBody.event.user
