@@ -1,0 +1,91 @@
+-- messages
+
+CREATE INDEX idx_messages_from_phone_number
+ON messages(from_phone_number);
+
+CREATE INDEX idx_messages_to_phone_number
+ON messages(to_phone_number);
+
+CREATE INDEX idx_messages_user_id
+ON messages(user_id);
+
+CREATE INDEX idx_messages_originating_slack_user_name
+ON messages(originating_slack_user_name);
+
+CREATE INDEX idx_messages_originating_slack_user_id
+ON messages(originating_slack_user_name);
+
+CREATE INDEX idx_messages_slack_channel
+ON messages(slack_channel);
+
+CREATE INDEX idx_messages_twilio_send_timestamp
+ON messages(twilio_send_timestamp);
+
+CREATE INDEX idx_messages_twilio_receive_timestamp
+ON messages(twilio_receive_timestamp);
+
+CREATE INDEX idx_messages_slack_send_timestamp
+ON messages(slack_send_timestamp);
+
+CREATE INDEX idx_messages_slack_receive_timestamp
+ON messages(slack_receive_timestamp);
+
+
+-- voter_status_updates
+
+CREATE INDEX idx_voter_status_updates_created_at
+ON voter_status_updates(created_at);
+
+CREATE INDEX idx_voter_status_updates_user_id
+ON voter_status_updates(user_id);
+
+CREATE INDEX idx_voter_status_updates_user_phone_number
+ON voter_status_updates(user_phone_number);
+
+CREATE INDEX idx_voter_status_updates_twilio_phone_number
+ON voter_status_updates(twilio_phone_number);
+
+CREATE INDEX idx_voter_status_updates_voter_status
+ON voter_status_updates(voter_status);
+
+CREATE INDEX idx_voter_status_updates_originating_slack_user_name
+ON voter_status_updates(originating_slack_user_name);
+
+CREATE INDEX idx_voter_status_updates_originating_slack_user_id
+ON voter_status_updates(originating_slack_user_id);
+
+CREATE INDEX idx_voter_status_updates_originating_slack_channel_name
+ON voter_status_updates(originating_slack_channel_name);
+
+CREATE INDEX idx_voter_status_updates_originating_slack_channel_id
+ON voter_status_updates(originating_slack_channel_id);
+
+
+-- volunteer_voter_claims
+
+CREATE INDEX idx_volunteer_voter_claims_user_id
+ON volunteer_voter_claims(user_id);
+
+CREATE INDEX idx_volunteer_voter_claims_user_phone_number
+ON volunteer_voter_claims(user_phone_number);
+
+CREATE INDEX idx_volunteer_voter_claims_twilio_phone_number
+ON volunteer_voter_claims(twilio_phone_number);
+
+CREATE INDEX idx_volunteer_voter_claims_volunteer_slack_user_name
+ON volunteer_voter_claims(volunteer_slack_user_name);
+
+CREATE INDEX idx_volunteer_voter_claims_volunteer_slack_user_id
+ON volunteer_voter_claims(volunteer_slack_user_id);
+
+CREATE INDEX idx_volunteer_voter_claims_originating_slack_user_name
+ON volunteer_voter_claims(originating_slack_user_name);
+
+CREATE INDEX idx_volunteer_voter_claims_originating_slack_user_id
+ON volunteer_voter_claims(originating_slack_user_id);
+
+CREATE INDEX idx_volunteer_voter_claims_originating_slack_channel_name
+ON volunteer_voter_claims(originating_slack_channel_name);
+
+CREATE INDEX idx_volunteer_voter_claims_originating_slack_channel_id
+ON volunteer_voter_claims(originating_slack_channel_id);
