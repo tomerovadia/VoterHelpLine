@@ -21,106 +21,121 @@ test("Returns null if message doesn't immediately follow Slack bot mention with 
 });
 
 describe('ROUTE_VOTER', () => {
-  test("Returns object that contains admin command.", () => {
+  test('Returns object that contains admin command.', () => {
     const input = `<@${process.env.SLACK_BOT_USER_ID}> ROUTE_VOTER someVoterIdBlah +18551234567 someDestinationChannelBlah`;
-    expect(CommandUtil.parseSlackCommand(input)).toEqual(expect.objectContaining({
-      command: CommandUtil.ROUTE_VOTER
-    }));
+    expect(CommandUtil.parseSlackCommand(input)).toEqual(
+      expect.objectContaining({
+        command: CommandUtil.ROUTE_VOTER,
+      })
+    );
   });
 
-  test("ROUTE_VOTER Returns object that contains the voter userId.", () => {
+  test('ROUTE_VOTER Returns object that contains the voter userId.', () => {
     const input = `<@${process.env.SLACK_BOT_USER_ID}> ROUTE_VOTER someVoterIdBlah +18551234567 someDestinationChannelBlah`;
-    expect(CommandUtil.parseSlackCommand(input)).toEqual(expect.objectContaining({
-      userId: "someVoterIdBlah"
-    }));
+    expect(CommandUtil.parseSlackCommand(input)).toEqual(
+      expect.objectContaining({
+        userId: 'someVoterIdBlah',
+      })
+    );
   });
 
-  test("ROUTE_VOTER Returns object that contains the voter userId.", () => {
+  test('ROUTE_VOTER Returns object that contains the voter userId.', () => {
     const input = `<@${process.env.SLACK_BOT_USER_ID}> ROUTE_VOTER someVoterIdBlah <tel:+18551234567|+18551234567> someDestinationChannelBlah`;
-    expect(CommandUtil.parseSlackCommand(input)).toEqual(expect.objectContaining({
-      twilioPhoneNumber: "+18551234567",
-    }));
+    expect(CommandUtil.parseSlackCommand(input)).toEqual(
+      expect.objectContaining({
+        twilioPhoneNumber: '+18551234567',
+      })
+    );
   });
 
-  test("ROUTE_VOTER Returns object that contains the destination channel.", () => {
+  test('ROUTE_VOTER Returns object that contains the destination channel.', () => {
     const input = `<@${process.env.SLACK_BOT_USER_ID}> ROUTE_VOTER someVoterIdBlah +18551234567 someDestinationChannelBlah`;
-    expect(CommandUtil.parseSlackCommand(input)).toEqual(expect.objectContaining({
-      destinationSlackChannelName: "someDestinationChannelBlah"
-    }));
+    expect(CommandUtil.parseSlackCommand(input)).toEqual(
+      expect.objectContaining({
+        destinationSlackChannelName: 'someDestinationChannelBlah',
+      })
+    );
   });
 
-  test("ROUTE_VOTER Returns null for any admin message that contains more than required params.", () => {
+  test('ROUTE_VOTER Returns null for any admin message that contains more than required params.', () => {
     const input = `<@${process.env.SLACK_BOT_USER_ID}> ROUTE_VOTER someVoterIdBlah +18551234567 someDestinationChannelBlah somethingExtra`;
     expect(CommandUtil.parseSlackCommand(input)).toBe(null);
   });
 
-  test("ROUTE_VOTER Returns null for any admin message that contains fewer than required params.", () => {
+  test('ROUTE_VOTER Returns null for any admin message that contains fewer than required params.', () => {
     const input = `<@${process.env.SLACK_BOT_USER_ID}> ROUTE_VOTER someVoterIdBlah +18551234567`;
     expect(CommandUtil.parseSlackCommand(input)).toBe(null);
   });
 
-  test("ROUTE_VOTER Is resilient to multiple spaces between arguments.", () => {
+  test('ROUTE_VOTER Is resilient to multiple spaces between arguments.', () => {
     const input = `<@${process.env.SLACK_BOT_USER_ID}>    ROUTE_VOTER   someVoterIdBlah  +18551234567 someDestinationChannelBlah`;
-    expect(CommandUtil.parseSlackCommand(input)).toEqual(expect.objectContaining({
-      command: CommandUtil.ROUTE_VOTER,
-      userId: "someVoterIdBlah",
-      twilioPhoneNumber: "+18551234567",
-      destinationSlackChannelName: "someDestinationChannelBlah",
-    }));
+    expect(CommandUtil.parseSlackCommand(input)).toEqual(
+      expect.objectContaining({
+        command: CommandUtil.ROUTE_VOTER,
+        userId: 'someVoterIdBlah',
+        twilioPhoneNumber: '+18551234567',
+        destinationSlackChannelName: 'someDestinationChannelBlah',
+      })
+    );
   });
-
 });
 
 describe('UPDATE_VOTER_STATUS', () => {
-
-  test("UPDATE_VOTER_STATUS Returns object that contains the voter userId.", () => {
+  test('UPDATE_VOTER_STATUS Returns object that contains the voter userId.', () => {
     const input = `<@${process.env.SLACK_BOT_USER_ID}> UPDATE_VOTER_STATUS someVoterIdBlah VOTED`;
-    expect(CommandUtil.parseSlackCommand(input)).toEqual(expect.objectContaining({
-      command: "UPDATE_VOTER_STATUS"
-    }));
+    expect(CommandUtil.parseSlackCommand(input)).toEqual(
+      expect.objectContaining({
+        command: 'UPDATE_VOTER_STATUS',
+      })
+    );
   });
 
-  test("UPDATE_VOTER_STATUS Returns object that contains the voter userId.", () => {
+  test('UPDATE_VOTER_STATUS Returns object that contains the voter userId.', () => {
     const input = `<@${process.env.SLACK_BOT_USER_ID}> UPDATE_VOTER_STATUS someVoterIdBlah VOTED`;
-    expect(CommandUtil.parseSlackCommand(input)).toEqual(expect.objectContaining({
-      userId: "someVoterIdBlah",
-    }));
+    expect(CommandUtil.parseSlackCommand(input)).toEqual(
+      expect.objectContaining({
+        userId: 'someVoterIdBlah',
+      })
+    );
   });
 
-  test("UPDATE_VOTER_STATUS Returns object that contains the voter userId.", () => {
+  test('UPDATE_VOTER_STATUS Returns object that contains the voter userId.', () => {
     const input = `<@${process.env.SLACK_BOT_USER_ID}> UPDATE_VOTER_STATUS someVoterIdBlah VOTED`;
-    expect(CommandUtil.parseSlackCommand(input)).toEqual(expect.objectContaining({
-      voterStatus: "VOTED",
-    }));
+    expect(CommandUtil.parseSlackCommand(input)).toEqual(
+      expect.objectContaining({
+        voterStatus: 'VOTED',
+      })
+    );
   });
 
-  test("UPDATE_VOTER_STATUS Returns null for any admin message that contains more than required params.", () => {
+  test('UPDATE_VOTER_STATUS Returns null for any admin message that contains more than required params.', () => {
     const input = `<@${process.env.SLACK_BOT_USER_ID}> UPDATE_VOTER_STATUS someVoterIdBlah VOTED somethingExtra`;
     expect(CommandUtil.parseSlackCommand(input)).toBe(null);
   });
 
-  test("UPDATE_VOTER_STATUS Returns null for any admin message that contains fewer than required params.", () => {
+  test('UPDATE_VOTER_STATUS Returns null for any admin message that contains fewer than required params.', () => {
     const input = `<@${process.env.SLACK_BOT_USER_ID}> UPDATE_VOTER_STATUS someVoterIdBlah`;
     expect(CommandUtil.parseSlackCommand(input)).toBe(null);
   });
 
-  test("UPDATE_VOTER_STATUS Returns null for any admin message that contains fewer than required params.", () => {
+  test('UPDATE_VOTER_STATUS Returns null for any admin message that contains fewer than required params.', () => {
     const input = `<@${process.env.SLACK_BOT_USER_ID}> UPDATE_VOTER_STATUS someVoterIdBlah`;
     expect(CommandUtil.parseSlackCommand(input)).toBe(null);
   });
 
-  test("UPDATE_VOTER_STATUS Returns null for invalid voter status.", () => {
+  test('UPDATE_VOTER_STATUS Returns null for invalid voter status.', () => {
     const input = `<@${process.env.SLACK_BOT_USER_ID}> UPDATE_VOTER_STATUS someVoterIdBlah someInvalidVoterStatus`;
     expect(CommandUtil.parseSlackCommand(input)).toBe(null);
   });
 
-  test("UPDATE_VOTER_STATUS Is resilient to multiple spaces between arguments.", () => {
+  test('UPDATE_VOTER_STATUS Is resilient to multiple spaces between arguments.', () => {
     const input = `<@${process.env.SLACK_BOT_USER_ID}>    UPDATE_VOTER_STATUS   someVoterIdBlah  VOTED`;
-    expect(CommandUtil.parseSlackCommand(input)).toEqual(expect.objectContaining({
-      command: "UPDATE_VOTER_STATUS",
-      userId: "someVoterIdBlah",
-      voterStatus: "VOTED",
-    }));
+    expect(CommandUtil.parseSlackCommand(input)).toEqual(
+      expect.objectContaining({
+        command: 'UPDATE_VOTER_STATUS',
+        userId: 'someVoterIdBlah',
+        voterStatus: 'VOTED',
+      })
+    );
   });
-
 });
