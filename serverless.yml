@@ -13,15 +13,16 @@ provider:
   # VPC configuration -- this should match the VPC subnets where you've deployed
   # your Redis and Postgres servers
   vpc:
-    securityGroupIds: { 'Fn::Split': [ ",", "${ssm:helpline.common.securityGroups~true}" ] }
-    subnetIds: { 'Fn::Split': [ ",", "${ssm:helpline.common.subnets~true}" ] }
+    securityGroupIds:
+      { 'Fn::Split': [',', '${ssm:helpline.common.securityGroups~true}'] }
+    subnetIds: { 'Fn::Split': [',', '${ssm:helpline.common.subnets~true}'] }
 
   # 30-second timeout by default
   timeout: 30
 
   # Tags that will be added to each of the deployment resources
   tags:
-      env: ${self:custom.stage}
+    env: ${self:custom.stage}
 
   # Environment variables
   environment:
@@ -43,7 +44,8 @@ provider:
     REDISCLOUD_URL: ${ssm:helpline.${self:custom.stage}.redis_url~true}
     DATABASE_URL: ${ssm:helpline.${self:custom.stage}.database_url~true}
 
-    CONNECTION_POOL_MAX: "2"
+    CONNECTION_POOL_MAX: '2'
+    LOG_FORMAT: json
 
   # Memory allocated to each lambda function
   memorySize: 512
@@ -61,6 +63,9 @@ plugins:
 
   # Custom domains: remove this to use an API Gateway-provided domain instead
   - serverless-domain-manager
+
+  # Compile typescript
+  - serverless-plugin-typescript
 
 custom:
   # The custom domain name to use for the muxer. You can remove this and
@@ -96,12 +101,10 @@ custom:
     staging: 100
     prod: 1000
 
-
 functions:
   app:
-    handler: server_lambda.handler
+    handler: src/server_lambda.handler
     events:
       - http: ANY /
       - http: 'ANY {proxy+}'
     reservedConcurrency: ${self:custom.reservedConcurrency.${self:custom.stage}}
-
