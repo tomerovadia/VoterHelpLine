@@ -20,7 +20,7 @@ if (process.env.SENTRY_DSN) {
   const sentryWrappedHandler = Sentry.AWSLambda.wrapHandler(handler);
   handler = (event: any, context: any) => {
     return sentryWrappedHandler(event, context)
-      .then((res) => Sentry.flush().then(() => Promise.resolve(res)))
+      .then((res: any) => Sentry.flush().then(() => Promise.resolve(res)))
       .catch((err: Error) => {
         Sentry.flush().then(() => Promise.reject(err));
       });
