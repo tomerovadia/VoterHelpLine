@@ -21,7 +21,6 @@ import redisClient from './redis_client';
 import { EntryPoint, Request, UserInfo } from './types';
 
 const app = express();
-// const MessagingResponse = twilio.twiml.MessagingResponse;
 
 const rawBodySaver = (
   req: Request,
