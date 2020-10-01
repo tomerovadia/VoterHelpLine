@@ -49,10 +49,12 @@ const introduceNewVoterToSlackChannel = async (
       `ROUTER.introduceNewVoterToSlackChannel: Entry point is PULL, so sending automated welcome to voter.`
     );
     // Welcome the voter
+    // Note: handleNewVoter isn't called if voter is blocked.
     await TwilioApiUtil.sendMessage(
       welcomeMessage,
       { userPhoneNumber: userInfo.userPhoneNumber, twilioPhoneNumber },
-      await DbApiUtil.populateAutomatedDbMessageEntry(userInfo)
+      false /* outboundTextsBlocked */,
+      DbApiUtil.populateAutomatedDbMessageEntry(userInfo)
     );
   }
 
@@ -201,9 +203,9 @@ export async function handleNewVoter(
     voterStatus: 'UNKNOWN',
     originatingSlackUserName: null,
     originatingSlackUserId: null,
-    originatingSlackChannelName: null,
-    originatingSlackChannelId: null,
-    originatingSlackParentMessageTs: null,
+    slackChannelName: null,
+    slackChannelId: null,
+    slackParentMessageTs: null,
     isDemo: userInfo.isDemo || null,
   });
 
@@ -604,7 +606,8 @@ export async function determineVoterState(
   userOptions: UserOptions & { userInfo: UserInfo },
   redisClient: PromisifiedRedisClient,
   twilioPhoneNumber: string,
-  inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry
+  inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry,
+  outboundTextsBlocked: boolean
 ): Promise<void> {
   logger.debug('ENTERING ROUTER.determineVoterState');
   const userInfo = userOptions.userInfo;
@@ -630,14 +633,26 @@ export async function determineVoterState(
     userInfo
   );
 
+  // Note: there are two layers of protection here for not sending when outboundTextsBlocked=true:
+  // 1. This return.
+  // 2. TwilioApiUtil.sendMessage returns early if outboundTextsBlocked=true.
+  if (outboundTextsBlocked) {
+    logger.info(
+      `ROUTER.determineVoterState: Voter message (${userMessage}) is not being relayed because voter (ID: ${userId}) status is refused.`
+    );
+    return;
+  }
+
   const stateName = StateParser.determineState(userMessage);
   if (stateName == null) {
     logger.debug(
       `ROUTER.determineVoterState: StateParser could not determine U.S. state of voter from message ${userMessage}`
     );
+
     await TwilioApiUtil.sendMessage(
       MessageConstants.CLARIFY_STATE(),
       { userPhoneNumber, twilioPhoneNumber },
+      outboundTextsBlocked,
       DbApiUtil.populateAutomatedDbMessageEntry(userInfo)
     );
     await SlackApiUtil.sendMessage(
@@ -667,7 +682,12 @@ export async function determineVoterState(
   await TwilioApiUtil.sendMessage(
     MessageConstants.STATE_CONFIRMATION(stateName),
     { userPhoneNumber, twilioPhoneNumber },
+    outboundTextsBlocked,
     DbApiUtil.populateAutomatedDbMessageEntry(userInfo)
+  );
+  await SlackApiUtil.sendMessage(
+    `*Automated Message:* ${MessageConstants.STATE_CONFIRMATION(stateName)}`,
+    { parentMessageTs: lobbyParentMessageTs, channel: lobbyChannelId }
   );
 
   // Slack channel name must abide by the rules in this function.
@@ -676,11 +696,6 @@ export async function determineVoterState(
     LoadBalancer.PULL_ENTRY_POINT,
     stateName,
     userInfo.isDemo
-  );
-
-  await SlackApiUtil.sendMessage(
-    `*Automated Message:* ${MessageConstants.STATE_CONFIRMATION(stateName)}`,
-    { parentMessageTs: lobbyParentMessageTs, channel: lobbyChannelId }
   );
 
   if (!selectedStateChannelName) {
@@ -706,7 +721,8 @@ export async function handleDisclaimer(
   userOptions: UserOptions & { userInfo: UserInfo },
   redisClient: PromisifiedRedisClient,
   twilioPhoneNumber: string,
-  inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry
+  inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry,
+  outboundTextsBlocked: boolean
 ): Promise<void> {
   logger.debug('ENTERING ROUTER.handleDisclaimer');
   const userInfo = userOptions.userInfo;
@@ -728,6 +744,16 @@ export async function handleDisclaimer(
     inboundDbMessageEntry,
     userInfo
   );
+
+  // Note: there are two layers of protection here for not sending when outboundTextsBlocked=true:
+  // 1. This return.
+  // 2. TwilioApiUtil.sendMessage returns early if outboundTextsBlocked=true.
+  if (outboundTextsBlocked) {
+    logger.info(
+      `ROUTER.handleDisclaimer: Voter message (${userMessage}) is not being relayed because voter (ID: ${userId}) status is refused.`
+    );
+    return;
+  }
 
   const userMessageNoPunctuation = userOptions.userMessage.replace(
     /[.,?/#!$%^&*;:{}=\-_`~()]/g,
@@ -756,9 +782,9 @@ export async function handleDisclaimer(
   await TwilioApiUtil.sendMessage(
     automatedMessage,
     { userPhoneNumber: userOptions.userPhoneNumber, twilioPhoneNumber },
+    outboundTextsBlocked,
     DbApiUtil.populateAutomatedDbMessageEntry(userInfo)
   );
-
   await SlackApiUtil.sendMessage(
     `*Automated Message:* ${automatedMessage}`,
     slackLobbyMessageParams
@@ -769,7 +795,8 @@ export async function handleClearedVoter(
   userOptions: UserOptions & { userInfo: UserInfo },
   redisClient: PromisifiedRedisClient,
   twilioPhoneNumber: string,
-  inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry
+  inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry,
+  outboundTextsBlocked: boolean
 ): Promise<void> {
   logger.debug('ENTERING ROUTER.handleClearedVoter');
   const userInfo = userOptions.userInfo;
@@ -792,6 +819,16 @@ export async function handleClearedVoter(
     userInfo
   );
 
+  // Note: there are two layers of protection here for not sending when outboundTextsBlocked=true:
+  // 1. This return.
+  // 2. TwilioApiUtil.sendMessage returns early if outboundTextsBlocked=true.
+  if (outboundTextsBlocked) {
+    logger.info(
+      `ROUTER.handleClearedVoter: Voter message (${userOptions.userMessage}) is not being relayed because voter (ID: ${userId}) status is refused.`
+    );
+    return;
+  }
+
   logger.debug(
     `ROUTER.handleClearedVoter: Seconds since last message from voter: ${
       nowSecondsEpoch - lastVoterMessageSecsFromEpoch
@@ -808,10 +845,14 @@ export async function handleClearedVoter(
       } > : ${MINS_BEFORE_WELCOME_BACK_MESSAGE}), sending welcome back message.`
     );
     const welcomeBackMessage = MessageConstants.WELCOME_BACK();
-    await TwilioApiUtil.sendMessage(welcomeBackMessage, {
-      userPhoneNumber: userOptions.userPhoneNumber,
-      twilioPhoneNumber,
-    });
+    await TwilioApiUtil.sendMessage(
+      welcomeBackMessage,
+      {
+        userPhoneNumber: userOptions.userPhoneNumber,
+        twilioPhoneNumber,
+      },
+      outboundTextsBlocked
+    );
     await SlackApiUtil.sendMessage(
       `*Automated Message:* ${welcomeBackMessage}`,
       activeChannelMessageParams
@@ -847,7 +888,7 @@ export async function handleSlackVoterThreadMessage(
   const unprocessedSlackMessage = reqBody.event.text;
   logger.debug(`Received message from Slack: ${unprocessedSlackMessage}`);
 
-  // If the message doesnt need processing.
+  // If the message doesn't need processing.
   let messageToSend = unprocessedSlackMessage;
   let unprocessedMessageToLog = null;
   const processedSlackMessage = MessageParser.processMessageText(
@@ -895,9 +936,12 @@ export async function handleSlackVoterThreadMessage(
       userInfo,
       outboundDbMessageEntry
     );
+
+    // Note: handleSlackVoterThreadMessage isn't called if voter is blocked.
     await TwilioApiUtil.sendMessage(
       messageToSend,
       { userPhoneNumber, twilioPhoneNumber },
+      false /* outboundTextsBlocked */,
       outboundDbMessageEntry
     );
     // Slack message is from inactive Slack thread.

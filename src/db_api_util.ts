@@ -46,9 +46,9 @@ export type DatabaseVoterStatusEntry = {
   voterStatus: string | null;
   originatingSlackUserName: string | null;
   originatingSlackUserId: string | null;
-  originatingSlackChannelName: string | null;
-  originatingSlackChannelId: string | null;
-  originatingSlackParentMessageTs: number | null;
+  slackChannelName: string | null;
+  slackChannelId: string | null;
+  slackParentMessageTs: number | null;
   actionTs?: number | null;
   twilioPhoneNumber: string | null;
   isDemo: boolean | null;
@@ -63,9 +63,9 @@ export type DatabaseVolunteerVoterClaim = {
   volunteerSlackUserId: string | null;
   originatingSlackUserName: string | null;
   originatingSlackUserId: string | null;
-  originatingSlackChannelName: string | null;
-  originatingSlackChannelId: string | null;
-  originatingSlackParentMessageTs: number | null;
+  slackChannelName: string | null;
+  slackChannelId: string | null;
+  slackParentMessageTs: number | null;
   actionTs: number | null;
 };
 
@@ -409,16 +409,16 @@ export async function logVoterStatusToDb(
   const client = await pool.connect();
   try {
     await client.query(
-      'INSERT INTO voter_status_updates (user_id, user_phone_number, voter_status, originating_slack_user_name, originating_slack_user_id, originating_slack_channel_name, originating_slack_channel_id, originating_slack_parent_message_ts, action_ts, twilio_phone_number, is_demo) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11);',
+      'INSERT INTO voter_status_updates (user_id, user_phone_number, voter_status, originating_slack_user_name, originating_slack_user_id, slack_channel_name, slack_channel_id, slack_parent_message_ts, action_ts, twilio_phone_number, is_demo) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11);',
       [
         databaseVoterStatusEntry.userId,
         databaseVoterStatusEntry.userPhoneNumber,
         databaseVoterStatusEntry.voterStatus,
         databaseVoterStatusEntry.originatingSlackUserName,
         databaseVoterStatusEntry.originatingSlackUserId,
-        databaseVoterStatusEntry.originatingSlackChannelName,
-        databaseVoterStatusEntry.originatingSlackChannelId,
-        databaseVoterStatusEntry.originatingSlackParentMessageTs,
+        databaseVoterStatusEntry.slackChannelName,
+        databaseVoterStatusEntry.slackChannelId,
+        databaseVoterStatusEntry.slackParentMessageTs,
         databaseVoterStatusEntry.actionTs,
         databaseVoterStatusEntry.twilioPhoneNumber,
         databaseVoterStatusEntry.isDemo,
@@ -477,7 +477,7 @@ export async function logVolunteerVoterClaimToDb(
 
   try {
     await client.query(
-      'INSERT INTO volunteer_voter_claims (user_id, user_phone_number, twilio_phone_number, is_demo, volunteer_slack_user_name, volunteer_slack_user_id, originating_slack_user_name, originating_slack_user_id, originating_slack_channel_name, originating_slack_channel_id, originating_slack_parent_message_ts, action_ts) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12);',
+      'INSERT INTO volunteer_voter_claims (user_id, user_phone_number, twilio_phone_number, is_demo, volunteer_slack_user_name, volunteer_slack_user_id, originating_slack_user_name, originating_slack_user_id, slack_channel_name, slack_channel_id, slack_parent_message_ts, action_ts) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12);',
       [
         databaseVolunteerVoterClaimEntry.userId,
         databaseVolunteerVoterClaimEntry.userPhoneNumber,
@@ -487,9 +487,9 @@ export async function logVolunteerVoterClaimToDb(
         databaseVolunteerVoterClaimEntry.volunteerSlackUserId,
         databaseVolunteerVoterClaimEntry.originatingSlackUserName,
         databaseVolunteerVoterClaimEntry.originatingSlackUserId,
-        databaseVolunteerVoterClaimEntry.originatingSlackChannelName,
-        databaseVolunteerVoterClaimEntry.originatingSlackChannelId,
-        databaseVolunteerVoterClaimEntry.originatingSlackParentMessageTs,
+        databaseVolunteerVoterClaimEntry.slackChannelName,
+        databaseVolunteerVoterClaimEntry.slackChannelId,
+        databaseVolunteerVoterClaimEntry.slackParentMessageTs,
         databaseVolunteerVoterClaimEntry.actionTs,
       ]
     );
