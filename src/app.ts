@@ -344,21 +344,18 @@ app.post(
       '******************************************************************************************************'
     );
     logger.info('Entering SERVER POST /twilio-push');
-    // const twiml = new MessagingResponse();
 
     if (TwilioUtil.passesAuth(req)) {
       logger.info('SERVER POST /twilio-push: Passes Twilio auth.');
       await handleIncomingTwilioMessage(req, LoadBalancer.PUSH_ENTRY_POINT);
       res.writeHead(200, { 'Content-Type': 'text/xml' });
       res.send();
-      // res.end(twiml.toString());
     } else {
       logger.error(
         'SERVER POST /twilio-push: ERROR authenticating /twilio-push request is from Twilio.'
       );
       res.writeHead(401, { 'Content-Type': 'text/xml' });
       res.send();
-      // res.end(twiml.toString());
     }
   })
 );
@@ -373,21 +370,18 @@ app.post(
       '******************************************************************************************************'
     );
     logger.info('Entering SERVER POST /twilio-pull');
-    // const twiml = new MessagingResponse();
 
     if (TwilioUtil.passesAuth(req)) {
       logger.info('SERVER POST /twilio-pull: Passes Twilio auth.');
       await handleIncomingTwilioMessage(req, LoadBalancer.PULL_ENTRY_POINT);
       res.writeHead(200, { 'Content-Type': 'text/xml' });
       res.send();
-      // res.end(twiml.toString());
     } else {
       logger.error(
         'SERVER POST /twilio-pull: ERROR authenticating /twilio-pull request is from Twilio.'
       );
       res.writeHead(401, { 'Content-Type': 'text/xml' });
       res.send();
-      // res.end(twiml.toString());
     }
   })
 );
