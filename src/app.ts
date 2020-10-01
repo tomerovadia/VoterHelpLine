@@ -1,7 +1,6 @@
 import express from 'express';
 import Hashes from 'jshashes';
 import bodyParser from 'body-parser';
-// import twilio from 'twilio';
 import * as Sentry from '@sentry/node';
 import morgan from 'morgan';
 import axios, { AxiosResponse } from 'axios';
