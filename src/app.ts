@@ -1,7 +1,6 @@
 import express from 'express';
 import Hashes from 'jshashes';
 import bodyParser from 'body-parser';
-import twilio from 'twilio';
 import * as Sentry from '@sentry/node';
 import morgan from 'morgan';
 import axios, { AxiosResponse } from 'axios';
@@ -21,7 +20,6 @@ import redisClient from './redis_client';
 import { EntryPoint, Request, UserInfo } from './types';
 
 const app = express();
-const MessagingResponse = twilio.twiml.MessagingResponse;
 
 const rawBodySaver = (
   req: Request,
@@ -115,6 +113,7 @@ app.post(
       await TwilioApiUtil.sendMessage(
         MESSAGE,
         { twilioPhoneNumber: TWILIO_PHONE_NUMBER, userPhoneNumber },
+        false /* outboundTextsBlocked */,
         dbMessageEntry
       );
 
@@ -133,15 +132,15 @@ const handleIncomingTwilioMessage = async (
 
   const userPhoneNumber = req.body.From;
 
-  const isBlocked = await RedisApiUtil.getHashField(
+  const inboundTextsBlocked = await RedisApiUtil.getHashField(
     redisClient,
     'twilioBlockedUserPhoneNumbers',
     userPhoneNumber
   );
 
-  if (isBlocked === '1') {
+  if (inboundTextsBlocked === '1') {
     logger.info(
-      `SERVER POST /twilio-push: Received text from blocked phone number: ${userPhoneNumber}.`
+      `SERVER.handleIncomingTwilioMessage: Received text from blocked phone number: ${userPhoneNumber}.`
     );
     return;
   }
@@ -185,6 +184,58 @@ const handleIncomingTwilioMessage = async (
     logger.info(
       `SERVER.handleIncomingTwilioMessage (${userId}): Voter is known to us (Redis returned userInfo for redisHashKey ${redisHashKey})`
     );
+
+    // Outbound texts should be blocked if either:
+    // 1. this current message is STOP, or
+    // 2. a prior interaction set outbound texts to be blocked for this user.
+    let outboundTextsBlocked = await RedisApiUtil.getHashField(
+      redisClient,
+      'slackBlockedUserPhoneNumbers',
+      userPhoneNumber
+    );
+
+    if (userMessage.toLowerCase().trim() === 'stop') {
+      logger.info(
+        `SERVER.handleIncomingTwilioMessage: Received STOP text from phone number: ${userPhoneNumber}.`
+      );
+      const messageBlocks = await SlackApiUtil.fetchSlackMessageBlocks(
+        userInfo.activeChannelId,
+        userInfo[userInfo.activeChannelId]
+      );
+
+      if (!messageBlocks) {
+        throw new Error(`Could not get Slack blocks for known user ${userId}`);
+      }
+
+      const payload = {
+        automatedButtonSelection: true,
+        message: {
+          blocks: messageBlocks,
+        },
+        container: {
+          thread_ts: userInfo[userInfo.activeChannelId],
+        },
+        channel: {
+          id: userInfo.activeChannelId,
+        },
+        user: {
+          id: null,
+        },
+      };
+
+      await SlackInteractionHandler.handleVoterStatusUpdate({
+        payload,
+        selectedVoterStatus: 'REFUSED',
+        originatingSlackUserName: 'AUTOMATED',
+        slackChannelName: userInfo.activeChannelName,
+        userPhoneNumber,
+        twilioPhoneNumber,
+        redisClient,
+      });
+      outboundTextsBlocked = true;
+      // Don't return, so the message is relayed to Slack and written into Postgres.
+    }
+
     // PUSH
     if (entryPoint === LoadBalancer.PUSH_ENTRY_POINT) {
       logger.info(
@@ -195,7 +246,8 @@ const handleIncomingTwilioMessage = async (
         { userInfo, userPhoneNumber, userMessage },
         redisClient,
         twilioPhoneNumber,
-        inboundDbMessageEntry
+        inboundDbMessageEntry,
+        outboundTextsBlocked
       );
       // PULL
     } else if (userInfo.confirmedDisclaimer) {
@@ -217,7 +269,8 @@ const handleIncomingTwilioMessage = async (
           { userInfo, userPhoneNumber, userMessage },
           redisClient,
           twilioPhoneNumber,
-          inboundDbMessageEntry
+          inboundDbMessageEntry,
+          outboundTextsBlocked
         );
         // Voter has no state determined
       } else {
@@ -228,7 +281,8 @@ const handleIncomingTwilioMessage = async (
           { userInfo, userPhoneNumber, userMessage },
           redisClient,
           twilioPhoneNumber,
-          inboundDbMessageEntry
+          inboundDbMessageEntry,
+          outboundTextsBlocked
         );
       }
     } else {
@@ -242,14 +296,34 @@ const handleIncomingTwilioMessage = async (
         { userInfo, userPhoneNumber, userMessage },
         redisClient,
         twilioPhoneNumber,
-        inboundDbMessageEntry
+        inboundDbMessageEntry,
+        outboundTextsBlocked
       );
     }
-    // Haven't seen this voter before
+    // No Slack thread for this voter's conversation with this phone number.
   } else {
     logger.info(
       `SERVER.handleIncomingTwilioMessage (${userId}): Voter is new to us (Redis returned no userInfo for redisHashKey ${redisHashKey})`
     );
+
+    if (userMessage.toLowerCase().trim() === 'stop') {
+      logger.info(
+        `SERVER.handleIncomingTwilioMessage: Received STOP text from phone number: ${userPhoneNumber}.`
+      );
+      // Block volunteers or automated system from sending messages to this number in the future,
+      // even though there is no thread from which volunteers could do so.
+      await RedisApiUtil.setHash(redisClient, 'slackBlockedUserPhoneNumbers', {
+        [userPhoneNumber]: '1',
+      });
+      // If the voter's first messsage to us is STOP, ignore any and all subsequent messages.
+      await RedisApiUtil.setHash(redisClient, 'twilioBlockedUserPhoneNumbers', {
+        [userPhoneNumber]: '1',
+      });
+      // Return so that there is no logging in PG, no Slack thread is created, and
+      // no automated response is sent to the voter.
+      return;
+    }
+
     await Router.handleNewVoter(
       { userPhoneNumber, userMessage, userId },
       redisClient,
@@ -270,19 +344,18 @@ app.post(
       '******************************************************************************************************'
     );
     logger.info('Entering SERVER POST /twilio-push');
-    const twiml = new MessagingResponse();
 
     if (TwilioUtil.passesAuth(req)) {
-      logger.info('SERVER.handleIncomingTwilioMessage: Passes Twilio auth.');
+      logger.info('SERVER POST /twilio-push: Passes Twilio auth.');
       await handleIncomingTwilioMessage(req, LoadBalancer.PUSH_ENTRY_POINT);
       res.writeHead(200, { 'Content-Type': 'text/xml' });
-      res.end(twiml.toString());
+      res.send();
     } else {
       logger.error(
-        'SERVER.handleIncomingTwilioMessage: ERROR authenticating /twilio-push request is from Twilio.'
+        'SERVER POST /twilio-push: ERROR authenticating /twilio-push request is from Twilio.'
       );
       res.writeHead(401, { 'Content-Type': 'text/xml' });
-      res.end(twiml.toString());
+      res.send();
     }
   })
 );
@@ -297,19 +370,18 @@ app.post(
       '******************************************************************************************************'
     );
     logger.info('Entering SERVER POST /twilio-pull');
-    const twiml = new MessagingResponse();
 
     if (TwilioUtil.passesAuth(req)) {
-      logger.info('SERVER.handleIncomingTwilioMessage: Passes Twilio auth.');
+      logger.info('SERVER POST /twilio-pull: Passes Twilio auth.');
       await handleIncomingTwilioMessage(req, LoadBalancer.PULL_ENTRY_POINT);
       res.writeHead(200, { 'Content-Type': 'text/xml' });
-      res.end(twiml.toString());
+      res.send();
     } else {
       logger.error(
-        'SERVER.handleIncomingTwilioMessage: ERROR authenticating /twilio-pull request is from Twilio.'
+        'SERVER POST /twilio-pull: ERROR authenticating /twilio-pull request is from Twilio.'
       );
       res.writeHead(401, { 'Content-Type': 'text/xml' });
-      res.end(twiml.toString());
+      res.send();
     }
   })
 );
@@ -381,12 +453,12 @@ app.post(
           'SERVER POST /slack: Server received non-bot Slack message INSIDE a voter thread.'
         );
 
-        const isBlocked = await RedisApiUtil.getHashField(
+        const outboundTextsBlocked = await RedisApiUtil.getHashField(
           redisClient,
           'slackBlockedUserPhoneNumbers',
           redisData.userPhoneNumber
         );
-        if (isBlocked != '1') {
+        if (outboundTextsBlocked != '1') {
           const originatingSlackUserName = await SlackApiUtil.fetchSlackUserName(
             reqBody.event.user
           );
@@ -507,7 +579,7 @@ app.post(
     );
     if (!originatingSlackChannelName) {
       throw new Error(
-        `Could not get slack channel name for slack channel ${payload.channel.id}`
+        `Could not get slack channel name for Slack channel ${payload.channel.id}`
       );
     }
 
@@ -525,7 +597,7 @@ app.post(
         payload,
         selectedVoterStatus,
         originatingSlackUserName,
-        originatingSlackChannelName,
+        slackChannelName: originatingSlackChannelName,
         userPhoneNumber: redisData.userPhoneNumber,
         twilioPhoneNumber: redisData.twilioPhoneNumber,
         redisClient,
@@ -537,7 +609,7 @@ app.post(
       await SlackInteractionHandler.handleVolunteerUpdate({
         payload,
         originatingSlackUserName,
-        originatingSlackChannelName,
+        slackChannelName: originatingSlackChannelName,
         userPhoneNumber: redisData.userPhoneNumber,
         twilioPhoneNumber: redisData.twilioPhoneNumber,
       });

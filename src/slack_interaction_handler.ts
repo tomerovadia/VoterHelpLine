@@ -18,13 +18,14 @@ type Payload = {
   channel: {
     id: string;
   };
-  actions: SlackBlockUtil.SlackBlock[];
+  actions?: SlackBlockUtil.SlackBlock[];
   user: {
-    id: string;
+    id: string | null;
   };
   message: {
     blocks: SlackBlockUtil.SlackBlock[];
   };
+  automatedButtonSelection: boolean | undefined;
 };
 
 const getClosedVoterPanelText = (
@@ -38,9 +39,9 @@ const getClosedVoterPanelText = (
 
   switch (selectedVoterStatus) {
     case 'VOTED':
-      return `*Congratulations!* :tada: This voter has been marked as *VOTED* by *${originatingSlackUserName}* as of *${specialSlackTimestamp}*. On to the next one! :ballot_box_with_ballot:`;
+      return `*Congratulations!* :tada: This voter was marked as *VOTED* by *${originatingSlackUserName}* on *${specialSlackTimestamp}*. On to the next one! :ballot_box_with_ballot:`;
     default:
-      return `:no_entry_sign: This voter was marked as *${selectedVoterStatus}* by *${originatingSlackUserName}* on *${specialSlackTimestamp}*. :no_entry_sign:`;
+      return `:no_entry_sign: This voter  marked as *${selectedVoterStatus}* by *${originatingSlackUserName}* on *${specialSlackTimestamp}*. :no_entry_sign:`;
   }
 };
 
@@ -48,18 +49,18 @@ const handleVoterStatusUpdateHelper = async ({
   payload,
   selectedVoterStatus,
   originatingSlackUserName,
-  originatingSlackChannelName,
+  slackChannelName,
   userPhoneNumber,
   twilioPhoneNumber,
 }: {
   payload: Payload;
   selectedVoterStatus: VoterStatusUpdate;
   originatingSlackUserName: string;
-  originatingSlackChannelName: string;
+  slackChannelName: string;
   userPhoneNumber: string;
   twilioPhoneNumber: string;
 }) => {
-  logger.info('ENTERING SLACKINTERACTIONHANDLER.handleVoterStatusUpdate');
+  logger.info('ENTERING SLACKINTERACTIONHANDLER.handleVoterStatusUpdateHelper');
   const MD5 = new Hashes.MD5();
   const userId = MD5.hex(userPhoneNumber);
 
@@ -77,7 +78,7 @@ const handleVoterStatusUpdateHelper = async ({
   );
 
   logger.info(
-    `SLACKINTERACTIONHANDLER.handleVoterStatusUpdate: Successfully sent message recording voter status change`
+    `SLACKINTERACTIONHANDLER.handleVoterStatusUpdateHelper: Successfully sent message recording voter status change`
   );
 
   await DbApiUtil.logVoterStatusToDb({
@@ -91,10 +92,10 @@ const handleVoterStatusUpdateHelper = async ({
     voterStatus: selectedVoterStatus,
     originatingSlackUserName,
     originatingSlackUserId: payload.user.id,
-    originatingSlackChannelName,
-    originatingSlackChannelId: payload.channel.id,
-    originatingSlackParentMessageTs: payload.container.thread_ts,
-    actionTs: payload.actions[0].action_ts,
+    slackChannelName,
+    slackChannelId: payload.channel.id,
+    slackParentMessageTs: payload.container.thread_ts,
+    actionTs: payload.actions ? payload.actions[0].action_ts : null,
   });
 };
 
@@ -102,7 +103,7 @@ export async function handleVoterStatusUpdate({
   payload,
   selectedVoterStatus,
   originatingSlackUserName,
-  originatingSlackChannelName,
+  slackChannelName,
   userPhoneNumber,
   twilioPhoneNumber,
   redisClient,
@@ -110,7 +111,7 @@ export async function handleVoterStatusUpdate({
   payload: Payload;
   selectedVoterStatus: VoterStatusUpdate;
   originatingSlackUserName: string;
-  originatingSlackChannelName: string;
+  slackChannelName: string;
   userPhoneNumber: string;
   twilioPhoneNumber: string;
   redisClient: PromisifiedRedisClient;
@@ -128,12 +129,17 @@ export async function handleVoterStatusUpdate({
       payload,
       selectedVoterStatus,
       originatingSlackUserName,
-      originatingSlackChannelName,
+      slackChannelName,
       userPhoneNumber,
       twilioPhoneNumber,
     });
 
-    if (payload.actions[0].type === 'button') {
+    // Accommodate either a button press or an automated, programmatic operation
+    // that desires the same effect.
+    if (
+      (payload.actions && payload.actions[0].type === 'button') ||
+      payload.automatedButtonSelection
+    ) {
       const closedVoterPanelText = getClosedVoterPanelText(
         selectedVoterStatus,
         originatingSlackUserName
@@ -186,6 +192,7 @@ export async function handleVoterStatusUpdate({
     }
   } else if (
     selectedVoterStatus === 'UNDO' &&
+    payload.actions &&
     payload.actions[0].type === 'button'
   ) {
     logger.info(
@@ -195,7 +202,7 @@ export async function handleVoterStatusUpdate({
       payload,
       selectedVoterStatus: 'UNKNOWN',
       originatingSlackUserName,
-      originatingSlackChannelName,
+      slackChannelName,
       userPhoneNumber,
       twilioPhoneNumber,
     });
@@ -223,13 +230,13 @@ export async function handleVoterStatusUpdate({
 export async function handleVolunteerUpdate({
   payload,
   originatingSlackUserName,
-  originatingSlackChannelName,
+  slackChannelName,
   userPhoneNumber,
   twilioPhoneNumber,
 }: {
   payload: Payload;
   originatingSlackUserName: string;
-  originatingSlackChannelName: string;
+  slackChannelName: string;
   userPhoneNumber: string;
   twilioPhoneNumber: string;
 }): Promise<void> {
@@ -237,7 +244,7 @@ export async function handleVolunteerUpdate({
     `SLACKINTERACTIONHANDLER.handleVolunteerUpdate: Determined user interaction is a volunteer update`
   );
   const selectedVolunteerSlackUserName = await SlackApiUtil.fetchSlackUserName(
-    payload.actions[0].selected_user
+    payload.actions && payload.actions[0].selected_user
   );
   const MD5 = new Hashes.MD5();
   const userId = MD5.hex(userPhoneNumber);
@@ -268,20 +275,22 @@ export async function handleVolunteerUpdate({
       userPhoneNumber
     ),
     volunteerSlackUserName: selectedVolunteerSlackUserName,
-    volunteerSlackUserId: payload.actions[0].selected_user,
+    volunteerSlackUserId: payload.actions
+      ? payload.actions[0].selected_user
+      : null,
     originatingSlackUserName,
     originatingSlackUserId: payload.user.id,
-    originatingSlackChannelName,
-    originatingSlackChannelId: payload.channel.id,
-    originatingSlackParentMessageTs: payload.container.thread_ts,
-    actionTs: payload.actions[0].action_ts,
+    slackChannelName,
+    slackChannelId: payload.channel.id,
+    slackParentMessageTs: payload.container.thread_ts,
+    actionTs: payload.actions ? payload.actions[0].action_ts : null,
   });
 
   // Take the blocks and replace the initial_user with the new user, so that
   // even when Slack is refreshed this new status is shown.
   SlackBlockUtil.populateDropdownNewInitialValue(
     payload.message.blocks,
-    payload.actions[0].selected_user
+    payload.actions ? payload.actions[0].selected_user : null
   );
 
   // Replace the entire block so that the initial user change persists.
