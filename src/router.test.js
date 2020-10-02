@@ -102,7 +102,8 @@ const handleNewVoterWrapper = (
         redisClient,
         twilioPhoneNumber,
         inboundDbMessageEntry,
-        LoadBalancer.PULL_ENTRY_POINT
+        LoadBalancer.PULL_ENTRY_POINT,
+        false /* outboundTextsBlocked */
       )
     );
   });
