@@ -11,22 +11,41 @@ import { PromisifiedRedisClient } from './redis_client';
 
 export type VoterStatusUpdate = VoterStatus | 'UNDO';
 
-type Payload = {
+export type SlackEventPayload = {
   container: {
     thread_ts: number;
   };
   channel: {
     id: string;
   };
-  actions?: SlackBlockUtil.SlackBlock[];
+  actions: SlackBlockUtil.SlackBlock[];
   user: {
-    id: string | null;
+    id: string;
   };
   message: {
     blocks: SlackBlockUtil.SlackBlock[];
   };
   automatedButtonSelection: boolean | undefined;
 };
+
+export type SlackSyntheticPayload = {
+  container: {
+    thread_ts: number;
+  };
+  channel: {
+    id: string;
+  };
+  actions?: undefined;
+  user: {
+    id: null;
+  };
+  message: {
+    blocks: SlackBlockUtil.SlackBlock[];
+  };
+  automatedButtonSelection: boolean | undefined;
+};
+
+type Payload = SlackEventPayload | SlackSyntheticPayload;
 
 const getClosedVoterPanelText = (
   selectedVoterStatus: VoterStatusUpdate,
