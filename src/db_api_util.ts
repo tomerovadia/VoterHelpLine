@@ -191,7 +191,7 @@ export function populateIncomingDbMessageSlackEntry({
   slackRetryReason,
   originatingSlackUserName,
 }: {
-  unprocessedMessage: string;
+  unprocessedMessage: string | null;
   originatingSlackUserId: string;
   slackChannel: string;
   slackParentMessageTs: number;
