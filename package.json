@@ -64,7 +64,7 @@
     "nodemon": "^2.0.4",
     "prettier": "^2.1.2",
     "redis-mock": "^0.49.0",
-    "serverless": "^2.3.0",
+    "serverless": "^2.4.0",
     "serverless-domain-manager": "^5.0.0",
     "serverless-plugin-datadog": "^2.4.0",
     "serverless-plugin-typescript": "^1.1.9",
