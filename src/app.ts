@@ -14,7 +14,6 @@ import * as RedisApiUtil from './redis_api_util';
 import * as LoadBalancer from './load_balancer';
 import * as SlackUtil from './slack_util';
 import * as TwilioUtil from './twilio_util';
-import * as SlackInteractionHandler from './slack_interaction_handler';
 import * as SlackInteractionApiUtil from './slack_interaction_api_util';
 import logger from './logger';
 import redisClient from './redis_client';
