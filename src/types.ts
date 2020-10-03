@@ -25,6 +25,7 @@ type UserInfoCore = {
   volunteerEngaged: boolean;
   stateName: string | null;
   twilioPhoneNumber: string;
+  numStateSelectionAttempts: number;
 };
 
 type UserInfoChannels = {

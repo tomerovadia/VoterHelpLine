@@ -14,17 +14,9 @@ export async function sendMessage(
     twilioPhoneNumber: string;
     userPhoneNumber: string;
   },
-  outboundTextsBlocked: boolean,
   databaseMessageEntry?: DbApiUtil.DatabaseMessageEntry
 ): Promise<void> {
   logger.info(`ENTERING TWILIOAPIUTIL.sendMessage`);
-
-  if (outboundTextsBlocked) {
-    logger.info(
-      `SLACKAPIUTIL.sendMessage: Message ${message} will not be sent because texts to user ${options.userPhoneNumber} are blocked.`
-    );
-    return;
-  }
 
   if (databaseMessageEntry) {
     logger.info(
