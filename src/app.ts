@@ -14,11 +14,11 @@ import * as RedisApiUtil from './redis_api_util';
 import * as LoadBalancer from './load_balancer';
 import * as SlackUtil from './slack_util';
 import * as TwilioUtil from './twilio_util';
-import * as SlackInteractionHandler from './slack_interaction_handler';
 import * as SlackInteractionApiUtil from './slack_interaction_api_util';
 import logger from './logger';
 import redisClient from './redis_client';
 import { EntryPoint, Request, UserInfo } from './types';
+import { enqueueBackgroundTask } from './async_jobs';
 
 const app = express();
 
@@ -476,10 +476,6 @@ app.post(
   })
 );
 
-const isSlackRetry = (req: Request): boolean => {
-  return 'x-slack-retry-reason' in req.headers;
-};
-
 app.post(
   '/slack',
   runAsyncWrapper(async (req, res) => {
@@ -523,103 +519,31 @@ app.post(
       return;
     }
 
+    const retryCount = req.header('X-Slack-Retry-Num')
+      ? Number(req.header('X-Slack-Retry-Num'))
+      : undefined;
+
+    const retryReason = req.header('X-Slack-Retry-Reason');
+
+    // We do some first-order routing here to make sure this is an event we
+    // actually care about -- we want to quickly ignore things like
+    // messages from the bot itself, hidden events, etc.
     if (
       reqBody.event.type === 'message' &&
       reqBody.event.user != process.env.SLACK_BOT_USER_ID &&
       !reqBody.event.hidden
     ) {
-      logger.info(
-        `SERVER POST /slack: Slack event listener caught non-bot Slack message from ${reqBody.event.user}.`
-      );
-      const redisHashKey = `${reqBody.event.channel}:${reqBody.event.thread_ts}`;
-
-      // Pass Slack message to Twilio
-      const redisData = (await RedisApiUtil.getHash(
-        redisClient,
-        redisHashKey
-      )) as UserInfo;
-
-      if (redisData != null) {
-        logger.info(
-          'SERVER POST /slack: Server received non-bot Slack message INSIDE a voter thread.'
-        );
-
-        const outboundTextsBlocked = await RedisApiUtil.getHashField(
-          redisClient,
-          'slackBlockedUserPhoneNumbers',
-          redisData.userPhoneNumber
-        );
-        if (outboundTextsBlocked != '1') {
-          const originatingSlackUserName = await SlackApiUtil.fetchSlackUserName(
-            reqBody.event.user
-          );
-          if (!originatingSlackUserName) {
-            throw new Error(
-              `Could not get slack user name for slack user ${reqBody.event.user}`
-            );
-          }
-
-          logger.info(
-            `SERVER POST /slack: Successfully determined Slack user name of message sender: ${originatingSlackUserName}, from Slack user ID: ${reqBody.event.user}`
-          );
-          await Router.handleSlackVoterThreadMessage(
-            req,
-            redisClient,
-            redisData,
-            originatingSlackUserName
-          );
-        } else {
-          logger.info(
-            `SERVER POST /slack: Received attempted Slack message to blocked phone number: ${redisData.userPhoneNumber}`
-          );
-          await SlackApiUtil.sendMessage(
-            `*Operator:* Your message was not relayed, as this phone number has been added to our blocklist.`,
-            {
-              channel: reqBody.event.channel,
-              parentMessageTs: reqBody.event.thread_ts,
-            }
-          );
-        }
-      } else {
-        // Hash doesn't exist (this message is likely outside of a voter thread).
-        logger.info(
-          'SERVER POST /slack: Server received non-bot Slack message OUTSIDE a voter thread. Doing nothing.'
-        );
-      }
+      await enqueueBackgroundTask('slackMessageEventHandler', reqBody, {
+        retryCount,
+        retryReason,
+      });
     } else if (
       reqBody.event.type === 'app_mention' &&
       // Require that the Slack bot be the (first) user mentioned.
       reqBody.authed_users[0] === process.env.SLACK_BOT_USER_ID &&
-      !isSlackRetry(req)
+      !retryReason
     ) {
-      const originatingSlackUserName = await SlackApiUtil.fetchSlackUserName(
-        reqBody.event.user
-      );
-      if (!originatingSlackUserName) {
-        throw new Error(
-          `Could not get slack user name for slack user ${reqBody.event.user}`
-        );
-      }
-      logger.info(
-        `SERVER POST /slack: Successfully determined Slack user name of bot mentioner: ${originatingSlackUserName}, from Slack user ID: ${reqBody.event.user}`
-      );
-      // For these commands, require that the message was sent in the #admin-control-room Slack channel.
-      if (
-        reqBody.event.channel ===
-        process.env.ADMIN_CONTROL_ROOM_SLACK_CHANNEL_ID
-      ) {
-        logger.info(
-          'SERVER POST /slack: Slack event listener caught bot mention in admin channel.'
-        );
-        logger.info(
-          `SERVER POST /slack: Received admin control command from ${originatingSlackUserName}: ${reqBody.event.text}`
-        );
-        await Router.handleSlackAdminCommand(
-          reqBody,
-          redisClient,
-          originatingSlackUserName
-        );
-      }
+      await enqueueBackgroundTask('slackAppMentionEventHandler', reqBody);
     }
 
     res.sendStatus(200);
@@ -656,55 +580,7 @@ app.post(
 
     const payload = JSON.parse(req.body.payload);
 
-    const originatingSlackUserName = await SlackApiUtil.fetchSlackUserName(
-      payload.user.id
-    );
-    if (!originatingSlackUserName) {
-      throw new Error(
-        `Could not get slack user name for slack user ${payload.user.id}`
-      );
-    }
-
-    const originatingSlackChannelName = await SlackApiUtil.fetchSlackChannelName(
-      payload.channel.id
-    );
-    if (!originatingSlackChannelName) {
-      throw new Error(
-        `Could not get slack channel name for Slack channel ${payload.channel.id}`
-      );
-    }
-
-    const redisHashKey = `${payload.channel.id}:${payload.container.thread_ts}`;
-    const redisData = await RedisApiUtil.getHash(redisClient, redisHashKey);
-
-    const selectedVoterStatus = payload.actions[0].selected_option
-      ? payload.actions[0].selected_option.value
-      : payload.actions[0].value;
-    if (selectedVoterStatus) {
-      logger.info(
-        `SERVER POST /slack-interactivity: Determined user interaction is a voter status update or undo.`
-      );
-      await SlackInteractionHandler.handleVoterStatusUpdate({
-        payload,
-        selectedVoterStatus,
-        originatingSlackUserName,
-        slackChannelName: originatingSlackChannelName,
-        userPhoneNumber: redisData.userPhoneNumber,
-        twilioPhoneNumber: redisData.twilioPhoneNumber,
-        redisClient,
-      });
-    } else if (payload.actions[0].selected_user) {
-      logger.info(
-        `SERVER POST /slack-interactivity: Determined user interaction is a volunteer update.`
-      );
-      await SlackInteractionHandler.handleVolunteerUpdate({
-        payload,
-        originatingSlackUserName,
-        slackChannelName: originatingSlackChannelName,
-        userPhoneNumber: redisData.userPhoneNumber,
-        twilioPhoneNumber: redisData.twilioPhoneNumber,
-      });
-    }
+    await enqueueBackgroundTask('slackInteractivityHandler', payload);
 
     res.sendStatus(200);
   })
@@ -730,42 +606,42 @@ app.get(
 );
 
 function testHTTP() {
-  return new Promise<void>((resolve) => {
+  return new Promise<string>((resolve) => {
     logger.info('START testHTTP');
     setTimeout(() => {
-      logger.info('TIMEOUT testHTTP');
-      resolve();
+      resolve('TIMEOUT');
     }, 3000);
 
     void axios
       .get('https://google.com')
       .then((res: AxiosResponse) => {
         logger.info('PASS testHttp', res.status);
+        resolve('PASS');
       })
       .catch((err) => {
         logger.info('FAIL testHttp', err);
-      })
-      .then(resolve);
+        resolve('FAIL');
+      });
   });
 }
 
 function testRedis() {
-  return new Promise<void>((resolve) => {
+  return new Promise<string>((resolve) => {
     logger.info('START testRedis');
     setTimeout(() => {
-      logger.info('TIMEOUT testRedis');
-      resolve();
+      resolve('TIMEOUT');
     }, 3000);
 
     void redisClient
       .pingAsync()
       .then((res: any) => {
         logger.info('PASS testRedis', res);
+        resolve('PASS');
       })
       .catch((err: Error) => {
         logger.info('FAIL testRedis', err);
-      })
-      .then(resolve);
+        resolve('FAIL');
+      });
   });
 }
 
@@ -775,11 +651,10 @@ function testPostgres() {
     max: Number(process.env.CONNECTION_POOL_MAX || 20),
   });
 
-  return new Promise<void>((resolve) => {
+  return new Promise<string>((resolve) => {
     logger.info('START testPostgres');
     setTimeout(() => {
-      logger.info('TIMEOUT testPostgres');
-      resolve();
+      resolve('TIMEOUT');
     }, 3000);
 
     void pool
@@ -789,19 +664,30 @@ function testPostgres() {
       })
       .then((res) => {
         logger.info('PASS testPostgres', res);
+        resolve('PASS');
       })
       .catch((err) => {
         logger.info('FAIL testPostgres', err);
-      })
-      .then(resolve);
+        resolve('FAIL');
+      });
   });
 }
 
 app.get(
   '/debug-connect',
-  runAsyncWrapper(async function mainHandler(req, res) {
-    await Promise.all([testHTTP(), testRedis(), testPostgres()]);
-    res.sendStatus(200);
+  runAsyncWrapper(async function mainHandler(
+    req: Request,
+    res: express.Response
+  ) {
+    const httpPromise = testHTTP();
+    const redisPromise = testRedis();
+    const pgPromise = testPostgres();
+
+    res.json({
+      http: await httpPromise,
+      redis: await redisPromise,
+      pg: await pgPromise,
+    });
   })
 );
 

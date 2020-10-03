@@ -13,7 +13,7 @@ import * as CommandUtil from './command_util';
 import MessageParser from './message_parser';
 import * as SlackInteractionApiUtil from './slack_interaction_api_util';
 import logger from './logger';
-import { EntryPoint, Request, UserInfo } from './types';
+import { EntryPoint, UserInfo } from './types';
 import { PromisifiedRedisClient } from './redis_client';
 import * as Sentry from '@sentry/node';
 
@@ -980,14 +980,16 @@ export async function handleClearedVoter(
 }
 
 export async function handleSlackVoterThreadMessage(
-  req: Request,
+  reqBody: SlackEventRequestBody,
   redisClient: PromisifiedRedisClient,
   redisData: UserInfo,
-  originatingSlackUserName: string
+  originatingSlackUserName: string,
+  {
+    retryCount,
+    retryReason,
+  }: { retryCount: number | undefined; retryReason: string | undefined }
 ): Promise<void> {
   logger.debug('ENTERING ROUTER.handleSlackVoterThreadMessage');
-  const reqBody = req.body;
-
   const userPhoneNumber = redisData.userPhoneNumber;
   const twilioPhoneNumber = redisData.twilioPhoneNumber;
   if (!userPhoneNumber) {
@@ -1022,10 +1024,8 @@ export async function handleSlackVoterThreadMessage(
     slackParentMessageTs: reqBody.event.thread_ts,
     slackMessageTs: reqBody.event.ts,
     unprocessedMessage: unprocessedMessageToLog,
-    slackRetryNum: req.header('X-Slack-Retry-Num')
-      ? Number(req.header('X-Slack-Retry-Num'))
-      : undefined,
-    slackRetryReason: req.header('X-Slack-Retry-Reason'),
+    slackRetryNum: retryCount,
+    slackRetryReason: retryReason,
   });
 
   const userInfo = (await RedisApiUtil.getHash(
@@ -1066,13 +1066,21 @@ export async function handleSlackVoterThreadMessage(
   }
 }
 
+export type SlackEventRequestBody = {
+  event: {
+    type: string;
+    hidden: boolean;
+    text: string;
+    ts: number;
+    thread_ts: number;
+    user: string;
+    channel: string;
+  };
+  authed_users: string[];
+};
+
 export async function handleSlackAdminCommand(
-  reqBody: {
-    event: {
-      text: string;
-      ts: number;
-    };
-  },
+  reqBody: SlackEventRequestBody,
   redisClient: PromisifiedRedisClient,
   originatingSlackUserName: string
 ): Promise<void> {

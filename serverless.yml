@@ -14,7 +14,7 @@ provider:
   # your Redis and Postgres servers
   vpc:
     securityGroupIds:
-      { 'Fn::Split': [',', '${ssm:helpline.common.securityGroups~true}'] }
+      { 'Fn::Split': [',', '${ssm:helpline.${self:custom.stage}.securityGroups~true}'] }
     subnetIds: { 'Fn::Split': [',', '${ssm:helpline.common.subnets~true}'] }
 
   # 30-second timeout by default
@@ -43,12 +43,21 @@ provider:
     DEMO_PHONE_NUMBER: ${ssm:helpline.${self:custom.stage}.demo_phone_number~true}
     REDISCLOUD_URL: ${ssm:helpline.${self:custom.stage}.redis_url~true}
     DATABASE_URL: ${ssm:helpline.${self:custom.stage}.database_url~true}
+    LAMBDA_BACKGROUND_TASK_FUNCTION: helpline-${self:custom.stage}-worker
 
     CONNECTION_POOL_MAX: '2'
     LOG_FORMAT: json
 
   # Memory allocated to each lambda function
   memorySize: 512
+
+  # Allow the app server to invoke the background worker
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - lambda:InvokeFunction
+        - lambda:InvokeAsync
+      Resource: arn:aws:lambda:${self:custom.region}:*:function:helpline-${self:custom.stage}-worker
 
 package:
   exclude:
@@ -97,9 +106,12 @@ custom:
   # running at the same time. Make sure that this is less than the maximum
   # number of concurrent database connections your Postgres and Redis instances
   # can accept.
+  #
+  # This applies to the app server and background worker SEPARATELY. So the
+  # actual max concurrency is twice this value.
   reservedConcurrency:
-    staging: 100
-    prod: 1000
+    staging: 50
+    prod: 500
 
 functions:
   app:
@@ -107,4 +119,7 @@ functions:
     events:
       - http: ANY /
       - http: 'ANY {proxy+}'
+    reservedConcurrency: ${self:custom.reservedConcurrency.${self:custom.stage}}
+  worker:
+    handler: src/async_jobs.backgroundLambdaHandler
     reservedConcurrency: ${self:custom.reservedConcurrency.${self:custom.stage}}
