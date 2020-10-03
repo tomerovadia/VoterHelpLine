@@ -5,6 +5,8 @@ import * as DbApiUtil from './db_api_util';
 import logger from './logger';
 import { UserInfo } from './types';
 import { SlackBlock } from './slack_block_util';
+import * as RedisApiUtil from './redis_api_util';
+import { PromisifiedRedisClient } from './redis_client';
 
 type SlackSendMessageResponse = {
   data: {
@@ -17,6 +19,10 @@ type SlackSendMessageOptions = {
   channel: string;
   parentMessageTs?: number;
   blocks?: SlackBlock[];
+};
+
+type SlackChannelNamesAndIds = {
+  [channelId: string]: string; // mapping of channel ID to channel name
 };
 
 export async function sendMessage(
@@ -235,5 +241,51 @@ export async function fetchSlackMessageBlocks(
         `SLACKAPIUTIL.fetchSlackMessageFirstBlockText: Failed to reveal Slack message text (${messageTs}). Error: ${response.data.error}.`
       );
     return null;
+  }
+}
+
+export async function fetchSlackChannelNamesAndIds(): Promise<SlackChannelNamesAndIds | null> {
+  logger.info(`ENTERING SLACKAPIUTIL.fetchSlackChannelNamesAndIds`);
+  const response = await axios.get('https://slack.com/api/conversations.list', {
+    params: {
+      'Content-Type': 'application/json',
+      token: process.env.SLACK_BOT_ACCESS_TOKEN,
+      types: 'private_channel',
+    },
+  });
+
+  if (response.data.ok) {
+    if (process.env.NODE_ENV !== 'test')
+      logger.info(
+        `SLACKAPIUTIL.fetchSlackChannelNamesAndIds: Successfully fetched Slack channel names and IDs.`
+      );
+    const slackChannelNamesAndIds = {} as SlackChannelNamesAndIds;
+    for (const idx in response.data.channels) {
+      const channel = response.data.channels[idx];
+      slackChannelNamesAndIds[channel.id] = channel.name;
+    }
+    return slackChannelNamesAndIds;
+    // return response.data.messages[0].blocks;
+  } else {
+    if (process.env.NODE_ENV !== 'test')
+      logger.error(
+        `SLACKAPIUTIL.fetchSlackChannelNamesAndIds: ERROR fetching Slack channel names and IDs. Error: ${response.data.error}.`
+      );
+    return null;
+  }
+}
+
+export async function updateSlackChannelNamesAndIdsInRedis(
+  redisClient: PromisifiedRedisClient
+): Promise<void> {
+  logger.info(`ENTERING SLACKAPIUTIL.updateSlackChannelNamesAndIdsInRedis`);
+  const slackChannelNamesAndIds = await fetchSlackChannelNamesAndIds();
+
+  if (slackChannelNamesAndIds) {
+    await RedisApiUtil.setHash(
+      redisClient,
+      'slackPodChannelIds',
+      slackChannelNamesAndIds
+    );
   }
 }

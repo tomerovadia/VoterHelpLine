@@ -1,6 +1,10 @@
 import axios from 'axios';
 import { voterStatusPanel, SlackBlock } from './slack_block_util';
 import logger from './logger';
+import { UserInfo } from './types';
+import * as SlackApiUtil from './slack_api_util';
+import * as SlackInteractionHandler from './slack_interaction_handler';
+import { PromisifiedRedisClient } from './redis_client';
 
 export async function replaceSlackMessageBlocks({
   slackChannelId,
@@ -60,5 +64,57 @@ export function addBackVoterStatusPanel({
     slackChannelId,
     slackParentMessageTs,
     newBlocks,
+  });
+}
+
+// This function is used in app.js for automated refusals.
+export async function handleAutomatedCollapseOfVoterStatusPanel({
+  userInfo,
+  redisClient,
+  newVoterStatus,
+  userPhoneNumber,
+  twilioPhoneNumber,
+}: {
+  userInfo: UserInfo;
+  redisClient: PromisifiedRedisClient;
+  newVoterStatus: SlackInteractionHandler.VoterStatusUpdate;
+  userPhoneNumber: string;
+  twilioPhoneNumber: string;
+}): Promise<void> {
+  const messageBlocks = await SlackApiUtil.fetchSlackMessageBlocks(
+    userInfo.activeChannelId,
+    userInfo[userInfo.activeChannelId]
+  );
+
+  if (!messageBlocks) {
+    throw new Error(
+      `Could not get Slack blocks for known user ${userInfo.userId}`
+    );
+  }
+
+  const payload = {
+    automatedButtonSelection: true,
+    message: {
+      blocks: messageBlocks,
+    },
+    container: {
+      thread_ts: userInfo[userInfo.activeChannelId],
+    },
+    channel: {
+      id: userInfo.activeChannelId,
+    },
+    user: {
+      id: null,
+    },
+  };
+
+  await SlackInteractionHandler.handleVoterStatusUpdate({
+    payload,
+    selectedVoterStatus: newVoterStatus,
+    originatingSlackUserName: 'AUTOMATED',
+    slackChannelName: userInfo.activeChannelName,
+    userPhoneNumber,
+    twilioPhoneNumber,
+    redisClient,
   });
 }
