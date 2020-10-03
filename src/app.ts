@@ -70,6 +70,7 @@ app.use(
     },
   })
 );
+
 app.post(
   '/push',
   runAsyncWrapper(async (req: Request, res: express.Response) => {
@@ -114,7 +115,6 @@ app.post(
       await TwilioApiUtil.sendMessage(
         MESSAGE,
         { twilioPhoneNumber: TWILIO_PHONE_NUMBER, userPhoneNumber },
-        false /* outboundTextsBlocked */,
         dbMessageEntry
       );
 
@@ -124,6 +124,82 @@ app.post(
     res.sendStatus(200);
   })
 );
+
+export async function handleKnownVoterBlockLogic(
+  userInfo: UserInfo,
+  userMessage: string,
+  userPhoneNumber: string,
+  twilioPhoneNumber: string,
+  inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry
+): Promise<boolean> {
+  logger.debug('ENTERING SERVER');
+  // Outbound texts should be blocked if either:
+  // 1. this current message is STOP, or
+  // 2. a prior interaction set outbound texts to be blocked for this user.
+  let outboundTextsBlocked = await RedisApiUtil.getHashField(
+    redisClient,
+    'slackBlockedUserPhoneNumbers',
+    userPhoneNumber
+  );
+
+  if (userMessage.toLowerCase().trim() === 'stop') {
+    logger.info(
+      `SERVER.handleIncomingTwilioMessage: Received STOP text from phone number: ${userPhoneNumber}.`
+    );
+    // Check is necessary in case a previously seen voter doesn't have a Slack thread
+    // and their 2nd+ message is STOP, in which case there's nothing to collapse.
+    if ('activeChannelId' in userInfo) {
+      // This function also handles adding the phone number to blocklists.
+      await SlackInteractionApiUtil.handleAutomatedCollapseOfVoterStatusPanel({
+        userInfo,
+        redisClient,
+        newVoterStatus: 'REFUSED',
+        userPhoneNumber,
+        twilioPhoneNumber,
+      });
+    } else {
+      await RedisApiUtil.setHash(redisClient, 'slackBlockedUserPhoneNumbers', {
+        [userPhoneNumber]: '1',
+      });
+    }
+    outboundTextsBlocked = true;
+  }
+
+  // If outbound texts are prohibited to this user, we return --
+  // but first, we relay the message to Slack if a thread exists for
+  // this voter and we write to the DB.
+  if (outboundTextsBlocked) {
+    DbApiUtil.updateDbMessageEntryWithUserInfo(
+      userInfo!,
+      inboundDbMessageEntry
+    );
+
+    if ('activeChannelId' in userInfo) {
+      // This includes a DB write of the message.
+      await SlackApiUtil.sendMessage(
+        `*${userInfo.userId.substring(0, 5)}:* ${userMessage}`,
+        {
+          parentMessageTs: userInfo[userInfo.activeChannelId],
+          channel: userInfo.activeChannelId,
+        },
+        inboundDbMessageEntry,
+        userInfo
+      );
+    } else {
+      // The message isn't being relayed, so don't fill this field in Postgres.
+      inboundDbMessageEntry.successfullySent = null;
+      try {
+        await DbApiUtil.logMessageToDb(inboundDbMessageEntry);
+      } catch (error) {
+        logger.info(
+          `SERVER.handleIncomingTwilioMessage: failed to log incoming voter message to DB`
+        );
+        Sentry.captureException(error);
+      }
+    }
+  }
+  return outboundTextsBlocked;
+}
 
 const handleIncomingTwilioMessage = async (
   req: Request,
@@ -186,35 +262,14 @@ const handleIncomingTwilioMessage = async (
       `SERVER.handleIncomingTwilioMessage (${userId}): Voter is known to us (Redis returned userInfo for redisHashKey ${redisHashKey})`
     );
 
-    // Outbound texts should be blocked if either:
-    // 1. this current message is STOP, or
-    // 2. a prior interaction set outbound texts to be blocked for this user.
-    let outboundTextsBlocked = await RedisApiUtil.getHashField(
-      redisClient,
-      'slackBlockedUserPhoneNumbers',
-      userPhoneNumber
+    const outboundTextsBlocked = await handleKnownVoterBlockLogic(
+      userInfo,
+      userMessage,
+      userPhoneNumber,
+      twilioPhoneNumber,
+      inboundDbMessageEntry
     );
-
-    if (userMessage.toLowerCase().trim() === 'stop') {
-      logger.info(
-        `SERVER.handleIncomingTwilioMessage: Received STOP text from phone number: ${userPhoneNumber}.`
-      );
-      // Check is necessary in case a previously seen voter doesn't have a Slack thread
-      // and their 2nd+ message is STOP, in which case there's nothing to collapse.
-      if ('activeChannelId' in userInfo) {
-        await SlackInteractionApiUtil.handleAutomatedCollapseOfVoterStatusPanel(
-          {
-            userInfo,
-            redisClient,
-            newVoterStatus: 'REFUSED',
-            userPhoneNumber,
-            twilioPhoneNumber,
-          }
-        );
-      }
-      outboundTextsBlocked = true;
-      // Don't return, so the message is still relayed to Slack and written into Postgres.
-    }
+    if (outboundTextsBlocked) return;
 
     // Voter is known but has no Slack thread.
     // Context: Certain organizations require an extra step before a Slack
@@ -235,8 +290,7 @@ const handleIncomingTwilioMessage = async (
             redisClient,
             twilioPhoneNumber,
             inboundDbMessageEntry,
-            entryPoint,
-            outboundTextsBlocked
+            entryPoint
           );
           return;
         } else {
@@ -244,8 +298,7 @@ const handleIncomingTwilioMessage = async (
             { userInfo, userPhoneNumber, userMessage },
             redisClient,
             twilioPhoneNumber,
-            inboundDbMessageEntry,
-            outboundTextsBlocked
+            inboundDbMessageEntry
           );
           return;
         }
@@ -267,8 +320,7 @@ const handleIncomingTwilioMessage = async (
         { userInfo, userPhoneNumber, userMessage },
         redisClient,
         twilioPhoneNumber,
-        inboundDbMessageEntry,
-        outboundTextsBlocked
+        inboundDbMessageEntry
       );
       // PULL
     } else if (
@@ -290,7 +342,8 @@ const handleIncomingTwilioMessage = async (
       if (
         userInfo.stateName ||
         userInfo.volunteerEngaged ||
-        userInfo.numStateAsks > Router.NUM_STATES_ASKS_LIMIT
+        userInfo.numStateSelectionAttempts >=
+          Router.NUM_STATE_SELECTION_ATTEMPTS_LIMIT
       ) {
         logger.info(
           `SERVER.handleIncomingTwilioMessage (${userId}): Known U.S. state for voter (${userInfo.stateName}) or volunteer has engaged (${userInfo.volunteerEngaged}). Automated system no longer active.`
@@ -299,8 +352,7 @@ const handleIncomingTwilioMessage = async (
           { userInfo, userPhoneNumber, userMessage },
           redisClient,
           twilioPhoneNumber,
-          inboundDbMessageEntry,
-          outboundTextsBlocked
+          inboundDbMessageEntry
         );
         // Voter has no state determined
       } else {
@@ -311,8 +363,7 @@ const handleIncomingTwilioMessage = async (
           { userInfo, userPhoneNumber, userMessage },
           redisClient,
           twilioPhoneNumber,
-          inboundDbMessageEntry,
-          outboundTextsBlocked
+          inboundDbMessageEntry
         );
       }
     } else {
@@ -326,8 +377,7 @@ const handleIncomingTwilioMessage = async (
         { userInfo, userPhoneNumber, userMessage },
         redisClient,
         twilioPhoneNumber,
-        inboundDbMessageEntry,
-        outboundTextsBlocked
+        inboundDbMessageEntry
       );
     }
     // This is the first time we're seeing this voter.
@@ -368,10 +418,7 @@ const handleIncomingTwilioMessage = async (
         redisClient,
         twilioPhoneNumber,
         inboundDbMessageEntry,
-        entryPoint,
-        // Voter hasn't been seen before, so this must be false.
-        // This argument is necessary for other calls to handleNewVoter.
-        false /* outboundTextsBlocked */
+        entryPoint
       );
     }
   }
@@ -491,6 +538,7 @@ app.post(
         redisClient,
         redisHashKey
       )) as UserInfo;
+
       if (redisData != null) {
         logger.info(
           'SERVER POST /slack: Server received non-bot Slack message INSIDE a voter thread.'
