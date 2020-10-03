@@ -2,12 +2,25 @@ export function STATE_CONFIRMATION(state: string): string {
   switch (process.env.CLIENT_ORGANIZATION) {
     case 'VOTE_AMERICA':
       return `Great! We are finding a ${state} volunteer. We try to reply within minutes but may take 24 hours. Meanwhile, please share more about how we can help.`;
-    case 'VOTER_HELP_LINE':
-      return `Great! We are finding a ${state} volunteer. We try to reply within minutes but may take 24 hours. Meanwhile, please share more about how we can help.`;
     case 'VOTE_FROM_HOME_2020':
+      return `Great! We are finding a ${state} volunteer. We try to reply within minutes but may take 24 hours. Meanwhile, please share more about how we can help.`;
+    case 'VOTER_HELP_LINE':
       return `Great! We are finding a ${state} volunteer. We try to reply within minutes but may take 24 hours. Meanwhile, please share more about how we can help.`;
     default:
       return `Great! We are finding a ${state} volunteer. We try to reply within minutes but may take 24 hours. Meanwhile, please share more about how we can help.`;
+  }
+}
+
+export function NO_STATE_FINDING_VOLUNTEER(): string {
+  switch (process.env.CLIENT_ORGANIZATION) {
+    case 'VOTE_AMERICA':
+      return `We are finding a volunteer. We try to reply within minutes but may take 24 hours. Meanwhile, please share more about how we can help.`;
+    case 'VOTE_FROM_HOME_2020':
+      return `We are finding a volunteer. We try to reply within minutes but may take 24 hours. Meanwhile, please share more about how we can help.`;
+    case 'VOTER_HELP_LINE':
+      return `We are finding a volunteer. We try to reply within minutes but may take 24 hours. Meanwhile, please share more about how we can help.`;
+    default:
+      return `We are finding a volunteer. We try to reply within minutes but may take 24 hours. Meanwhile, please share more about how we can help.`;
   }
 }
 
@@ -15,10 +28,10 @@ export function CLARIFY_STATE(): string {
   switch (process.env.CLIENT_ORGANIZATION) {
     case 'VOTE_AMERICA':
       return "I'm sorry I didn't understand. In which U.S. state are you looking to vote? Please use your state’s abbreviation.";
-    case 'VOTER_HELP_LINE':
-      return "I'm sorry I didn't understand. In which U.S. state are you looking to vote? We currently service FL, NC and OH.";
     case 'VOTE_FROM_HOME_2020':
       return "I'm sorry I didn't understand. In which U.S. state are you looking to vote? We currently service MI, NC and PA.";
+    case 'VOTER_HELP_LINE':
+      return "I'm sorry I didn't understand. In which U.S. state are you looking to vote? We currently service FL, NC and OH.";
     default:
       return "I'm sorry I didn't understand. In which U.S. state are you looking to vote? We currently service FL, NC and OH.";
   }
@@ -39,9 +52,9 @@ export function WELCOME_VOTER(): string {
 
 export function CLARIFY_DISCLAIMER(): string {
   switch (process.env.CLIENT_ORGANIZATION) {
-    case 'VOTER_HELP_LINE':
-      return 'To continue, please reply “agree” to confirm that you understand.';
     case 'VOTE_FROM_HOME_2020':
+      return 'To continue, please reply “agree” to confirm that you understand.';
+    case 'VOTER_HELP_LINE':
       return 'To continue, please reply “agree” to confirm that you understand.';
     default:
       return 'To continue, please reply “agree” to confirm that you understand.';
@@ -61,10 +74,10 @@ export function STATE_QUESTION(): string {
   switch (process.env.CLIENT_ORGANIZATION) {
     case 'VOTE_AMERICA':
       return 'Great! To match you with the most knowledgeable volunteer, in which U.S. state are you looking to vote?';
-    case 'VOTER_HELP_LINE':
-      return 'Great! To match you with the most knowledgeable volunteer, in which U.S. state are you looking to vote? We currently service Florida, North Carolina and Ohio.';
     case 'VOTE_FROM_HOME_2020':
       return 'Great! To match you with the most knowledgeable volunteer, in which U.S. state are you looking to vote? We currently service Michigan, North Carolina and Pennsylvania.';
+    case 'VOTER_HELP_LINE':
+      return 'Great! To match you with the most knowledgeable volunteer, in which U.S. state are you looking to vote? We currently service Florida, North Carolina and Ohio.';
     default:
       return 'Great! To match you with the most knowledgeable volunteer, in which U.S. state are you looking to vote? We currently service Florida, North Carolina and Ohio.';
   }
@@ -74,9 +87,9 @@ export function WELCOME_BACK(): string {
   switch (process.env.CLIENT_ORGANIZATION) {
     case 'VOTE_AMERICA':
       return 'Welcome back! We are connecting you with a volunteer. We will try to reply within a matter of minutes, but depending on the time of day, you might hear back later. In the meantime, please feel free to share more information about your question and situation.';
-    case 'VOTER_HELP_LINE':
-      return `Welcome back! We are connecting you with a volunteer. We will try to reply within a matter of minutes, but depending on the time of day, you might hear back later. In the meantime, please feel free to share more information about your question and situation. (Msg & data rates may apply).`;
     case 'VOTE_FROM_HOME_2020':
+      return `Welcome back! We are connecting you with a volunteer. We will try to reply within a matter of minutes, but depending on the time of day, you might hear back later. In the meantime, please feel free to share more information about your question and situation. (Msg & data rates may apply).`;
+    case 'VOTER_HELP_LINE':
       return `Welcome back! We are connecting you with a volunteer. We will try to reply within a matter of minutes, but depending on the time of day, you might hear back later. In the meantime, please feel free to share more information about your question and situation. (Msg & data rates may apply).`;
     default:
       return `Welcome back! We are connecting you with a volunteer. We will try to reply within a matter of minutes, but depending on the time of day, you might hear back later. In the meantime, please feel free to share more information about your question and situation. (Msg & data rates may apply).`;

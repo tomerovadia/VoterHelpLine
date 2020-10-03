@@ -102,8 +102,7 @@ const handleNewVoterWrapper = (
         redisClient,
         twilioPhoneNumber,
         inboundDbMessageEntry,
-        LoadBalancer.PULL_ENTRY_POINT,
-        false /* outboundTextsBlocked */
+        LoadBalancer.PULL_ENTRY_POINT
       )
     );
   });
@@ -244,12 +243,8 @@ describe('handleNewVoter', () => {
     );
   });
 
-  test('Passes outboundTextsBlocked=false to TwilioApiUtil if voter is not blocked', () => {
-    expect(TwilioApiUtil.sendMessage.mock.calls[0][2]).toBe(false);
-  });
-
   test('Creates outbound database entry and passes to TwilioApiUtil for logging', () => {
-    expect(TwilioApiUtil.sendMessage.mock.calls[0][3]).toEqual(
+    expect(TwilioApiUtil.sendMessage.mock.calls[0][2]).toEqual(
       expect.objectContaining({
         direction: 'OUTBOUND',
         automated: true,
@@ -259,7 +254,7 @@ describe('handleNewVoter', () => {
 
   test('Includes updated lastVoterMessageSecsFromEpoch in outbound database entry object for logging', () => {
     const secsFromEpochNow = Math.round(Date.now() / 1000);
-    const dbMessageEntry = TwilioApiUtil.sendMessage.mock.calls[0][3];
+    const dbMessageEntry = TwilioApiUtil.sendMessage.mock.calls[0][2];
     const newLastVoterMessageSecsFromEpoch =
       dbMessageEntry.lastVoterMessageSecsFromEpoch;
     expect(newLastVoterMessageSecsFromEpoch - secsFromEpochNow).toBeLessThan(
@@ -434,8 +429,7 @@ const determineVoterStateWrapper = (
   userOptions,
   redisClient,
   twilioPhoneNumber,
-  inboundDbMessageEntry,
-  outboundTextsBlocked
+  inboundDbMessageEntry
 ) => {
   return new Promise((resolve) => {
     resolve(
@@ -443,8 +437,7 @@ const determineVoterStateWrapper = (
         userOptions,
         redisClient,
         twilioPhoneNumber,
-        inboundDbMessageEntry,
-        outboundTextsBlocked
+        inboundDbMessageEntry
       )
     );
   });
@@ -482,8 +475,7 @@ describe('determineVoterState', () => {
         },
         redisClient,
         '+12054985052',
-        inboundDbMessageEntry,
-        false /* outboundTextsBlocked */
+        inboundDbMessageEntry
       );
     });
     test('Passes voter message to Slack', () => {
@@ -558,8 +550,7 @@ describe('determineVoterState', () => {
         },
         redisClient,
         '+12054985052',
-        inboundDbMessageEntry,
-        false /* outboundTextsBlocked */
+        inboundDbMessageEntry
       );
     });
 
@@ -575,12 +566,8 @@ describe('determineVoterState', () => {
       );
     });
 
-    test('Passes outboundTextsBlocked=false to TwilioApiUtil if voter is not blocked', () => {
-      expect(TwilioApiUtil.sendMessage.mock.calls[0][2]).toBe(false);
-    });
-
     test('Creates outbound database entry and passes to TwilioApiUtil for logging', () => {
-      expect(TwilioApiUtil.sendMessage.mock.calls[0][3]).toEqual(
+      expect(TwilioApiUtil.sendMessage.mock.calls[0][2]).toEqual(
         expect.objectContaining({
           direction: 'OUTBOUND',
           automated: true,
@@ -590,7 +577,7 @@ describe('determineVoterState', () => {
 
     test('Includes updated lastVoterMessageSecsFromEpoch in outbound database entry object for logging', () => {
       const secsFromEpochNow = Math.round(Date.now() / 1000);
-      const dbMessageEntry = TwilioApiUtil.sendMessage.mock.calls[0][3];
+      const dbMessageEntry = TwilioApiUtil.sendMessage.mock.calls[0][2];
       const newLastVoterMessageSecsFromEpoch =
         dbMessageEntry.lastVoterMessageSecsFromEpoch;
       expect(newLastVoterMessageSecsFromEpoch - secsFromEpochNow).toBeLessThan(
@@ -740,8 +727,7 @@ describe('determineVoterState', () => {
         },
         redisClient,
         twilioPhoneNumber,
-        inboundDbMessageEntry,
-        false /* outboundTextsBlocked */
+        inboundDbMessageEntry
       ).then(() => {
         expect(TwilioApiUtil.sendMessage.mock.calls[0][0]).toEqual(
           expect.stringMatching(
@@ -757,22 +743,6 @@ describe('determineVoterState', () => {
       });
     });
 
-    test('Passes outboundTextsBlocked=false to TwilioApiUtil if voter is not blocked', () => {
-      return determineVoterStateWrapper(
-        {
-          userPhoneNumber: '+1234567890',
-          userMessage: 'NC',
-          userInfo,
-        },
-        redisClient,
-        twilioPhoneNumber,
-        inboundDbMessageEntry,
-        false /* outboundTextsBlocked */
-      ).then(() => {
-        expect(TwilioApiUtil.sendMessage.mock.calls[0][2]).toBe(false);
-      });
-    });
-
     test('Creates outbound database entry and passes to TwilioApiUtil for logging', () => {
       return determineVoterStateWrapper(
         {
@@ -782,10 +752,9 @@ describe('determineVoterState', () => {
         },
         redisClient,
         twilioPhoneNumber,
-        inboundDbMessageEntry,
-        false /* outboundTextsBlocked */
+        inboundDbMessageEntry
       ).then(() => {
-        expect(TwilioApiUtil.sendMessage.mock.calls[0][3]).toEqual(
+        expect(TwilioApiUtil.sendMessage.mock.calls[0][2]).toEqual(
           expect.objectContaining({
             direction: 'OUTBOUND',
             automated: true,
@@ -803,11 +772,10 @@ describe('determineVoterState', () => {
         },
         redisClient,
         twilioPhoneNumber,
-        inboundDbMessageEntry,
-        false /* outboundTextsBlocked */
+        inboundDbMessageEntry
       ).then(() => {
         const secsFromEpochNow = Math.round(Date.now() / 1000);
-        const dbMessageEntry = TwilioApiUtil.sendMessage.mock.calls[0][3];
+        const dbMessageEntry = TwilioApiUtil.sendMessage.mock.calls[0][2];
         const newLastVoterMessageSecsFromEpoch =
           dbMessageEntry.lastVoterMessageSecsFromEpoch;
         expect(
@@ -825,8 +793,7 @@ describe('determineVoterState', () => {
         },
         redisClient,
         twilioPhoneNumber,
-        inboundDbMessageEntry,
-        false /* outboundTextsBlocked */
+        inboundDbMessageEntry
       ).then(() => {
         expectNthSlackMessageToChannel(
           'CTHELOBBYID',
@@ -846,8 +813,7 @@ describe('determineVoterState', () => {
         },
         redisClient,
         twilioPhoneNumber,
-        inboundDbMessageEntry,
-        false /* outboundTextsBlocked */
+        inboundDbMessageEntry
       ).then(() => {
         expectNthSlackMessageToChannel(
           'CTHELOBBYID',
@@ -867,8 +833,7 @@ describe('determineVoterState', () => {
         },
         redisClient,
         twilioPhoneNumber,
-        inboundDbMessageEntry,
-        false /* outboundTextsBlocked */
+        inboundDbMessageEntry
       ).then(() => {
         expectNthSlackMessageToChannel(
           'CTHELOBBYID',
@@ -888,8 +853,7 @@ describe('determineVoterState', () => {
         },
         redisClient,
         twilioPhoneNumber,
-        inboundDbMessageEntry,
-        false /* outboundTextsBlocked */
+        inboundDbMessageEntry
       ).then(() => {
         const MD5 = new Hashes.MD5();
         const userId = MD5.hex('+1234567890').substring(0, 5);
@@ -913,8 +877,7 @@ describe('determineVoterState', () => {
         },
         redisClient,
         twilioPhoneNumber,
-        inboundDbMessageEntry,
-        false /* outboundTextsBlocked */
+        inboundDbMessageEntry
       ).then(() => {
         expectNthSlackMessageToChannel('north-carolina-3', 0, [
           'New North Carolina voter',
@@ -937,8 +900,7 @@ describe('determineVoterState', () => {
         },
         redisClient,
         twilioPhoneNumber,
-        inboundDbMessageEntry,
-        false /* outboundTextsBlocked */
+        inboundDbMessageEntry
       ).then(() => {
         expectNthSlackMessageToChannel('north-carolina-5', 0, [
           'New North Carolina voter',
@@ -961,8 +923,7 @@ describe('determineVoterState', () => {
         },
         redisClient,
         twilioPhoneNumber,
-        inboundDbMessageEntry,
-        false /* outboundTextsBlocked */
+        inboundDbMessageEntry
       ).then(() => {
         expectNthSlackMessageToChannel('north-carolina-3', 0, [
           'New North Carolina voter',
@@ -985,8 +946,7 @@ describe('determineVoterState', () => {
         },
         redisClient,
         twilioPhoneNumber,
-        inboundDbMessageEntry,
-        false /* outboundTextsBlocked */
+        inboundDbMessageEntry
       ).then(() => {
         expectNthSlackMessageToChannel('north-carolina-10', 0, [
           'New North Carolina voter',
@@ -1041,8 +1001,7 @@ describe('determineVoterState', () => {
         },
         redisClient,
         twilioPhoneNumber,
-        inboundDbMessageEntry,
-        false /* outboundTextsBlocked */
+        inboundDbMessageEntry
       ).then(() => {
         // 53rd demo NC voter goes to #demo-north-carolina-2
         expectNthSlackMessageToChannel('demo-north-carolina-2', 0, [
@@ -1060,8 +1019,7 @@ describe('determineVoterState', () => {
         },
         redisClient,
         twilioPhoneNumber,
-        inboundDbMessageEntry,
-        false /* outboundTextsBlocked */
+        inboundDbMessageEntry
       ).then(() => {
         // # of assertions = # of message parts + # of calls with parentMessageTs
         expect.assertions(1);
@@ -1085,8 +1043,7 @@ describe('determineVoterState', () => {
         },
         redisClient,
         twilioPhoneNumber,
-        inboundDbMessageEntry,
-        false /* outboundTextsBlocked */
+        inboundDbMessageEntry
       ).then(() => {
         expect.assertions(2);
         const secsFromEpochNow = Math.round(Date.now() / 1000);
@@ -1127,8 +1084,7 @@ describe('determineVoterState', () => {
         },
         redisClient,
         twilioPhoneNumber,
-        inboundDbMessageEntry,
-        false /* outboundTextsBlocked */
+        inboundDbMessageEntry
       ).then(() => {
         expect.assertions(1);
         for (call of RedisApiUtil.setHash.mock.calls) {
@@ -1160,8 +1116,7 @@ const handleDisclaimerWrapper = (
         userOptions,
         redisClient,
         twilioPhoneNumber,
-        inboundDbMessageEntry,
-        false /* outboundTextsBlocked */
+        inboundDbMessageEntry
       )
     );
   });
@@ -1277,12 +1232,8 @@ describe('handleDisclaimer', () => {
       );
     });
 
-    test('Passes outboundTextsBlocked=false to TwilioApiUtil if voter is not blocked', () => {
-      expect(TwilioApiUtil.sendMessage.mock.calls[0][2]).toBe(false);
-    });
-
     test('Creates outbound database entry and passes to TwilioApiUtil for logging', () => {
-      expect(TwilioApiUtil.sendMessage.mock.calls[0][3]).toEqual(
+      expect(TwilioApiUtil.sendMessage.mock.calls[0][2]).toEqual(
         expect.objectContaining({
           direction: 'OUTBOUND',
           automated: true,
@@ -1292,7 +1243,7 @@ describe('handleDisclaimer', () => {
 
     test('Includes updated lastVoterMessageSecsFromEpoch in outbound database entry object for logging', () => {
       const secsFromEpochNow = Math.round(Date.now() / 1000);
-      const dbMessageEntry = TwilioApiUtil.sendMessage.mock.calls[0][3];
+      const dbMessageEntry = TwilioApiUtil.sendMessage.mock.calls[0][2];
       const newLastVoterMessageSecsFromEpoch =
         dbMessageEntry.lastVoterMessageSecsFromEpoch;
       expect(newLastVoterMessageSecsFromEpoch - secsFromEpochNow).toBeLessThan(
@@ -1405,12 +1356,8 @@ describe('handleDisclaimer', () => {
       );
     });
 
-    test('Passes outboundTextsBlocked=false to TwilioApiUtil if voter is not blocked', () => {
-      expect(TwilioApiUtil.sendMessage.mock.calls[0][2]).toBe(false);
-    });
-
     test('Creates outbound database entry and passes to TwilioApiUtil for logging', () => {
-      expect(TwilioApiUtil.sendMessage.mock.calls[0][3]).toEqual(
+      expect(TwilioApiUtil.sendMessage.mock.calls[0][2]).toEqual(
         expect.objectContaining({
           direction: 'OUTBOUND',
           automated: true,
@@ -1420,7 +1367,7 @@ describe('handleDisclaimer', () => {
 
     test('Includes updated lastVoterMessageSecsFromEpoch in outbound database entry object for logging', () => {
       const secsFromEpochNow = Math.round(Date.now() / 1000);
-      const dbMessageEntry = TwilioApiUtil.sendMessage.mock.calls[0][3];
+      const dbMessageEntry = TwilioApiUtil.sendMessage.mock.calls[0][2];
       const newLastVoterMessageSecsFromEpoch =
         dbMessageEntry.lastVoterMessageSecsFromEpoch;
       expect(newLastVoterMessageSecsFromEpoch - secsFromEpochNow).toBeLessThan(
@@ -1505,8 +1452,7 @@ const handleClearedVoterWrapper = (
         userOptions,
         redisClient,
         twilioPhoneNumber,
-        inboundDbMessageEntry,
-        false /* outboundTextsBlocked */
+        inboundDbMessageEntry
       )
     );
   });
