@@ -537,7 +537,12 @@ app.post(
         retryCount,
         retryReason,
       });
-    } else if (reqBody.event.type === 'app_mention' && !retryReason) {
+    } else if (
+      reqBody.event.type === 'app_mention' &&
+      // Require that the Slack bot be the (first) user mentioned.
+      reqBody.event.text.startsWith(`<@${process.env.SLACK_BOT_USER_ID}>`) &&
+      !retryReason
+    ) {
       await enqueueBackgroundTask('slackAppMentionEventHandler', reqBody);
     }
 
