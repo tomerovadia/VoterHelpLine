@@ -13,7 +13,7 @@ export type VoterStatusUpdate = VoterStatus | 'UNDO';
 
 export type SlackEventPayload = {
   container: {
-    thread_ts: number;
+    thread_ts: string;
   };
   channel: {
     id: string;
@@ -30,7 +30,7 @@ export type SlackEventPayload = {
 
 export type SlackSyntheticPayload = {
   container: {
-    thread_ts: number;
+    thread_ts: string;
   };
   channel: {
     id: string;

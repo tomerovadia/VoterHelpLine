@@ -29,7 +29,7 @@ type UserInfoCore = {
 };
 
 type UserInfoChannels = {
-  [channel: string]: number; // mapping of channel ID to message timestamp
+  [channel: string]: string; // mapping of channel ID to message timestamp
 };
 
 export type UserInfo = UserInfoCore & UserInfoChannels;
