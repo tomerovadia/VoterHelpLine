@@ -540,7 +540,7 @@ app.post(
     } else if (
       reqBody.event.type === 'app_mention' &&
       // Require that the Slack bot be the (first) user mentioned.
-      reqBody.authed_users[0] === process.env.SLACK_BOT_USER_ID &&
+      reqBody.event.text.startsWith(`<@${process.env.SLACK_BOT_USER_ID}>`) &&
       !retryReason
     ) {
       await enqueueBackgroundTask('slackAppMentionEventHandler', reqBody);
