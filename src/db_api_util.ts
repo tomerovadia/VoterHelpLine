@@ -443,8 +443,9 @@ export async function getSlackThreadsForVoter(
       `SELECT slack_channel, slack_parent_message_ts
         FROM messages 
         WHERE user_id = $1 
-        AND (to_phone_number = $2 OR from_phone_number = $2)
-        AND slack_parent_message_ts IS NOT NULL
+          AND (to_phone_number = $2 OR from_phone_number = $2)
+          AND slack_parent_message_ts IS NOT NULL
+          AND NOT archived
         GROUP BY slack_parent_message_ts, slack_channel;`,
       [userId, twilioPhoneNumber]
     );
