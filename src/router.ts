@@ -76,7 +76,8 @@ export async function welcomePotentialVoter(
   redisClient: PromisifiedRedisClient,
   twilioPhoneNumber: string,
   inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry,
-  entryPoint: EntryPoint
+  entryPoint: EntryPoint,
+  twilioCallbackURL: string
 ): Promise<void> {
   logger.debug('ENTERING ROUTER.welcomePotentialVoter');
   const userInfo = prepareUserInfoForNewVoter({
@@ -87,7 +88,11 @@ export async function welcomePotentialVoter(
 
   await TwilioApiUtil.sendMessage(
     MessageConstants.WELCOME_VOTER(),
-    { userPhoneNumber: userOptions.userPhoneNumber, twilioPhoneNumber },
+    {
+      userPhoneNumber: userOptions.userPhoneNumber,
+      twilioPhoneNumber,
+      twilioCallbackURL,
+    },
     DbApiUtil.populateAutomatedDbMessageEntry(userInfo)
   );
 
@@ -123,7 +128,8 @@ const introduceNewVoterToSlackChannel = async (
   twilioPhoneNumber: string,
   inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry,
   entryPoint: EntryPoint,
-  slackChannelName: string
+  slackChannelName: string,
+  twilioCallbackURL: string
 ) => {
   logger.debug('ENTERING ROUTER.introduceNewVoterToSlackChannel');
   logger.debug(
@@ -143,7 +149,11 @@ const introduceNewVoterToSlackChannel = async (
     // Welcome the voter
     await TwilioApiUtil.sendMessage(
       messageToVoter,
-      { userPhoneNumber: userInfo.userPhoneNumber, twilioPhoneNumber },
+      {
+        userPhoneNumber: userInfo.userPhoneNumber,
+        twilioPhoneNumber,
+        twilioCallbackURL,
+      },
       DbApiUtil.populateAutomatedDbMessageEntry(userInfo)
     );
   }
@@ -270,7 +280,8 @@ export async function handleNewVoter(
   redisClient: PromisifiedRedisClient,
   twilioPhoneNumber: string,
   inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry,
-  entryPoint: EntryPoint
+  entryPoint: EntryPoint,
+  twilioCallbackURL: string
 ): Promise<void> {
   logger.debug('ENTERING ROUTER.handleNewVoter');
   const userMessage = userOptions.userMessage;
@@ -330,7 +341,8 @@ export async function handleNewVoter(
     twilioPhoneNumber,
     inboundDbMessageEntry,
     entryPoint,
-    slackChannelName
+    slackChannelName,
+    twilioCallbackURL
   );
 }
 
@@ -704,7 +716,8 @@ export async function determineVoterState(
   userOptions: UserOptions & { userInfo: UserInfo },
   redisClient: PromisifiedRedisClient,
   twilioPhoneNumber: string,
-  inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry
+  inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry,
+  twilioCallbackURL: string
 ): Promise<void> {
   logger.debug('ENTERING ROUTER.determineVoterState');
   const userInfo = userOptions.userInfo;
@@ -745,7 +758,7 @@ export async function determineVoterState(
 
       await TwilioApiUtil.sendMessage(
         MessageConstants.CLARIFY_STATE(),
-        { userPhoneNumber, twilioPhoneNumber },
+        { userPhoneNumber, twilioPhoneNumber, twilioCallbackURL },
         DbApiUtil.populateAutomatedDbMessageEntry(userInfo)
       );
       await SlackApiUtil.sendMessage(
@@ -783,7 +796,7 @@ export async function determineVoterState(
 
   await TwilioApiUtil.sendMessage(
     messageToVoter,
-    { userPhoneNumber, twilioPhoneNumber },
+    { userPhoneNumber, twilioPhoneNumber, twilioCallbackURL },
     DbApiUtil.populateAutomatedDbMessageEntry(userInfo)
   );
   await SlackApiUtil.sendMessage(`*Automated Message:* ${messageToVoter}`, {
@@ -820,7 +833,8 @@ export async function clarifyHelplineRequest(
   userOptions: UserOptions & { userInfo: UserInfo },
   redisClient: PromisifiedRedisClient,
   twilioPhoneNumber: string,
-  inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry
+  inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry,
+  twilioCallbackURL: string
 ): Promise<void> {
   logger.debug('ENTERING ROUTER.clarifyHelplineRequest');
   const userInfo = userOptions.userInfo;
@@ -828,7 +842,11 @@ export async function clarifyHelplineRequest(
 
   await TwilioApiUtil.sendMessage(
     MessageConstants.CLARIFY_HELPLINE_REQUEST(),
-    { userPhoneNumber: userOptions.userPhoneNumber, twilioPhoneNumber },
+    {
+      userPhoneNumber: userOptions.userPhoneNumber,
+      twilioPhoneNumber,
+      twilioCallbackURL,
+    },
     DbApiUtil.populateAutomatedDbMessageEntry(userInfo)
   );
 
@@ -860,7 +878,8 @@ export async function handleDisclaimer(
   userOptions: UserOptions & { userInfo: UserInfo },
   redisClient: PromisifiedRedisClient,
   twilioPhoneNumber: string,
-  inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry
+  inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry,
+  twilioCallbackURL: string
 ): Promise<void> {
   logger.debug('ENTERING ROUTER.handleDisclaimer');
   const userInfo = userOptions.userInfo;
@@ -909,7 +928,11 @@ export async function handleDisclaimer(
   );
   await TwilioApiUtil.sendMessage(
     automatedMessage,
-    { userPhoneNumber: userOptions.userPhoneNumber, twilioPhoneNumber },
+    {
+      userPhoneNumber: userOptions.userPhoneNumber,
+      twilioPhoneNumber,
+      twilioCallbackURL,
+    },
     DbApiUtil.populateAutomatedDbMessageEntry(userInfo)
   );
   await SlackApiUtil.sendMessage(
@@ -922,7 +945,8 @@ export async function handleClearedVoter(
   userOptions: UserOptions & { userInfo: UserInfo },
   redisClient: PromisifiedRedisClient,
   twilioPhoneNumber: string,
-  inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry
+  inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry,
+  twilioCallbackURL: string
 ): Promise<void> {
   logger.debug('ENTERING ROUTER.handleClearedVoter');
   const userInfo = userOptions.userInfo;
@@ -964,6 +988,7 @@ export async function handleClearedVoter(
     await TwilioApiUtil.sendMessage(welcomeBackMessage, {
       userPhoneNumber: userOptions.userPhoneNumber,
       twilioPhoneNumber,
+      twilioCallbackURL,
     });
     await SlackApiUtil.sendMessage(
       `*Automated Message:* ${welcomeBackMessage}`,
@@ -984,6 +1009,7 @@ export async function handleSlackVoterThreadMessage(
   redisClient: PromisifiedRedisClient,
   redisData: UserInfo,
   originatingSlackUserName: string,
+  twilioCallbackURL: string,
   {
     retryCount,
     retryReason,
@@ -1000,7 +1026,9 @@ export async function handleSlackVoterThreadMessage(
     `ROUTER.handleSlackVoterThreadMessage: Successfully determined userPhoneNumber from Redis`
   );
   const unprocessedSlackMessage = reqBody.event.text;
-  logger.debug(`Received message from Slack: ${unprocessedSlackMessage}`);
+  logger.debug(
+    `Received message from Slack (channel ${reqBody.event.channel} ts ${reqBody.event.ts}): ${unprocessedSlackMessage}`
+  );
 
   // If the message doesn't need processing.
   let messageToSend = unprocessedSlackMessage;
@@ -1051,7 +1079,7 @@ export async function handleSlackVoterThreadMessage(
 
     await TwilioApiUtil.sendMessage(
       messageToSend,
-      { userPhoneNumber, twilioPhoneNumber },
+      { userPhoneNumber, twilioPhoneNumber, twilioCallbackURL },
       outboundDbMessageEntry
     );
     // Slack message is from inactive Slack thread.
@@ -1104,7 +1132,7 @@ export async function handleSlackAdminCommand(
 
   switch (adminCommandArgs.command) {
     case CommandUtil.ROUTE_VOTER: {
-      // TODO: Move some of this logic to CommandUtil, so this swith statement
+      // TODO: Move some of this logic to CommandUtil, so this switch statement
       // is cleaner.
       const redisHashKey = `${adminCommandArgs.userId}:${adminCommandArgs.twilioPhoneNumber}`;
       logger.debug(

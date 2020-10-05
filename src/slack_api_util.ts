@@ -290,6 +290,32 @@ export async function updateSlackChannelNamesAndIdsInRedis(
   }
 }
 
+export async function addSlackMessageReaction(
+  messageChannel: string,
+  messageTs: string,
+  reaction: string
+): Promise<void> {
+  const response = await axios.post(
+    'https://slack.com/api/reactions.add',
+    {
+      channel: messageChannel,
+      timestamp: messageTs,
+      name: reaction,
+    },
+    {
+      headers: {
+        Authorization: `Bearer ${process.env.SLACK_BOT_ACCESS_TOKEN}`,
+      },
+    }
+  );
+
+  if (!response.data.ok) {
+    throw new Error(
+      `SLACKAPIUTIL.addSlackMessageReaction: ERROR in adding reaction: ${response.data.error}`
+    );
+  }
+}
+
 export async function renderModal(
   triggerId: string,
   view: SlackView

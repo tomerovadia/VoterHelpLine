@@ -593,6 +593,53 @@ export async function logVolunteerVoterClaimToDb(
   }
 }
 
+/**
+ * Updates the Twilio status of the given text message in the DB.
+ *
+ * Additionally, returns the slack channel and message timestamp so we can
+ * react to the message to indicate success/failure
+ */
+export async function logTwilioStatusToDb(
+  messageSid: string,
+  status: string
+): Promise<null | { slackChannel: string; slackMessageTs: string }> {
+  logger.info(`ENTERING DBAPIUTIL.logTwilioStatusToDb`);
+
+  const client = await pool.connect();
+
+  try {
+    const result = await client.query(
+      `
+      UPDATE messages
+      SET
+        twilio_callback_status = $1,
+        twilio_callback_timestamp = now()
+      WHERE
+        twilio_message_sid = $2
+      RETURNING
+        slack_channel,
+        slack_message_ts
+    `,
+      [status, messageSid]
+    );
+
+    if (result.rows.length > 0) {
+      const row = result.rows[0];
+      return {
+        slackChannel: row.slack_channel,
+        slackMessageTs: row.slack_message_ts,
+      };
+    } else {
+      logger.error(
+        `DBAPIUTIL.logTwilioStatusToDb: No message with sid ${messageSid}`
+      );
+      return null;
+    }
+  } finally {
+    client.release();
+  }
+}
+
 export async function logCommandToDb(
   databaseCommandEntry: DatabaseCommandEntry
 ): Promise<void> {
