@@ -366,6 +366,22 @@ export async function receiveResetDemo({
   const MD5 = new Hashes.MD5();
   const userId = MD5.hex(userPhoneNumber);
 
+  const commandType = 'RESET_DEMO';
+  // Ignore Prettier formatting because this object needs to adhere to JSON strigify requirements.
+  // prettier-ignore
+  const modalPrivateMetadata = {
+    "commandType": commandType,
+    "userId": userId,
+    "userPhoneNumber": userPhoneNumber,
+    "twilioPhoneNumber": twilioPhoneNumber,
+    "slackChannelId": payload.channel.id,
+    "slackParentMessageTs": payload.message.ts,
+    "originatingSlackUserName": originatingSlackUserName,
+    "originatingSlackUserId": payload.user.id,
+    "slackChannelName": slackChannelName,
+    "actionTs": payload.action_ts
+  } as SlackModalPrivateMetadata;
+
   const redisUserInfoKey = `${userId}:${twilioPhoneNumber}`;
   const userInfo = (await RedisApiUtil.getHash(
     redisClient,
@@ -373,13 +389,17 @@ export async function receiveResetDemo({
   )) as UserInfo;
 
   if (!userInfo) {
+    modalPrivateMetadata.success = false;
+    await DbApiUtil.logCommandToDb(modalPrivateMetadata);
     throw new Error(
-      `SLACKINTERACTIONHANDLER.receiveResetDemo: Interaction received for voter who has redisData but not userInfo: redisData key is ${payload.channel.id}:${payload.message.ts}, userInfo key is ${redisUserInfoKey}.`
+      `SLACKINTERACTIONHANDLER.receiveResetDemo: Interaction received for voter who has redisData but not userInfo: active redisData key is ${payload.channel.id}:${payload.message.ts}, userInfo key is ${redisUserInfoKey}.`
     );
   }
 
   let slackView;
   if (!userInfo.isDemo) {
+    modalPrivateMetadata.success = false;
+    await DbApiUtil.logCommandToDb(modalPrivateMetadata);
     logger.info(
       `SLACKINTERACTIONHANDLER.receiveResetDemo: Volunteer tried to reset demo on non-demo voter.`
     );
@@ -388,6 +408,8 @@ export async function receiveResetDemo({
       'This shortcut is strictly for demo conversations only. Please reach out to an admin for assistance.'
     );
   } else if (!(payload.channel.id === userInfo.activeChannelId)) {
+    modalPrivateMetadata.success = false;
+    await DbApiUtil.logCommandToDb(modalPrivateMetadata);
     logger.info(
       `SLACKINTERACTIONHANDLER.receiveResetDemo: Volunteer issued reset demo command from #${payload.channel.id} but voter active channel is ${userInfo.activeChannelId}.`
     );
@@ -399,23 +421,9 @@ export async function receiveResetDemo({
     logger.info(
       `SLACKINTERACTIONHANDLER.receiveResetDemo: Reset demo command is valid.`
     );
-    const commandType = 'RESET_DEMO';
+
     // Store the relevant information in the modal so that when the requested action is confirmed
     // the data needed for the necessary actions is available.
-    // Ignore Prettier formatting because this object needs to adhere to JSON strigify requirements.
-    // prettier-ignore
-    const modalPrivateMetadata = {
-      "commandType": commandType,
-      "userId": userId,
-      "userPhoneNumber": userPhoneNumber,
-      "twilioPhoneNumber": twilioPhoneNumber,
-      "slackChannelId": userInfo.activeChannelId,
-      "slackParentMessageTs": userInfo[userInfo.activeChannelId],
-      "originatingSlackUserName": originatingSlackUserName,
-      "originatingSlackUserId": payload.user.id,
-      "slackChannelName": slackChannelName,
-      "actionTs": payload.action_ts
-    } as SlackModalPrivateMetadata;
     slackView = SlackBlockUtil.resetConfirmationSlackView(
       commandType,
       modalPrivateMetadata
