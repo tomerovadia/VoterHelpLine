@@ -443,7 +443,6 @@ export async function handleResetDemo(
   redisClient: PromisifiedRedisClient,
   modalPrivateMetadata: SlackModalPrivateMetadata
 ): Promise<void> {
-  console.log(modalPrivateMetadata);
   const redisUserInfoKey = `${modalPrivateMetadata.userId}:${modalPrivateMetadata.twilioPhoneNumber}`;
 
   const slackThreads = (await DbApiUtil.getSlackThreadsForVoter(
@@ -451,14 +450,9 @@ export async function handleResetDemo(
     modalPrivateMetadata.twilioPhoneNumber
   )) as SlackThreadInfo[];
 
-  console.log('slackThreads');
-  console.log(slackThreads);
-
   const redisDatas = slackThreads.map(
     (row) => `${row.slackChannel}:${row.slackParentMessageTs}`
   );
-
-  console.log([redisUserInfoKey, ...redisDatas]);
 
   const numKeysPresent = await RedisApiUtil.keysExist(redisClient, [
     redisUserInfoKey,
@@ -468,8 +462,6 @@ export async function handleResetDemo(
   // If any key is missing, something is wrong, so log and don't try to delete.
   // Count = multiple Slack thread lookups + 1 phone number lookup for this user.
   let redisError = numKeysPresent !== slackThreads.length + 1;
-  console.log(numKeysPresent);
-  console.log('numKeysPresent');
 
   // If all keys are present, try to delete.
   if (!redisError) {
