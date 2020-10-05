@@ -1,5 +1,9 @@
+// This file is not imported by any other file in the checked in version.
+// It is intended for use by developers for set-up, until it is no longer
+// necessary.
+
 import { PromisifiedRedisClient } from '../src/redis_client';
-import { getStateConstants } from '../src/state_constants';
+import { getStateConstants } from './state_constants';
 
 // This function establishes initial open pods in Redis,
 // populating demo and non-demo entry points and
