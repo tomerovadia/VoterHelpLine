@@ -1,6 +1,5 @@
 import { Pool } from 'pg';
 import logger from './logger';
-import { SlackModalPrivateMetadata } from './slack_interaction_handler';
 import {
   MessageDirection,
   EntryPoint,
@@ -72,22 +71,20 @@ export type DatabaseVolunteerVoterClaim = {
   actionTs: string | null;
 };
 
-export type DatabaseCommandEntry =
-  | {
-      commandType: string | null;
-      userId: string | null;
-      userPhoneNumber: string | null;
-      twilioPhoneNumber: string | null;
-      originatingSlackUserName: string | null;
-      originatingSlackUserId: string | null;
-      slackChannelName: string | null;
-      slackChannelId: string | null;
-      slackParentMessageTs: string | null;
-      success: boolean | null;
-      actionTs: string | null;
-      failureReason?: string | null;
-    }
-  | SlackModalPrivateMetadata;
+export type DatabaseCommandEntry = {
+  commandType: string | null;
+  userId: string | null;
+  userPhoneNumber: string | null;
+  twilioPhoneNumber: string | null;
+  originatingSlackUserName: string | null;
+  originatingSlackUserId: string | null;
+  slackChannelName: string | null;
+  slackChannelId: string | null;
+  slackParentMessageTs: string | null;
+  success?: boolean | null;
+  actionTs: string | null;
+  failureReason?: string | null;
+};
 
 export async function logMessageToDb(
   databaseMessageEntry: DatabaseMessageEntry
