@@ -21,9 +21,9 @@ export type DatabaseMessageEntry = {
   toPhoneNumber?: string | null;
   originatingSlackUserId?: string | null;
   slackChannel?: string | null;
-  slackParentMessageTs?: number | null;
+  slackParentMessageTs?: string | null;
   twilioMessageSid?: string | null;
-  slackMessageTs?: number | null;
+  slackMessageTs?: string | null;
   slackError?: string | null;
   twilioError?: string | null;
   twilioSendTimestamp?: Date | null;
@@ -48,8 +48,8 @@ export type DatabaseVoterStatusEntry = {
   originatingSlackUserId: string | null;
   slackChannelName: string | null;
   slackChannelId: string | null;
-  slackParentMessageTs: number | null;
-  actionTs?: number | null;
+  slackParentMessageTs: string | null;
+  actionTs?: string | null;
   twilioPhoneNumber: string | null;
   isDemo: boolean | null;
 };
@@ -65,8 +65,8 @@ export type DatabaseVolunteerVoterClaim = {
   originatingSlackUserId: string | null;
   slackChannelName: string | null;
   slackChannelId: string | null;
-  slackParentMessageTs: number | null;
-  actionTs: number | null;
+  slackParentMessageTs: string | null;
+  actionTs: string | null;
 };
 
 export async function logMessageToDb(
@@ -194,8 +194,8 @@ export function populateIncomingDbMessageSlackEntry({
   unprocessedMessage: string | null;
   originatingSlackUserId: string;
   slackChannel: string;
-  slackParentMessageTs: number;
-  slackMessageTs: number;
+  slackParentMessageTs: string;
+  slackMessageTs: string;
   slackRetryNum?: number;
   slackRetryReason?: string;
   originatingSlackUserName: string;
@@ -375,7 +375,7 @@ const LAST_TIMESTAMP_SQL_SCRIPT = `
   LIMIT 1;`;
 
 export async function getTimestampOfLastMessageInThread(
-  parentMessageTs: number
+  parentMessageTs: number | string
 ): Promise<string> {
   logger.info(`ENTERING DBAPIUTIL.getTimestampOfLastMessageInThread`);
   logger.info(
@@ -497,6 +497,53 @@ export async function logVolunteerVoterClaimToDb(
     logger.info(
       `DBAPIUTIL.logVolunteerVoterClaimToDb: Successfully inserted volunteer voter claim into PostgreSQL database.`
     );
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Updates the Twilio status of the given text message in the DB.
+ *
+ * Additionally, returns the slack channel and message timestamp so we can
+ * react to the message to indicate success/failure
+ */
+export async function logTwilioStatusToDb(
+  messageSid: string,
+  status: string
+): Promise<null | { slackChannel: string; slackMessageTs: string }> {
+  logger.info(`ENTERING DBAPIUTIL.logTwilioStatusToDb`);
+
+  const client = await pool.connect();
+
+  try {
+    const result = await client.query(
+      `
+      UPDATE messages
+      SET
+        twilio_callback_status = $1,
+        twilio_callback_timestamp = now()
+      WHERE
+        twilio_message_sid = $2
+      RETURNING
+        slack_channel,
+        slack_message_ts
+    `,
+      [status, messageSid]
+    );
+
+    if (result.rows.length > 0) {
+      const row = result.rows[0];
+      return {
+        slackChannel: row.slack_channel,
+        slackMessageTs: row.slack_message_ts,
+      };
+    } else {
+      logger.error(
+        `DBAPIUTIL.logTwilioStatusToDb: No message with sid ${messageSid}`
+      );
+      return null;
+    }
   } finally {
     client.release();
   }

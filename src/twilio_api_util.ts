@@ -13,6 +13,7 @@ export async function sendMessage(
   options: {
     twilioPhoneNumber: string;
     userPhoneNumber: string;
+    twilioCallbackURL: string;
   },
   databaseMessageEntry?: DbApiUtil.DatabaseMessageEntry
 ): Promise<void> {
@@ -33,6 +34,7 @@ export async function sendMessage(
       body: message,
       from: options.twilioPhoneNumber,
       to: options.userPhoneNumber,
+      statusCallback: options.twilioCallbackURL,
     });
 
     logger.info(`TWILIOAPIUTIL.sendMessage: Successfully sent Twilio message,

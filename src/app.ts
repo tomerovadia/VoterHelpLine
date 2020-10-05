@@ -19,6 +19,7 @@ import logger from './logger';
 import redisClient from './redis_client';
 import { EntryPoint, Request, UserInfo } from './types';
 import { enqueueBackgroundTask } from './async_jobs';
+import { handleTwilioStatusCallback } from './twilio_status_callback_handler';
 
 const app = express();
 
@@ -114,7 +115,11 @@ app.post(
 
       await TwilioApiUtil.sendMessage(
         MESSAGE,
-        { twilioPhoneNumber: TWILIO_PHONE_NUMBER, userPhoneNumber },
+        {
+          twilioPhoneNumber: TWILIO_PHONE_NUMBER,
+          userPhoneNumber,
+          twilioCallbackURL: TwilioUtil.twilioCallbackURL(req),
+        },
         dbMessageEntry
       );
 
@@ -256,6 +261,8 @@ const handleIncomingTwilioMessage = async (
     )}`
   );
 
+  const twilioCallbackURL = TwilioUtil.twilioCallbackURL(req);
+
   // Seen this voter before
   if (userInfo != null) {
     logger.info(
@@ -290,7 +297,8 @@ const handleIncomingTwilioMessage = async (
             redisClient,
             twilioPhoneNumber,
             inboundDbMessageEntry,
-            entryPoint
+            entryPoint,
+            twilioCallbackURL
           );
           return;
         } else {
@@ -298,7 +306,8 @@ const handleIncomingTwilioMessage = async (
             { userInfo, userPhoneNumber, userMessage },
             redisClient,
             twilioPhoneNumber,
-            inboundDbMessageEntry
+            inboundDbMessageEntry,
+            twilioCallbackURL
           );
           return;
         }
@@ -320,7 +329,8 @@ const handleIncomingTwilioMessage = async (
         { userInfo, userPhoneNumber, userMessage },
         redisClient,
         twilioPhoneNumber,
-        inboundDbMessageEntry
+        inboundDbMessageEntry,
+        twilioCallbackURL
       );
       // PULL
     } else if (
@@ -352,7 +362,8 @@ const handleIncomingTwilioMessage = async (
           { userInfo, userPhoneNumber, userMessage },
           redisClient,
           twilioPhoneNumber,
-          inboundDbMessageEntry
+          inboundDbMessageEntry,
+          twilioCallbackURL
         );
         // Voter has no state determined
       } else {
@@ -363,7 +374,8 @@ const handleIncomingTwilioMessage = async (
           { userInfo, userPhoneNumber, userMessage },
           redisClient,
           twilioPhoneNumber,
-          inboundDbMessageEntry
+          inboundDbMessageEntry,
+          twilioCallbackURL
         );
       }
     } else {
@@ -377,7 +389,8 @@ const handleIncomingTwilioMessage = async (
         { userInfo, userPhoneNumber, userMessage },
         redisClient,
         twilioPhoneNumber,
-        inboundDbMessageEntry
+        inboundDbMessageEntry,
+        twilioCallbackURL
       );
     }
     // This is the first time we're seeing this voter.
@@ -410,7 +423,8 @@ const handleIncomingTwilioMessage = async (
         redisClient,
         twilioPhoneNumber,
         inboundDbMessageEntry,
-        entryPoint
+        entryPoint,
+        twilioCallbackURL
       );
     } else {
       await Router.handleNewVoter(
@@ -418,7 +432,8 @@ const handleIncomingTwilioMessage = async (
         redisClient,
         twilioPhoneNumber,
         inboundDbMessageEntry,
-        entryPoint
+        entryPoint,
+        twilioCallbackURL
       );
     }
   }
@@ -533,10 +548,15 @@ app.post(
       reqBody.event.user != process.env.SLACK_BOT_USER_ID &&
       !reqBody.event.hidden
     ) {
-      await enqueueBackgroundTask('slackMessageEventHandler', reqBody, {
-        retryCount,
-        retryReason,
-      });
+      await enqueueBackgroundTask(
+        'slackMessageEventHandler',
+        reqBody,
+        TwilioUtil.twilioCallbackURL(req),
+        {
+          retryCount,
+          retryReason,
+        }
+      );
     } else if (
       reqBody.event.type === 'app_mention' &&
       // Require that the Slack bot be the (first) user mentioned.
@@ -583,6 +603,26 @@ app.post(
     await enqueueBackgroundTask('slackInteractivityHandler', payload);
 
     res.sendStatus(200);
+  })
+);
+
+app.post(
+  '/twilio-callback',
+  runAsyncWrapper(async (req, res) => {
+    logger.info('Entering SERVER POST /twilio-callback');
+
+    if (TwilioUtil.passesAuth(req)) {
+      logger.info('SERVER POST /twilio-callback: Passes Twilio auth.');
+      await handleTwilioStatusCallback(req);
+      res.writeHead(200, { 'Content-Type': 'text/xml' });
+      res.send();
+    } else {
+      logger.error(
+        'SERVER POST /twilio-callback: ERROR authenticating /twilio-callback request is from Twilio.'
+      );
+      res.writeHead(401, { 'Content-Type': 'text/xml' });
+      res.send();
+    }
   })
 );
 

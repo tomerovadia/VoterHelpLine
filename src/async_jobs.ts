@@ -75,6 +75,7 @@ async function slackInteractivityHandler(payload: SlackEventPayload) {
 
 async function slackMessageEventHandler(
   reqBody: SlackEventRequestBody,
+  twilioCallbackURL: string,
   {
     retryCount,
     retryReason,
@@ -119,6 +120,7 @@ async function slackMessageEventHandler(
         redisClient,
         redisData,
         originatingSlackUserName,
+        twilioCallbackURL,
         { retryCount, retryReason }
       );
     } else {

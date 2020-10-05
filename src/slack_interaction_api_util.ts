@@ -12,7 +12,7 @@ export async function replaceSlackMessageBlocks({
   newBlocks,
 }: {
   slackChannelId: string;
-  slackParentMessageTs: number;
+  slackParentMessageTs: string;
   newBlocks: SlackBlock[];
 }): Promise<void> {
   logger.info('ENTERING SLACKINTERACTIONAPIUTIL.replaceSlackMessageBlocks');
@@ -50,7 +50,7 @@ export function addBackVoterStatusPanel({
   oldBlocks,
 }: {
   slackChannelId: string;
-  slackParentMessageTs: number;
+  slackParentMessageTs: string;
   oldBlocks: SlackBlock[];
 }): Promise<void> {
   logger.info('ENTERING SLACKINTERACTIONAPIUTIL.addBackVoterStatusPanel');

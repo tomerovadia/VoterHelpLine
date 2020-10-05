@@ -11,13 +11,13 @@ import { PromisifiedRedisClient } from './redis_client';
 type SlackSendMessageResponse = {
   data: {
     channel: string;
-    ts: number;
+    ts: string;
   };
 };
 
 type SlackSendMessageOptions = {
   channel: string;
-  parentMessageTs?: number;
+  parentMessageTs?: string;
   blocks?: SlackBlock[];
 };
 
@@ -214,7 +214,7 @@ export async function fetchSlackUserName(
 // See reference here: https://api.slack.com/messaging/retrieving#individual_messages
 export async function fetchSlackMessageBlocks(
   channelId: string,
-  messageTs: number
+  messageTs: string
 ): Promise<SlackBlock[] | null> {
   const response = await axios.get(
     'https://slack.com/api/conversations.history',
@@ -286,6 +286,32 @@ export async function updateSlackChannelNamesAndIdsInRedis(
       redisClient,
       'slackPodChannelIds',
       slackChannelNamesAndIds
+    );
+  }
+}
+
+export async function addSlackMessageReaction(
+  messageChannel: string,
+  messageTs: string,
+  reaction: string
+): Promise<void> {
+  const response = await axios.post(
+    'https://slack.com/api/reactions.add',
+    {
+      channel: messageChannel,
+      timestamp: messageTs,
+      name: reaction,
+    },
+    {
+      headers: {
+        Authorization: `Bearer ${process.env.SLACK_BOT_ACCESS_TOKEN}`,
+      },
+    }
+  );
+
+  if (!response.data.ok) {
+    throw new Error(
+      `SLACKAPIUTIL.addSlackMessageReaction: ERROR in adding reaction: ${response.data.error}`
     );
   }
 }
