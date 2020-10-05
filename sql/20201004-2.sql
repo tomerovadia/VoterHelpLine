@@ -13,7 +13,8 @@ CREATE TABLE commands (
 	slack_channel_id text,
 	slack_parent_message_ts text,
 	action_ts text,
-    success boolean
+    success boolean,
+	failure_reason text
 );
 
 -- This field is used to express that a message should not be considered part

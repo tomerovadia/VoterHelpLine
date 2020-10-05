@@ -85,6 +85,7 @@ export type DatabaseCommandEntry =
       slackParentMessageTs: string | null;
       success: boolean | null;
       actionTs: string | null;
+      failureReason?: string | null;
     }
   | SlackModalPrivateMetadata;
 
@@ -647,7 +648,7 @@ export async function logCommandToDb(
   const client = await pool.connect();
   try {
     await client.query(
-      'INSERT INTO commands (command_type, user_id, user_phone_number, twilio_phone_number, originating_slack_user_name, originating_slack_user_id, slack_channel_name, slack_channel_id, slack_parent_message_ts, success, action_ts) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11);',
+      'INSERT INTO commands (command_type, user_id, user_phone_number, twilio_phone_number, originating_slack_user_name, originating_slack_user_id, slack_channel_name, slack_channel_id, slack_parent_message_ts, success, action_ts, failure_reason) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12);',
       [
         databaseCommandEntry.commandType,
         databaseCommandEntry.userId,
@@ -660,6 +661,7 @@ export async function logCommandToDb(
         databaseCommandEntry.slackParentMessageTs,
         databaseCommandEntry.success,
         databaseCommandEntry.actionTs,
+        databaseCommandEntry.failureReason,
       ]
     );
 

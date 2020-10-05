@@ -69,6 +69,7 @@ export type SlackModalPrivateMetadata = {
   slackChannelName: string;
   actionTs: string;
   success?: boolean;
+  failureReason?: string;
 };
 
 const getClosedVoterPanelText = (
@@ -390,6 +391,7 @@ export async function receiveResetDemo({
 
   if (!userInfo) {
     modalPrivateMetadata.success = false;
+    modalPrivateMetadata.failureReason = 'no_user_info';
     await DbApiUtil.logCommandToDb(modalPrivateMetadata);
     throw new Error(
       `SLACKINTERACTIONHANDLER.receiveResetDemo: Interaction received for voter who has redisData but not userInfo: active redisData key is ${payload.channel.id}:${payload.message.ts}, userInfo key is ${redisUserInfoKey}.`
@@ -399,6 +401,7 @@ export async function receiveResetDemo({
   let slackView;
   if (!userInfo.isDemo) {
     modalPrivateMetadata.success = false;
+    modalPrivateMetadata.failureReason = 'non_demo';
     await DbApiUtil.logCommandToDb(modalPrivateMetadata);
     logger.info(
       `SLACKINTERACTIONHANDLER.receiveResetDemo: Volunteer tried to reset demo on non-demo voter.`
@@ -409,6 +412,7 @@ export async function receiveResetDemo({
     );
   } else if (!(payload.channel.id === userInfo.activeChannelId)) {
     modalPrivateMetadata.success = false;
+    modalPrivateMetadata.failureReason = 'non_active_thread';
     await DbApiUtil.logCommandToDb(modalPrivateMetadata);
     logger.info(
       `SLACKINTERACTIONHANDLER.receiveResetDemo: Volunteer issued reset demo command from #${payload.channel.id} but voter active channel is ${userInfo.activeChannelId}.`
@@ -479,6 +483,7 @@ export async function handleResetDemo(
 
   if (redisError) {
     modalPrivateMetadata.success = false;
+    modalPrivateMetadata.failureReason = 'missing_redis_key';
     await DbApiUtil.logCommandToDb(modalPrivateMetadata);
     throw new Error(
       `SLACKINTERACTIONHANDLER.handleResetDemo: Either the userInfo (${redisUserInfoKey}) or one of the redisData keys (${JSON.stringify(
@@ -509,6 +514,7 @@ export async function handleResetDemo(
 
   if (previousParentMessageBlocks === null) {
     modalPrivateMetadata.success = false;
+    modalPrivateMetadata.failureReason = 'message_blocks_fetch_failure';
     await DbApiUtil.logCommandToDb(modalPrivateMetadata);
     throw new Error(
       `SLACKINTERACTIONHANDLER.handleResetDemo: Failed to fetch Slack message blocks for channelId (${modalPrivateMetadata.slackChannelId}) and parentMessageTs (${modalPrivateMetadata.slackParentMessageTs}).`
