@@ -49,7 +49,7 @@ export type DatabaseVoterStatusEntry = {
   slackChannelName: string | null;
   slackChannelId: string | null;
   slackParentMessageTs: string | null;
-  actionTs?: number | null;
+  actionTs?: string | null;
   twilioPhoneNumber: string | null;
   isDemo: boolean | null;
 };
@@ -66,7 +66,7 @@ export type DatabaseVolunteerVoterClaim = {
   slackChannelName: string | null;
   slackChannelId: string | null;
   slackParentMessageTs: string | null;
-  actionTs: number | null;
+  actionTs: string | null;
 };
 
 export async function logMessageToDb(
@@ -534,16 +534,14 @@ export async function logTwilioStatusToDb(
 
     if (result.rows.length > 0) {
       const row = result.rows[0];
-      console.log({
-        slackChannel: row.slack_channel,
-        slackMessageTs: row.slack_message_ts,
-      });
       return {
         slackChannel: row.slack_channel,
         slackMessageTs: row.slack_message_ts,
       };
     } else {
-      logger.error(`DBAPIUTIL.getLatestVoterStatus: No voter status for user`);
+      logger.error(
+        `DBAPIUTIL.logTwilioStatusToDb: No message with sid ${messageSid}`
+      );
       return null;
     }
   } finally {

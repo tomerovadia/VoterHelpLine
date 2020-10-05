@@ -26,6 +26,18 @@ ADD COLUMN twilio_callback_timestamp timestamptz;
 ALTER TABLE messages
 ALTER COLUMN slack_parent_message_ts TYPE text USING trim(to_char(slack_parent_message_ts, '99999999999999999999999999.999999'));
 
-
 ALTER TABLE messages
 ALTER COLUMN slack_message_ts TYPE text USING trim(to_char(slack_message_ts, '99999999999999999999999999.999999'));
+
+ALTER TABLE voter_status_updates
+ALTER COLUMN slack_parent_message_ts TYPE text USING trim(to_char(slack_parent_message_ts, '99999999999999999999999999.999999'));
+
+ALTER TABLE voter_status_updates
+ALTER COLUMN action_ts TYPE text USING trim(to_char(action_ts, '99999999999999999999999999.999999'));
+
+ALTER TABLE volunteer_voter_claims
+ALTER COLUMN slack_parent_message_ts TYPE text USING trim(to_char(slack_parent_message_ts, '99999999999999999999999999.999999'));
+
+ALTER TABLE volunteer_voter_claims
+ALTER COLUMN action_ts TYPE text USING trim(to_char(action_ts, '99999999999999999999999999.999999'));
+

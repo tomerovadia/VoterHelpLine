@@ -311,7 +311,7 @@ export async function addSlackMessageReaction(
 
   if (!response.data.ok) {
     throw new Error(
-      `SLACKAPIUTIL.sendMessage: ERROR in sending Slack message: ${response.data.error}`
+      `SLACKAPIUTIL.addSlackMessageReaction: ERROR in adding reaction: ${response.data.error}`
     );
   }
 }
