@@ -582,7 +582,11 @@ app.post(
 
     await enqueueBackgroundTask('slackInteractivityHandler', payload);
 
-    res.sendStatus(200);
+    // Use res.end instead of res.sendStatus because the latter sends the code as
+    // a string in the body, and modal responses require an empty body in some cases.
+    // See https://api.slack.com/surfaces/modals/using#close_current_view.
+    res.writeHead(200);
+    res.end();
   })
 );
 

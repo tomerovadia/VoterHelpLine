@@ -29,7 +29,7 @@ type UserInfoCore = {
 };
 
 type UserInfoChannels = {
-  [channel: string]: number; // mapping of channel ID to message timestamp
+  [channel: string]: string; // mapping of channel ID to message timestamp
 };
 
 export type UserInfo = UserInfoCore & UserInfoChannels;
@@ -40,6 +40,11 @@ export type HistoricalMessage = {
   automated: boolean;
   direction: MessageDirection;
   originating_slack_user_name: string;
+};
+
+export type SlackThreadInfo = {
+  slackParentMessageTs: string;
+  slackChannel: string;
 };
 
 export type Request = express.Request & { rawBody: string };

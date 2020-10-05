@@ -1,10 +1,12 @@
 import { Pool } from 'pg';
 import logger from './logger';
+import { SlackModalPrivateMetadata } from './slack_interaction_handler';
 import {
   MessageDirection,
   EntryPoint,
   UserInfo,
   HistoricalMessage,
+  SlackThreadInfo,
 } from './types';
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -21,9 +23,9 @@ export type DatabaseMessageEntry = {
   toPhoneNumber?: string | null;
   originatingSlackUserId?: string | null;
   slackChannel?: string | null;
-  slackParentMessageTs?: number | null;
+  slackParentMessageTs?: string | null;
   twilioMessageSid?: string | null;
-  slackMessageTs?: number | null;
+  slackMessageTs?: string | null;
   slackError?: string | null;
   twilioError?: string | null;
   twilioSendTimestamp?: Date | null;
@@ -38,6 +40,7 @@ export type DatabaseMessageEntry = {
   slackRetryReason?: string | null;
   originatingSlackUserName?: string | null;
   entryPoint: EntryPoint | null;
+  archived?: boolean | null;
 };
 
 export type DatabaseVoterStatusEntry = {
@@ -48,8 +51,8 @@ export type DatabaseVoterStatusEntry = {
   originatingSlackUserId: string | null;
   slackChannelName: string | null;
   slackChannelId: string | null;
-  slackParentMessageTs: number | null;
-  actionTs?: number | null;
+  slackParentMessageTs: string | null;
+  actionTs?: string | null;
   twilioPhoneNumber: string | null;
   isDemo: boolean | null;
 };
@@ -65,9 +68,25 @@ export type DatabaseVolunteerVoterClaim = {
   originatingSlackUserId: string | null;
   slackChannelName: string | null;
   slackChannelId: string | null;
-  slackParentMessageTs: number | null;
-  actionTs: number | null;
+  slackParentMessageTs: string | null;
+  actionTs: string | null;
 };
+
+export type DatabaseCommandEntry =
+  | {
+      commandType: string | null;
+      userId: string | null;
+      userPhoneNumber: string | null;
+      twilioPhoneNumber: string | null;
+      originatingSlackUserName: string | null;
+      originatingSlackUserId: string | null;
+      slackChannelName: string | null;
+      slackChannelId: string | null;
+      slackParentMessageTs: string | null;
+      success: boolean | null;
+      actionTs: string | null;
+    }
+  | SlackModalPrivateMetadata;
 
 export async function logMessageToDb(
   databaseMessageEntry: DatabaseMessageEntry
@@ -75,7 +94,7 @@ export async function logMessageToDb(
   const client = await pool.connect();
   try {
     await client.query(
-      'INSERT INTO messages (message, direction, automated, successfully_sent, from_phone_number, user_id, to_phone_number, originating_slack_user_id, slack_channel, slack_parent_message_ts, twilio_message_sid, slack_message_ts, slack_error, twilio_error, twilio_send_timestamp, twilio_receive_timestamp, slack_send_timestamp, slack_receive_timestamp, confirmed_disclaimer, is_demo, last_voter_message_secs_from_epoch, unprocessed_message, slack_retry_num, slack_retry_reason, originating_slack_user_name, entry_point) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26);',
+      'INSERT INTO messages (message, direction, automated, successfully_sent, from_phone_number, user_id, to_phone_number, originating_slack_user_id, slack_channel, slack_parent_message_ts, twilio_message_sid, slack_message_ts, slack_error, twilio_error, twilio_send_timestamp, twilio_receive_timestamp, slack_send_timestamp, slack_receive_timestamp, confirmed_disclaimer, is_demo, last_voter_message_secs_from_epoch, unprocessed_message, slack_retry_num, slack_retry_reason, originating_slack_user_name, entry_point, archived) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27);',
       [
         databaseMessageEntry.message,
         databaseMessageEntry.direction,
@@ -103,6 +122,7 @@ export async function logMessageToDb(
         databaseMessageEntry.slackRetryReason,
         databaseMessageEntry.originatingSlackUserName,
         databaseMessageEntry.entryPoint,
+        databaseMessageEntry.archived,
       ]
     );
 
@@ -177,6 +197,8 @@ export function populateIncomingDbMessageTwilioEntry({
     isDemo: null,
     // To be filled later
     lastVoterMessageSecsFromEpoch: null,
+
+    archived: false,
   };
 }
 
@@ -194,8 +216,8 @@ export function populateIncomingDbMessageSlackEntry({
   unprocessedMessage: string | null;
   originatingSlackUserId: string;
   slackChannel: string;
-  slackParentMessageTs: number;
-  slackMessageTs: number;
+  slackParentMessageTs: string;
+  slackMessageTs: string;
   slackRetryNum?: number;
   slackRetryReason?: string;
   originatingSlackUserName: string;
@@ -242,6 +264,8 @@ export function populateIncomingDbMessageSlackEntry({
     isDemo: null,
     // To be filled later
     lastVoterMessageSecsFromEpoch: null,
+
+    archived: false,
   };
 }
 
@@ -306,6 +330,8 @@ export function populateAutomatedDbMessageEntry(
     confirmedDisclaimer: userInfo.confirmedDisclaimer,
     isDemo: userInfo.isDemo,
     lastVoterMessageSecsFromEpoch: userInfo.lastVoterMessageSecsFromEpoch,
+
+    archived: false,
   };
 }
 
@@ -326,6 +352,7 @@ const MESSAGE_HISTORY_SQL_SCRIPT = `
     originating_slack_user_name
   FROM messages
   WHERE user_id = $1
+    AND NOT archived
     AND (
       CASE
       WHEN twilio_receive_timestamp IS NOT NULL THEN twilio_receive_timestamp
@@ -371,11 +398,12 @@ const LAST_TIMESTAMP_SQL_SCRIPT = `
   FROM messages
   WHERE
     slack_parent_message_ts = $1
+    AND NOT archived
   ORDER BY timestamp DESC
   LIMIT 1;`;
 
 export async function getTimestampOfLastMessageInThread(
-  parentMessageTs: number
+  parentMessageTs: string
 ): Promise<string> {
   logger.info(`ENTERING DBAPIUTIL.getTimestampOfLastMessageInThread`);
   logger.info(
@@ -397,6 +425,68 @@ export async function getTimestampOfLastMessageInThread(
     } else {
       return '1990-01-01 10:00:00.000';
     }
+  } finally {
+    client.release();
+  }
+}
+
+export async function getSlackThreadsForVoter(
+  userId: string,
+  twilioPhoneNumber: string
+): Promise<SlackThreadInfo[] | null> {
+  logger.info(`ENTERING DBAPIUTIL.getSlackThreadsForVoter`);
+
+  const client = await pool.connect();
+
+  try {
+    const result = await client.query(
+      `SELECT slack_channel, slack_parent_message_ts
+        FROM messages 
+        WHERE user_id = $1 
+        AND (to_phone_number = $2 OR from_phone_number = $2)
+        AND slack_parent_message_ts IS NOT NULL
+        GROUP BY slack_parent_message_ts, slack_channel;`,
+      [userId, twilioPhoneNumber]
+    );
+
+    if (result.rows.length > 0) {
+      logger.info(
+        `DBAPIUTIL.getSlackThreadsForVoter: Successfully fetched Slack threads for voter.`
+      );
+      return result.rows.map((row) => {
+        return {
+          slackChannel: row.slack_channel,
+          slackParentMessageTs: row.slack_parent_message_ts,
+        };
+      });
+    } else {
+      return null;
+    }
+  } finally {
+    client.release();
+  }
+}
+
+export async function archiveMessagesForDemoVoter(
+  userId: string,
+  twilioPhoneNumber: string
+): Promise<void> {
+  logger.info(`ENTERING DBAPIUTIL.getSlackThreadsForVoter`);
+
+  const client = await pool.connect();
+
+  try {
+    await client.query(
+      `UPDATE messages
+      SET archived = true
+      WHERE is_demo = true AND user_id = $1
+        AND (to_phone_number = $2 OR from_phone_number = $2);`,
+      [userId, twilioPhoneNumber]
+    );
+
+    logger.info(
+      `DBAPIUTIL.getSlackThreadsForVoter: Successfully fetched Slack threads for voter.`
+    );
   } finally {
     client.release();
   }
@@ -496,6 +586,37 @@ export async function logVolunteerVoterClaimToDb(
 
     logger.info(
       `DBAPIUTIL.logVolunteerVoterClaimToDb: Successfully inserted volunteer voter claim into PostgreSQL database.`
+    );
+  } finally {
+    client.release();
+  }
+}
+
+export async function logCommandToDb(
+  databaseCommandEntry: DatabaseCommandEntry
+): Promise<void> {
+  logger.info(`ENTERING DBAPIUTIL.logCommandToDb`);
+  const client = await pool.connect();
+  try {
+    await client.query(
+      'INSERT INTO commands (command_type, user_id, user_phone_number, twilio_phone_number, originating_slack_user_name, originating_slack_user_id, slack_channel_name, slack_channel_id, slack_parent_message_ts, success, action_ts) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11);',
+      [
+        databaseCommandEntry.commandType,
+        databaseCommandEntry.userId,
+        databaseCommandEntry.userPhoneNumber,
+        databaseCommandEntry.twilioPhoneNumber,
+        databaseCommandEntry.originatingSlackUserName,
+        databaseCommandEntry.originatingSlackUserId,
+        databaseCommandEntry.slackChannelName,
+        databaseCommandEntry.slackChannelId,
+        databaseCommandEntry.slackParentMessageTs,
+        databaseCommandEntry.success,
+        databaseCommandEntry.actionTs,
+      ]
+    );
+
+    logger.info(
+      `DBAPIUTIL.logCommandToDb: Successfully inserted command into PostgreSQL database.`
     );
   } finally {
     client.release();

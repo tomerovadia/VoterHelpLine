@@ -26,7 +26,7 @@ type UserOptions = {
 };
 
 type AdminCommandParams = {
-  commandParentMessageTs: number;
+  commandParentMessageTs: string;
   routingSlackUserName: string;
   previousSlackChannelName: string;
 };
@@ -342,7 +342,7 @@ const postUserMessageHistoryToSlack = async (
     destinationSlackParentMessageTs,
     destinationSlackChannelId,
   }: {
-    destinationSlackParentMessageTs: number;
+    destinationSlackParentMessageTs: string;
     destinationSlackChannelId: string;
   }
 ) => {
@@ -390,7 +390,7 @@ const routeVoterToSlackChannelHelper = async (
   }: {
     destinationSlackChannelName: string;
     destinationSlackChannelId: string;
-    destinationSlackParentMessageTs: number;
+    destinationSlackParentMessageTs: string;
   },
   timestampOfLastMessageInThread?: string
 ) => {
@@ -491,7 +491,7 @@ const routeVoterToSlackChannel = async (
     );
     destinationSlackChannelId = slackChannelIds[destinationSlackChannelName];
     logger.debug(
-      `ROUTER.routeVoterToSlackChannel: Resulting Slack channel ID after Slack conversations.list call: ${destinationSlackChannelId}`
+      `ROUTER.routeVoterToSlackChannel: Resulting Slack channel ID using Slack channel name (${destinationSlackChannelName}) after Slack conversations.list call: ${destinationSlackChannelId}`
     );
   }
 
@@ -1071,8 +1071,8 @@ export type SlackEventRequestBody = {
     type: string;
     hidden: boolean;
     text: string;
-    ts: number;
-    thread_ts: number;
+    ts: string;
+    thread_ts: string;
     user: string;
     channel: string;
   };
