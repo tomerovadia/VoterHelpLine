@@ -15,11 +15,16 @@ import * as LoadBalancer from './load_balancer';
 import * as SlackUtil from './slack_util';
 import * as TwilioUtil from './twilio_util';
 import * as SlackInteractionApiUtil from './slack_interaction_api_util';
+import * as SlackBlockUtil from './slack_block_util';
 import logger from './logger';
 import redisClient from './redis_client';
 import { EntryPoint, Request, UserInfo } from './types';
-import { enqueueBackgroundTask } from './async_jobs';
+import {
+  enqueueBackgroundTask,
+  InteractivityHandlerMetadata,
+} from './async_jobs';
 import { handleTwilioStatusCallback } from './twilio_status_callback_handler';
+import { SlackInteractionEventPayload } from './slack_interaction_handler';
 
 const app = express();
 
@@ -598,9 +603,22 @@ app.post(
       return;
     }
 
-    const payload = JSON.parse(req.body.payload);
+    const payload: SlackInteractionEventPayload = JSON.parse(req.body.payload);
 
-    await enqueueBackgroundTask('slackInteractivityHandler', payload);
+    const metadata: InteractivityHandlerMetadata = {};
+
+    if (payload.type === 'message_action') {
+      // For message actions, we always show a confirmation modal. Because we
+      // have to show this modal within 3 seconds, we immediately make the call
+      // to show a loading state, and then pass the modal ID on to the async
+      // task to update the modal
+      metadata.viewId = await SlackApiUtil.renderModal(
+        payload.trigger_id,
+        SlackBlockUtil.loadingSlackView()
+      );
+    }
+
+    await enqueueBackgroundTask('slackInteractivityHandler', payload, metadata);
 
     // Use res.end instead of res.sendStatus because the latter sends the code as
     // a string in the body, and modal responses require an empty body in some cases.

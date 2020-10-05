@@ -27,7 +27,7 @@
     "start": "node -r source-map-support/register build/server.js",
     "develop": "NODE_ENV=development nodemon --watch ./src --exec 'ts-node' --files ./src/server.ts",
     "heroku-postbuild": "npm install && npm run build",
-    "test": "LOG_LEVEL=info DOTENV_CONFIG_PATH=.env.test NODE_ENV=test node -r dotenv/config ./node_modules/.bin/jest ./src",
+    "test": "LOG_LEVEL=fatal DOTENV_CONFIG_PATH=.env.test NODE_ENV=test node -r dotenv/config ./node_modules/.bin/jest ./src",
     "sls": "serverless",
     "format:check": "prettier --check --ignore-path .gitignore ./src",
     "format:write": "prettier --write --ignore-path .gitignore ./src",

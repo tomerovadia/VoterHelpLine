@@ -355,6 +355,7 @@ export async function receiveResetDemo({
   slackChannelName,
   userPhoneNumber,
   twilioPhoneNumber,
+  viewId,
 }: {
   payload: SlackInteractionEventPayload;
   redisClient: PromisifiedRedisClient;
@@ -362,6 +363,7 @@ export async function receiveResetDemo({
   slackChannelName: string;
   userPhoneNumber: string;
   twilioPhoneNumber: string;
+  viewId: string;
 }): Promise<void> {
   logger.info(`Entering SLACKINTERACTIONHANDLER.receiveResetDemo`);
   const MD5 = new Hashes.MD5();
@@ -434,7 +436,7 @@ export async function receiveResetDemo({
     );
   }
 
-  await SlackApiUtil.renderModal(payload.trigger_id, slackView);
+  await SlackApiUtil.updateModal(viewId, slackView);
 }
 
 // This function receives the confirmation of the resetting of

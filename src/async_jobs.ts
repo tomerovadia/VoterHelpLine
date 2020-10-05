@@ -24,8 +24,11 @@ import { wrapLambdaHandlerForSentry } from './sentry_wrapper';
 import { SlackEventRequestBody } from './router';
 import { UserInfo } from './types';
 
+export type InteractivityHandlerMetadata = { viewId?: string };
+
 async function slackInteractivityHandler(
-  payload: SlackInteractionEventPayload
+  payload: SlackInteractionEventPayload,
+  interactivityMetadata: InteractivityHandlerMetadata
 ) {
   const originatingSlackUserName = await SlackApiUtil.fetchSlackUserName(
     payload.user.id
@@ -92,6 +95,14 @@ async function slackInteractivityHandler(
         logger.info(
           `SERVER POST /slack-interactivity: Determined user interaction is a message shortcut.`
         );
+
+        const { viewId } = interactivityMetadata;
+        if (!viewId) {
+          throw new Error(
+            'slackInteractivityHandler called for message_action without viewId'
+          );
+        }
+
         if (payload.callback_id === 'reset_demo') {
           await SlackInteractionHandler.receiveResetDemo({
             payload,
@@ -100,6 +111,7 @@ async function slackInteractivityHandler(
             slackChannelName: originatingSlackChannelName,
             userPhoneNumber: redisData ? redisData.userPhoneNumber : null,
             twilioPhoneNumber: redisData ? redisData.twilioPhoneNumber : null,
+            viewId,
           });
           return;
         }
