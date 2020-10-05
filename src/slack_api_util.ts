@@ -262,7 +262,7 @@ export async function fetchSlackChannelNamesAndIds(): Promise<SlackChannelNamesA
     const slackChannelNamesAndIds = {} as SlackChannelNamesAndIds;
     for (const idx in response.data.channels) {
       const channel = response.data.channels[idx];
-      slackChannelNamesAndIds[channel.id] = channel.name;
+      slackChannelNamesAndIds[channel.name] = channel.id;
     }
     return slackChannelNamesAndIds;
     // return response.data.messages[0].blocks;
