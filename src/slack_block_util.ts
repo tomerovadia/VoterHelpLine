@@ -1,10 +1,20 @@
 import logger from './logger';
+import { SlackActionId } from './slack_interaction_ids';
 import type { VoterStatus } from './types';
 import { SlackModalPrivateMetadata } from './slack_interaction_handler';
 
 export type SlackBlock = {
   type: string;
   [key: string]: any;
+};
+
+export type SlackOption = {
+  text: {
+    type: 'plain_text' | 'mrkdwn';
+    text: string;
+    emoji: boolean;
+  };
+  value: string;
 };
 
 export type SlackView = {
@@ -84,6 +94,7 @@ const volunteerSelectionPanel: SlackBlock = {
   elements: [
     {
       type: 'users_select',
+      action_id: SlackActionId.VOLUNTEER_UPDATE,
       placeholder: {
         type: 'plain_text',
         text: 'Claim this voter',
@@ -98,6 +109,7 @@ export const voterStatusPanel: SlackBlock = {
   elements: [
     {
       type: 'static_select',
+      action_id: SlackActionId.VOTER_STATUS_DROPDOWN,
       initial_option: {
         text: {
           type: 'plain_text',
@@ -165,6 +177,7 @@ export const voterStatusPanel: SlackBlock = {
         text: 'Voted',
         emoji: true,
       },
+      action_id: SlackActionId.VOTER_STATUS_VOTED,
       value: 'VOTED',
       confirm: {
         title: {
@@ -194,6 +207,7 @@ export const voterStatusPanel: SlackBlock = {
         text: 'Refused',
         emoji: true,
       },
+      action_id: SlackActionId.VOTER_STATUS_REFUSED,
       value: 'REFUSED',
       confirm: {
         title: {
@@ -223,6 +237,7 @@ export const voterStatusPanel: SlackBlock = {
         text: 'Spam',
         emoji: true,
       },
+      action_id: SlackActionId.VOTER_STATUS_SPAM,
       value: 'SPAM',
       confirm: {
         title: {
@@ -348,6 +363,7 @@ export function makeClosedVoterPanelBlocks(
       elements: [
         {
           type: 'button',
+          action_id: SlackActionId.CLOSED_VOTER_PANEL_UNDO,
           style: 'danger',
           text: {
             type: 'plain_text',
@@ -399,34 +415,34 @@ export function replaceVoterPanelBlocks(
 // This function mutates the blocks input.
 export function populateDropdownNewInitialValue(
   blocks: SlackBlock[],
+  actionId: SlackActionId,
   newInitialValue: VoterStatus
-): void {
-  const voterStatusOptions = getVoterStatusOptions();
-  const isVoterStatusOption = Object.keys(voterStatusOptions).includes(
-    newInitialValue
-  );
+): boolean {
   for (const i in blocks) {
     const block = blocks[i];
     if (block.type === 'actions') {
       const elements = block.elements;
       for (const j in elements) {
         const element = elements[j];
-        if (isVoterStatusOption) {
+        if (element.action_id === actionId) {
           if (element.type === 'static_select') {
-            element.initial_option.value = newInitialValue;
-            element.initial_option.text.text =
-              voterStatusOptions[newInitialValue];
-            // Javascript modifies the blocks by reference, so end but don't return anything.
-            return;
+            // Assume new options is already in the list of old options
+            element.initial_option = element.options.find(
+              (o: SlackOption) => o.value === newInitialValue
+            );
+            // Javascript modifies the blocks by reference, return success
+            return true;
           }
-        } else {
           if (element.type === 'users_select') {
             element.initial_user = newInitialValue;
-            // Javascript modifies the blocks by reference, so end but don't return anything.
-            return;
+            // Javascript modifies the blocks by reference, return success
+            return true;
           }
         }
       }
     }
   }
+
+  // If we get here, we were unable to find the element with the specified action ID
+  return false;
 }
