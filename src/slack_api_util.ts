@@ -4,7 +4,7 @@ import * as Sentry from '@sentry/node';
 import * as DbApiUtil from './db_api_util';
 import logger from './logger';
 import { UserInfo } from './types';
-import { SlackBlock } from './slack_block_util';
+import { SlackBlock, SlackView } from './slack_block_util';
 import * as RedisApiUtil from './redis_api_util';
 import { PromisifiedRedisClient } from './redis_client';
 
@@ -262,7 +262,7 @@ export async function fetchSlackChannelNamesAndIds(): Promise<SlackChannelNamesA
     const slackChannelNamesAndIds = {} as SlackChannelNamesAndIds;
     for (const idx in response.data.channels) {
       const channel = response.data.channels[idx];
-      slackChannelNamesAndIds[channel.id] = channel.name;
+      slackChannelNamesAndIds[channel.name] = channel.id;
     }
     return slackChannelNamesAndIds;
     // return response.data.messages[0].blocks;
@@ -312,6 +312,42 @@ export async function addSlackMessageReaction(
   if (!response.data.ok) {
     throw new Error(
       `SLACKAPIUTIL.addSlackMessageReaction: ERROR in adding reaction: ${response.data.error}`
+    );
+  }
+}
+
+export async function renderModal(
+  triggerId: string,
+  view: SlackView
+): Promise<void> {
+  logger.info(`ENTERING SLACKAPIUTIL.renderModal`);
+  const response = await axios.post(
+    'https://slack.com/api/views.open',
+    {
+      'Content-Type': 'application/json',
+      trigger_id: triggerId,
+      view,
+    },
+    {
+      headers: {
+        Authorization: `Bearer ${process.env.SLACK_BOT_ACCESS_TOKEN}`,
+      },
+    }
+  );
+
+  if (response.data.ok) {
+    if (process.env.NODE_ENV !== 'test')
+      logger.info(
+        `SLACKAPIUTIL.renderModal: Successfully rendered modal (callback_id: ${view.callback_id}).`
+      );
+    return;
+  } else {
+    if (process.env.NODE_ENV !== 'test')
+      logger.error(
+        `SLACKAPIUTIL.renderModal: Failed to render modal (callback_id: ${view.callback_id}). Error: ${response.data.error}.`
+      );
+    throw new Error(
+      `SLACKAPIUTIL.renderModal: Failed to render modal (callback_id: ${view.callback_id}). Error: ${response.data.error}.`
     );
   }
 }

@@ -503,7 +503,7 @@ const routeVoterToSlackChannel = async (
     );
     destinationSlackChannelId = slackChannelIds[destinationSlackChannelName];
     logger.debug(
-      `ROUTER.routeVoterToSlackChannel: Resulting Slack channel ID after Slack conversations.list call: ${destinationSlackChannelId}`
+      `ROUTER.routeVoterToSlackChannel: Resulting Slack channel ID using Slack channel name (${destinationSlackChannelName}) after Slack conversations.list call: ${destinationSlackChannelId}`
     );
   }
 

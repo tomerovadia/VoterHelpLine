@@ -42,4 +42,9 @@ export type HistoricalMessage = {
   originating_slack_user_name: string;
 };
 
+export type SlackThreadInfo = {
+  slackParentMessageTs: string;
+  slackChannel: string;
+};
+
 export type Request = express.Request & { rawBody: string };

@@ -19,10 +19,13 @@ redisClient.on('error', function (err) {
 export type PromisifiedRedisClient = typeof redisClient & {
   getAsync(key: string): Promise<string>;
   lrangeAsync(key: string, from: number, to: number): Promise<string[]>;
+  rpushAsync(key: string, from: string[]): Promise<number>;
   setAsync(key: string, value: string | number): Promise<void>;
   hgetallAsync(key: string): Promise<{ [k: string]: string }>;
   hgetAsync(key: string, field: string): Promise<string>;
   hsetAsync(key: string, field: string, value: string | number): Promise<void>;
+  existsAsync(...keys: string[]): Promise<number>;
+  delAsync(...keys: string[]): Promise<number>;
   hdelAsync(key: string, field: string): Promise<number>;
   pingAsync(): Promise<void>;
 };

@@ -1,9 +1,33 @@
 import logger from './logger';
 import type { VoterStatus } from './types';
+import { SlackModalPrivateMetadata } from './slack_interaction_handler';
 
 export type SlackBlock = {
   type: string;
   [key: string]: any;
+};
+
+export type SlackView = {
+  callback_id: string;
+  private_metadata?: string;
+  title: {
+    type: string;
+    text: string;
+  };
+  submit?: {
+    type: string;
+    text: string;
+  };
+  blocks: [
+    {
+      type: string;
+      text: {
+        type: string;
+        text: string;
+      };
+    }
+  ];
+  type: 'modal';
 };
 
 export function getVoterStatusOptions(): { [key in VoterStatus]: string } {
@@ -224,6 +248,58 @@ export const voterStatusPanel: SlackBlock = {
     },
   ],
 };
+
+export function resetConfirmationSlackView(
+  callbackId: string,
+  modalPrivateMetadata: SlackModalPrivateMetadata
+): SlackView {
+  return {
+    callback_id: callbackId,
+    private_metadata: JSON.stringify(modalPrivateMetadata),
+    title: {
+      type: 'plain_text',
+      text: 'Are you sure?',
+    },
+    submit: {
+      type: 'plain_text',
+      text: 'Confirm',
+    },
+    blocks: [
+      {
+        type: 'section',
+        text: {
+          type: 'mrkdwn',
+          text:
+            'Are you sure you want to end your demo conversation with this volunteer?\n\nYou will no longer be able to send messages to or receive messages from them, and they will be treated as a new demo voter the next time they send a text to this phone number.',
+        },
+      },
+    ],
+    type: 'modal',
+  };
+}
+
+export function getErrorSlackView(
+  callbackId: string,
+  errorText: string
+): SlackView {
+  return {
+    callback_id: callbackId,
+    title: {
+      type: 'plain_text',
+      text: 'Oops!',
+    },
+    blocks: [
+      {
+        type: 'section',
+        text: {
+          type: 'mrkdwn',
+          text: errorText,
+        },
+      },
+    ],
+    type: 'modal',
+  };
+}
 
 export function getVoterStatusBlocks(messageText: string): SlackBlock[] {
   return [

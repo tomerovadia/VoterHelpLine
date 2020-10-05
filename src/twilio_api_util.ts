@@ -50,7 +50,7 @@ export async function sendMessage(
       try {
         await DbApiUtil.logMessageToDb(databaseMessageEntry);
       } catch (error) {
-        logger.info(
+        logger.error(
           'TWILIOAPIUTIL.sendMessage: failed to log message send success to DB'
         );
         Sentry.captureException(error);
@@ -80,7 +80,7 @@ export async function sendMessage(
       try {
         await DbApiUtil.logMessageToDb(databaseMessageEntry);
       } catch (error) {
-        logger.info(
+        logger.error(
           'TWILIOAPIUTIL.sendMessage: failed to log message send failure to DB'
         );
         Sentry.captureException(error);

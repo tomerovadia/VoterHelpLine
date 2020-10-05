@@ -8,10 +8,18 @@ import * as RedisApiUtil from './redis_api_util';
 import logger from './logger';
 import { VoterStatus } from './types';
 import { PromisifiedRedisClient } from './redis_client';
+import { UserInfo, SlackThreadInfo } from './types';
 
 export type VoterStatusUpdate = VoterStatus | 'UNDO';
 
-export type SlackEventPayload = {
+export type SlackInteractionEventPayload = {
+  type: string;
+  callback_id: string;
+  trigger_id: string;
+  view: {
+    callback_id: string;
+    private_metadata: string;
+  };
   container: {
     thread_ts: string;
   };
@@ -23,9 +31,11 @@ export type SlackEventPayload = {
     id: string;
   };
   message: {
+    ts: string;
     blocks: SlackBlockUtil.SlackBlock[];
   };
   automatedButtonSelection: boolean | undefined;
+  action_ts: string;
 };
 
 export type SlackSyntheticPayload = {
@@ -45,7 +55,22 @@ export type SlackSyntheticPayload = {
   automatedButtonSelection: boolean | undefined;
 };
 
-type Payload = SlackEventPayload | SlackSyntheticPayload;
+type Payload = SlackInteractionEventPayload | SlackSyntheticPayload;
+
+export type SlackModalPrivateMetadata = {
+  commandType: string;
+  userId: string;
+  userPhoneNumber: string;
+  twilioPhoneNumber: string;
+  slackChannelId: string;
+  slackParentMessageTs: string;
+  originatingSlackUserName: string;
+  originatingSlackUserId: string;
+  slackChannelName: string;
+  actionTs: string;
+  success?: boolean;
+  failureReason?: string;
+};
 
 const getClosedVoterPanelText = (
   selectedVoterStatus: VoterStatusUpdate,
@@ -318,4 +343,194 @@ export async function handleVolunteerUpdate({
     slackParentMessageTs: payload.container.thread_ts,
     newBlocks: payload.message.blocks,
   });
+}
+
+// This function receives the initial request to reset a demo
+// and response by creating a modal populated with data needed
+// to reset the demo if the Slack user confirms.
+export async function receiveResetDemo({
+  payload,
+  redisClient,
+  originatingSlackUserName,
+  slackChannelName,
+  userPhoneNumber,
+  twilioPhoneNumber,
+}: {
+  payload: SlackInteractionEventPayload;
+  redisClient: PromisifiedRedisClient;
+  originatingSlackUserName: string;
+  slackChannelName: string;
+  userPhoneNumber: string;
+  twilioPhoneNumber: string;
+}): Promise<void> {
+  logger.info(`Entering SLACKINTERACTIONHANDLER.receiveResetDemo`);
+  const MD5 = new Hashes.MD5();
+  const userId = MD5.hex(userPhoneNumber);
+
+  const commandType = 'RESET_DEMO';
+  // Ignore Prettier formatting because this object needs to adhere to JSON strigify requirements.
+  // prettier-ignore
+  const modalPrivateMetadata = {
+    "commandType": commandType,
+    "userId": userId,
+    "userPhoneNumber": userPhoneNumber,
+    "twilioPhoneNumber": twilioPhoneNumber,
+    "slackChannelId": payload.channel.id,
+    "slackParentMessageTs": payload.message.ts,
+    "originatingSlackUserName": originatingSlackUserName,
+    "originatingSlackUserId": payload.user.id,
+    "slackChannelName": slackChannelName,
+    "actionTs": payload.action_ts
+  } as SlackModalPrivateMetadata;
+
+  const redisUserInfoKey = `${userId}:${twilioPhoneNumber}`;
+  const userInfo = (await RedisApiUtil.getHash(
+    redisClient,
+    redisUserInfoKey
+  )) as UserInfo;
+
+  if (!userInfo) {
+    modalPrivateMetadata.success = false;
+    modalPrivateMetadata.failureReason = 'no_user_info';
+    await DbApiUtil.logCommandToDb(modalPrivateMetadata);
+    throw new Error(
+      `SLACKINTERACTIONHANDLER.receiveResetDemo: Interaction received for voter who has redisData but not userInfo: active redisData key is ${payload.channel.id}:${payload.message.ts}, userInfo key is ${redisUserInfoKey}.`
+    );
+  }
+
+  let slackView;
+  if (!userInfo.isDemo) {
+    modalPrivateMetadata.success = false;
+    modalPrivateMetadata.failureReason = 'non_demo';
+    await DbApiUtil.logCommandToDb(modalPrivateMetadata);
+    logger.info(
+      `SLACKINTERACTIONHANDLER.receiveResetDemo: Volunteer tried to reset demo on non-demo voter.`
+    );
+    slackView = SlackBlockUtil.getErrorSlackView(
+      'demo_reset_error_not_demo',
+      'This shortcut is strictly for demo conversations only. Please reach out to an admin for assistance.'
+    );
+  } else if (!(payload.channel.id === userInfo.activeChannelId)) {
+    modalPrivateMetadata.success = false;
+    modalPrivateMetadata.failureReason = 'non_active_thread';
+    await DbApiUtil.logCommandToDb(modalPrivateMetadata);
+    logger.info(
+      `SLACKINTERACTIONHANDLER.receiveResetDemo: Volunteer issued reset demo command from #${payload.channel.id} but voter active channel is ${userInfo.activeChannelId}.`
+    );
+    slackView = SlackBlockUtil.getErrorSlackView(
+      'demo_reset_error_not_active_thread',
+      `This voter is no longer active in this thread. Please reach out to the folks at *#${userInfo.activeChannelName}*.`
+    );
+  } else {
+    logger.info(
+      `SLACKINTERACTIONHANDLER.receiveResetDemo: Reset demo command is valid.`
+    );
+
+    // Store the relevant information in the modal so that when the requested action is confirmed
+    // the data needed for the necessary actions is available.
+    slackView = SlackBlockUtil.resetConfirmationSlackView(
+      commandType,
+      modalPrivateMetadata
+    );
+  }
+
+  await SlackApiUtil.renderModal(payload.trigger_id, slackView);
+}
+
+// This function receives the confirmation of the resetting of
+// a voter and does the actual resetting work.
+export async function handleResetDemo(
+  redisClient: PromisifiedRedisClient,
+  modalPrivateMetadata: SlackModalPrivateMetadata
+): Promise<void> {
+  const redisUserInfoKey = `${modalPrivateMetadata.userId}:${modalPrivateMetadata.twilioPhoneNumber}`;
+
+  const slackThreads = (await DbApiUtil.getSlackThreadsForVoter(
+    modalPrivateMetadata.userId,
+    modalPrivateMetadata.twilioPhoneNumber
+  )) as SlackThreadInfo[];
+
+  const redisDatas = slackThreads.map(
+    (row) => `${row.slackChannel}:${row.slackParentMessageTs}`
+  );
+
+  const numKeysPresent = await RedisApiUtil.keysExist(redisClient, [
+    redisUserInfoKey,
+    ...redisDatas,
+  ]);
+
+  // If any key is missing, something is wrong, so log and don't try to delete.
+  // Count = multiple Slack thread lookups + 1 phone number lookup for this user.
+  let redisError = numKeysPresent !== slackThreads.length + 1;
+
+  // If all keys are present, try to delete.
+  if (!redisError) {
+    const numKeysDeleted = await RedisApiUtil.deleteKeys(redisClient, [
+      redisUserInfoKey,
+      ...redisDatas,
+    ]);
+    // If all keys don't delete, something is wrong, so log.
+    redisError = numKeysDeleted !== slackThreads.length + 1;
+  }
+
+  if (redisError) {
+    modalPrivateMetadata.success = false;
+    modalPrivateMetadata.failureReason = 'missing_redis_key';
+    await DbApiUtil.logCommandToDb(modalPrivateMetadata);
+    throw new Error(
+      `SLACKINTERACTIONHANDLER.handleResetDemo: Either the userInfo (${redisUserInfoKey}) or one of the redisData keys (${JSON.stringify(
+        slackThreads
+      )}) for the voter in Redis was not found.`
+    );
+  }
+
+  const timeSinceEpochSecs = Math.round(Date.now() / 1000);
+  // See https://api.slack.com/reference/surfaces/formatting#visual-styles
+  const specialSlackTimestamp = `<!date^${timeSinceEpochSecs}^{date_num} {time_secs}|${new Date()}>`;
+
+  const closedVoterPanelText = `:white_check_mark: This demo conversation was closed by *${modalPrivateMetadata.originatingSlackUserName}* on *${specialSlackTimestamp}*. :white_check_mark:`;
+
+  const closedVoterPanelBlocks = SlackBlockUtil.makeClosedVoterPanelBlocks(
+    closedVoterPanelText,
+    false /* include undo button */
+  );
+
+  const previousParentMessageBlocks = await SlackApiUtil.fetchSlackMessageBlocks(
+    modalPrivateMetadata.slackChannelId,
+    modalPrivateMetadata.slackParentMessageTs
+  );
+
+  logger.info(
+    `SLACKINTERACTIONHANDLER.handleResetDemo: Fetched previousParentMessageBlocks.`
+  );
+
+  if (previousParentMessageBlocks === null) {
+    modalPrivateMetadata.success = false;
+    modalPrivateMetadata.failureReason = 'message_blocks_fetch_failure';
+    await DbApiUtil.logCommandToDb(modalPrivateMetadata);
+    throw new Error(
+      `SLACKINTERACTIONHANDLER.handleResetDemo: Failed to fetch Slack message blocks for channelId (${modalPrivateMetadata.slackChannelId}) and parentMessageTs (${modalPrivateMetadata.slackParentMessageTs}).`
+    );
+  }
+
+  const newParentMessageBlocks = SlackBlockUtil.replaceVoterPanelBlocks(
+    previousParentMessageBlocks,
+    closedVoterPanelBlocks
+  );
+
+  await SlackInteractionApiUtil.replaceSlackMessageBlocks({
+    slackChannelId: modalPrivateMetadata.slackChannelId,
+    slackParentMessageTs: modalPrivateMetadata.slackParentMessageTs,
+    newBlocks: newParentMessageBlocks,
+  });
+
+  await DbApiUtil.archiveMessagesForDemoVoter(
+    modalPrivateMetadata.userId,
+    modalPrivateMetadata.twilioPhoneNumber
+  );
+
+  modalPrivateMetadata.success = true;
+  await DbApiUtil.logCommandToDb(modalPrivateMetadata);
+
+  return;
 }

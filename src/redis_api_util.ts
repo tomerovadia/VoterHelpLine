@@ -85,3 +85,21 @@ export function deleteHashField(
 
   return redisClient.hdelAsync(key, field);
 }
+
+export function keysExist(
+  redisClient: PromisifiedRedisClient,
+  keys: string[]
+): Promise<number> {
+  logger.debug(`ENTERING REDISAPIUTIL.keysExist`);
+
+  return redisClient.existsAsync(...keys);
+}
+
+export function deleteKeys(
+  redisClient: PromisifiedRedisClient,
+  keys: string[]
+): Promise<number> {
+  logger.debug(`ENTERING REDISAPIUTIL.deleteKeys`);
+
+  return redisClient.delAsync(...keys);
+}
