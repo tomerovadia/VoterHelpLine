@@ -11,8 +11,8 @@ CREATE TABLE commands (
 	originating_slack_user_id text,
 	slack_channel_name text,
 	slack_channel_id text,
-	slack_parent_message_ts DOUBLE PRECISION,
-	action_ts DOUBLE PRECISION,
+	slack_parent_message_ts text,
+	action_ts text,
     success boolean
 );
 
