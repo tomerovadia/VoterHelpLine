@@ -2,7 +2,7 @@
 // It is intended for use by developers for set-up, until it is no longer
 // necessary.
 
-import { PromisifiedRedisClient } from '../src/redis_client';
+import { PromisifiedRedisClient } from './redis_client';
 import { getStateConstants } from './state_constants';
 
 // This function establishes initial open pods in Redis,
