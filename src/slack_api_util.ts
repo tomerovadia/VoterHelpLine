@@ -300,7 +300,7 @@ export async function renderModal(
   view: SlackView
 ): Promise<string> {
   logger.info(`ENTERING SLACKAPIUTIL.renderModal`);
-  const response = await slackAPI.post('https://slack.com/api/views.open', {
+  const response = await slackAPI.post('views.open', {
     trigger_id: triggerId,
     view,
   });
@@ -328,7 +328,7 @@ export async function updateModal(
   view: SlackView
 ): Promise<string> {
   logger.info(`ENTERING SLACKAPIUTIL.updateModal`);
-  const response = await slackAPI.post('https://slack.com/api/views.update', {
+  const response = await slackAPI.post('views.update', {
     view_id: viewId,
     view,
   });

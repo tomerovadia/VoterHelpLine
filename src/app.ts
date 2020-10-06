@@ -607,7 +607,10 @@ app.post(
 
     const metadata: InteractivityHandlerMetadata = {};
 
-    if (payload.type === 'message_action') {
+    if (
+      payload.type === 'message_action' &&
+      payload.callback_id === 'reset_demo'
+    ) {
       // For message actions, we always show a confirmation modal. Because we
       // have to show this modal within 3 seconds, we immediately make the call
       // to show a loading state, and then pass the modal ID on to the async

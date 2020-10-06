@@ -253,7 +253,15 @@ export function loadingSlackView(): SlackView {
       type: 'plain_text',
       text: 'Loading...',
     },
-    blocks: [],
+    blocks: [
+      {
+        type: 'section',
+        text: {
+          type: 'mrkdwn',
+          text: 'Loading...',
+        },
+      },
+    ],
     type: 'modal',
   };
 }

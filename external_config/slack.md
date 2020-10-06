@@ -32,6 +32,8 @@
 
 #### Reset Demo
 
+This should be added as a **messages** shortcut.
+
 - **Name:** Reset Demo
 - **Short Description:** Closes this conversation, allowing the volunteer to message the demo line again as a new mock voter.
 - **Callback ID:** reset_demo
