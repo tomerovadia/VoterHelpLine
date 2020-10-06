@@ -355,6 +355,7 @@ export async function receiveResetDemo({
   slackChannelName,
   userPhoneNumber,
   twilioPhoneNumber,
+  viewId,
 }: {
   payload: SlackInteractionEventPayload;
   redisClient: PromisifiedRedisClient;
@@ -362,15 +363,19 @@ export async function receiveResetDemo({
   slackChannelName: string;
   userPhoneNumber: string;
   twilioPhoneNumber: string;
+  viewId: string;
 }): Promise<void> {
   logger.info(`Entering SLACKINTERACTIONHANDLER.receiveResetDemo`);
-  const MD5 = new Hashes.MD5();
-  const userId = MD5.hex(userPhoneNumber);
+  let slackView;
 
-  const commandType = 'RESET_DEMO';
-  // Ignore Prettier formatting because this object needs to adhere to JSON strigify requirements.
-  // prettier-ignore
-  const modalPrivateMetadata = {
+  try {
+    const MD5 = new Hashes.MD5();
+    const userId = MD5.hex(userPhoneNumber);
+
+    const commandType = 'RESET_DEMO';
+    // Ignore Prettier formatting because this object needs to adhere to JSON strigify requirements.
+    // prettier-ignore
+    const modalPrivateMetadata = {
     "commandType": commandType,
     "userId": userId,
     "userPhoneNumber": userPhoneNumber,
@@ -383,58 +388,69 @@ export async function receiveResetDemo({
     "actionTs": payload.action_ts
   } as SlackModalPrivateMetadata;
 
-  const redisUserInfoKey = `${userId}:${twilioPhoneNumber}`;
-  const userInfo = (await RedisApiUtil.getHash(
-    redisClient,
-    redisUserInfoKey
-  )) as UserInfo;
+    const redisUserInfoKey = `${userId}:${twilioPhoneNumber}`;
+    const userInfo = (await RedisApiUtil.getHash(
+      redisClient,
+      redisUserInfoKey
+    )) as UserInfo;
 
-  if (!userInfo) {
-    modalPrivateMetadata.success = false;
-    modalPrivateMetadata.failureReason = 'no_user_info';
-    await DbApiUtil.logCommandToDb(modalPrivateMetadata);
-    throw new Error(
-      `SLACKINTERACTIONHANDLER.receiveResetDemo: Interaction received for voter who has redisData but not userInfo: active redisData key is ${payload.channel.id}:${payload.message.ts}, userInfo key is ${redisUserInfoKey}.`
+    if (!userInfo) {
+      modalPrivateMetadata.success = false;
+      modalPrivateMetadata.failureReason = 'no_user_info';
+      await DbApiUtil.logCommandToDb(modalPrivateMetadata);
+      throw new Error(
+        `SLACKINTERACTIONHANDLER.receiveResetDemo: Interaction received for voter who has redisData but not userInfo: active redisData key is ${payload.channel.id}:${payload.message.ts}, userInfo key is ${redisUserInfoKey}.`
+      );
+    }
+
+    if (!userInfo.isDemo) {
+      modalPrivateMetadata.success = false;
+      modalPrivateMetadata.failureReason = 'non_demo';
+      await DbApiUtil.logCommandToDb(modalPrivateMetadata);
+      logger.info(
+        `SLACKINTERACTIONHANDLER.receiveResetDemo: Volunteer tried to reset demo on non-demo voter.`
+      );
+      slackView = SlackBlockUtil.getErrorSlackView(
+        'demo_reset_error_not_demo',
+        'This shortcut is strictly for demo conversations only. Please reach out to an admin for assistance.'
+      );
+    } else if (!(payload.channel.id === userInfo.activeChannelId)) {
+      modalPrivateMetadata.success = false;
+      modalPrivateMetadata.failureReason = 'non_active_thread';
+      await DbApiUtil.logCommandToDb(modalPrivateMetadata);
+      logger.info(
+        `SLACKINTERACTIONHANDLER.receiveResetDemo: Volunteer issued reset demo command from #${payload.channel.id} but voter active channel is ${userInfo.activeChannelId}.`
+      );
+      slackView = SlackBlockUtil.getErrorSlackView(
+        'demo_reset_error_not_active_thread',
+        `This voter is no longer active in this thread. Please reach out to the folks at *#${userInfo.activeChannelName}*.`
+      );
+    } else {
+      logger.info(
+        `SLACKINTERACTIONHANDLER.receiveResetDemo: Reset demo command is valid.`
+      );
+
+      // Store the relevant information in the modal so that when the requested action is confirmed
+      // the data needed for the necessary actions is available.
+      slackView = SlackBlockUtil.resetConfirmationSlackView(
+        commandType,
+        modalPrivateMetadata
+      );
+    }
+
+    await SlackApiUtil.updateModal(viewId, slackView);
+  } catch (e) {
+    // Update the modal to say that there was an error, then re-throw the
+    // error so it ends up in Sentry / the logs
+    await SlackApiUtil.updateModal(
+      viewId,
+      SlackBlockUtil.getErrorSlackView(
+        'internal_server_error',
+        'Sorry, something went wrong. Please try again.'
+      )
     );
+    throw e;
   }
-
-  let slackView;
-  if (!userInfo.isDemo) {
-    modalPrivateMetadata.success = false;
-    modalPrivateMetadata.failureReason = 'non_demo';
-    await DbApiUtil.logCommandToDb(modalPrivateMetadata);
-    logger.info(
-      `SLACKINTERACTIONHANDLER.receiveResetDemo: Volunteer tried to reset demo on non-demo voter.`
-    );
-    slackView = SlackBlockUtil.getErrorSlackView(
-      'demo_reset_error_not_demo',
-      'This shortcut is strictly for demo conversations only. Please reach out to an admin for assistance.'
-    );
-  } else if (!(payload.channel.id === userInfo.activeChannelId)) {
-    modalPrivateMetadata.success = false;
-    modalPrivateMetadata.failureReason = 'non_active_thread';
-    await DbApiUtil.logCommandToDb(modalPrivateMetadata);
-    logger.info(
-      `SLACKINTERACTIONHANDLER.receiveResetDemo: Volunteer issued reset demo command from #${payload.channel.id} but voter active channel is ${userInfo.activeChannelId}.`
-    );
-    slackView = SlackBlockUtil.getErrorSlackView(
-      'demo_reset_error_not_active_thread',
-      `This voter is no longer active in this thread. Please reach out to the folks at *#${userInfo.activeChannelName}*.`
-    );
-  } else {
-    logger.info(
-      `SLACKINTERACTIONHANDLER.receiveResetDemo: Reset demo command is valid.`
-    );
-
-    // Store the relevant information in the modal so that when the requested action is confirmed
-    // the data needed for the necessary actions is available.
-    slackView = SlackBlockUtil.resetConfirmationSlackView(
-      commandType,
-      modalPrivateMetadata
-    );
-  }
-
-  await SlackApiUtil.renderModal(payload.trigger_id, slackView);
 }
 
 // This function receives the confirmation of the resetting of

@@ -8,7 +8,7 @@ export type SlackBlock = {
 };
 
 export type SlackView = {
-  callback_id: string;
+  callback_id?: string;
   private_metadata?: string;
   title: {
     type: string;
@@ -18,15 +18,13 @@ export type SlackView = {
     type: string;
     text: string;
   };
-  blocks: [
-    {
+  blocks: {
+    type: string;
+    text: {
       type: string;
-      text: {
-        type: string;
-        text: string;
-      };
-    }
-  ];
+      text: string;
+    };
+  }[];
   type: 'modal';
 };
 
@@ -248,6 +246,25 @@ export const voterStatusPanel: SlackBlock = {
     },
   ],
 };
+
+export function loadingSlackView(): SlackView {
+  return {
+    title: {
+      type: 'plain_text',
+      text: 'Loading...',
+    },
+    blocks: [
+      {
+        type: 'section',
+        text: {
+          type: 'mrkdwn',
+          text: 'Loading...',
+        },
+      },
+    ],
+    type: 'modal',
+  };
+}
 
 export function resetConfirmationSlackView(
   callbackId: string,

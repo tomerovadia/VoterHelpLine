@@ -8,6 +8,14 @@ import { SlackBlock, SlackView } from './slack_block_util';
 import * as RedisApiUtil from './redis_api_util';
 import { PromisifiedRedisClient } from './redis_client';
 
+const slackAPI = axios.create({
+  baseURL: 'https://slack.com/api/',
+});
+slackAPI.defaults.headers.post['Content-Type'] = 'application/json';
+slackAPI.defaults.headers.post[
+  'Authorization'
+] = `Bearer ${process.env.SLACK_BOT_ACCESS_TOKEN}`;
+
 type SlackSendMessageResponse = {
   data: {
     channel: string;
@@ -54,22 +62,13 @@ export async function sendMessage(
   }
 
   try {
-    const response = await axios.post(
-      'https://slack.com/api/chat.postMessage',
-      {
-        'Content-Type': 'application/json',
-        channel: options.channel,
-        text: message,
-        token: process.env.SLACK_BOT_ACCESS_TOKEN,
-        thread_ts: options.parentMessageTs,
-        blocks: options.blocks,
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${process.env.SLACK_BOT_ACCESS_TOKEN}`,
-        },
-      }
-    );
+    const response = await slackAPI.post('chat.postMessage', {
+      channel: options.channel,
+      text: message,
+      token: process.env.SLACK_BOT_ACCESS_TOKEN,
+      thread_ts: options.parentMessageTs,
+      blocks: options.blocks,
+    });
 
     if (!response.data.ok) {
       logger.error(
@@ -162,25 +161,22 @@ export function copyUserInfoToDbMessageEntry(
 export async function fetchSlackChannelName(
   channelId: string
 ): Promise<string | null> {
-  const response = await axios.get('https://slack.com/api/conversations.info', {
+  const response = await slackAPI.get('conversations.info', {
     params: {
-      'Content-Type': 'application/json',
       channel: channelId,
       token: process.env.SLACK_BOT_ACCESS_TOKEN,
     },
   });
 
   if (response.data.ok) {
-    if (process.env.NODE_ENV !== 'test')
-      logger.info(
-        `SLACKAPIUTIL.fetchSlackChannelName: Successfully revealed Slack channel name (${channelId} -> ${response.data.channel.name})`
-      );
+    logger.info(
+      `SLACKAPIUTIL.fetchSlackChannelName: Successfully revealed Slack channel name (${channelId} -> ${response.data.channel.name})`
+    );
     return response.data.channel.name;
   } else {
-    if (process.env.NODE_ENV !== 'test')
-      logger.error(
-        `SLACKAPIUTIL.fetchSlackChannelName: Failed to reveal Slack channel name (${channelId}). Error: ${response.data.error}.`
-      );
+    logger.error(
+      `SLACKAPIUTIL.fetchSlackChannelName: Failed to reveal Slack channel name (${channelId}). Error: ${response.data.error}.`
+    );
     return null;
   }
 }
@@ -188,25 +184,22 @@ export async function fetchSlackChannelName(
 export async function fetchSlackUserName(
   userId: string
 ): Promise<string | null> {
-  const response = await axios.get('https://slack.com/api/users.info', {
+  const response = await slackAPI.get('users.info', {
     params: {
-      'Content-Type': 'application/json',
       user: userId,
       token: process.env.SLACK_BOT_ACCESS_TOKEN,
     },
   });
 
   if (response.data.ok) {
-    if (process.env.NODE_ENV !== 'test')
-      logger.info(
-        `SLACKAPIUTIL.fetchSlackUserName: Successfully revealed Slack user name (${userId} -> ${response.data.user.real_name})`
-      );
+    logger.info(
+      `SLACKAPIUTIL.fetchSlackUserName: Successfully revealed Slack user name (${userId} -> ${response.data.user.real_name})`
+    );
     return response.data.user.real_name;
   } else {
-    if (process.env.NODE_ENV !== 'test')
-      logger.error(
-        `SLACKAPIUTIL.fetchSlackUserName: Failed to reveal Slack user name (${userId}). Error: ${response.data.error}.`
-      );
+    logger.error(
+      `SLACKAPIUTIL.fetchSlackUserName: Failed to reveal Slack user name (${userId}). Error: ${response.data.error}.`
+    );
     return null;
   }
 }
@@ -216,49 +209,41 @@ export async function fetchSlackMessageBlocks(
   channelId: string,
   messageTs: string
 ): Promise<SlackBlock[] | null> {
-  const response = await axios.get(
-    'https://slack.com/api/conversations.history',
-    {
-      params: {
-        'Content-Type': 'application/json',
-        token: process.env.SLACK_BOT_ACCESS_TOKEN,
-        channel: channelId,
-        latest: messageTs,
-        inclusive: true,
-      },
-    }
-  );
+  const response = await slackAPI.get('conversations.history', {
+    params: {
+      token: process.env.SLACK_BOT_ACCESS_TOKEN,
+      channel: channelId,
+      latest: messageTs,
+      inclusive: true,
+    },
+  });
 
   if (response.data.ok) {
-    if (process.env.NODE_ENV !== 'test')
-      logger.info(
-        `SLACKAPIUTIL.fetchSlackMessageFirstBlockText: Successfully revealed Slack message text (${messageTs} -> ${response.data.messages[0].blocks[0].text.text})`
-      );
+    logger.info(
+      `SLACKAPIUTIL.fetchSlackMessageFirstBlockText: Successfully revealed Slack message text (${messageTs} -> ${response.data.messages[0].blocks[0].text.text})`
+    );
     return response.data.messages[0].blocks;
   } else {
-    if (process.env.NODE_ENV !== 'test')
-      logger.error(
-        `SLACKAPIUTIL.fetchSlackMessageFirstBlockText: Failed to reveal Slack message text (${messageTs}). Error: ${response.data.error}.`
-      );
+    logger.error(
+      `SLACKAPIUTIL.fetchSlackMessageFirstBlockText: Failed to reveal Slack message text (${messageTs}). Error: ${response.data.error}.`
+    );
     return null;
   }
 }
 
 export async function fetchSlackChannelNamesAndIds(): Promise<SlackChannelNamesAndIds | null> {
   logger.info(`ENTERING SLACKAPIUTIL.fetchSlackChannelNamesAndIds`);
-  const response = await axios.get('https://slack.com/api/conversations.list', {
+  const response = await slackAPI.get('conversations.list', {
     params: {
-      'Content-Type': 'application/json',
       token: process.env.SLACK_BOT_ACCESS_TOKEN,
       types: 'private_channel',
     },
   });
 
   if (response.data.ok) {
-    if (process.env.NODE_ENV !== 'test')
-      logger.info(
-        `SLACKAPIUTIL.fetchSlackChannelNamesAndIds: Successfully fetched Slack channel names and IDs.`
-      );
+    logger.info(
+      `SLACKAPIUTIL.fetchSlackChannelNamesAndIds: Successfully fetched Slack channel names and IDs.`
+    );
     const slackChannelNamesAndIds = {} as SlackChannelNamesAndIds;
     for (const idx in response.data.channels) {
       const channel = response.data.channels[idx];
@@ -267,10 +252,9 @@ export async function fetchSlackChannelNamesAndIds(): Promise<SlackChannelNamesA
     return slackChannelNamesAndIds;
     // return response.data.messages[0].blocks;
   } else {
-    if (process.env.NODE_ENV !== 'test')
-      logger.error(
-        `SLACKAPIUTIL.fetchSlackChannelNamesAndIds: ERROR fetching Slack channel names and IDs. Error: ${response.data.error}.`
-      );
+    logger.error(
+      `SLACKAPIUTIL.fetchSlackChannelNamesAndIds: ERROR fetching Slack channel names and IDs. Error: ${response.data.error}.`
+    );
     return null;
   }
 }
@@ -295,19 +279,11 @@ export async function addSlackMessageReaction(
   messageTs: string,
   reaction: string
 ): Promise<void> {
-  const response = await axios.post(
-    'https://slack.com/api/reactions.add',
-    {
-      channel: messageChannel,
-      timestamp: messageTs,
-      name: reaction,
-    },
-    {
-      headers: {
-        Authorization: `Bearer ${process.env.SLACK_BOT_ACCESS_TOKEN}`,
-      },
-    }
-  );
+  const response = await slackAPI.post('reactions.add', {
+    channel: messageChannel,
+    timestamp: messageTs,
+    name: reaction,
+  });
 
   if (!response.data.ok) {
     throw new Error(
@@ -316,38 +292,58 @@ export async function addSlackMessageReaction(
   }
 }
 
+/**
+ * Renders a modal in slack and returns the modal ID
+ */
 export async function renderModal(
   triggerId: string,
   view: SlackView
-): Promise<void> {
+): Promise<string> {
   logger.info(`ENTERING SLACKAPIUTIL.renderModal`);
-  const response = await axios.post(
-    'https://slack.com/api/views.open',
-    {
-      'Content-Type': 'application/json',
-      trigger_id: triggerId,
-      view,
-    },
-    {
-      headers: {
-        Authorization: `Bearer ${process.env.SLACK_BOT_ACCESS_TOKEN}`,
-      },
-    }
-  );
+  const response = await slackAPI.post('views.open', {
+    trigger_id: triggerId,
+    view,
+  });
 
   if (response.data.ok) {
-    if (process.env.NODE_ENV !== 'test')
-      logger.info(
-        `SLACKAPIUTIL.renderModal: Successfully rendered modal (callback_id: ${view.callback_id}).`
-      );
-    return;
+    logger.info(
+      `SLACKAPIUTIL.renderModal: Successfully rendered modal (callback_id: ${view.callback_id}).`
+    );
+    return response.data.view.id;
   } else {
-    if (process.env.NODE_ENV !== 'test')
-      logger.error(
-        `SLACKAPIUTIL.renderModal: Failed to render modal (callback_id: ${view.callback_id}). Error: ${response.data.error}.`
-      );
+    logger.error(
+      `SLACKAPIUTIL.renderModal: Failed to render modal (callback_id: ${view.callback_id}). Error: ${response.data.error}.`
+    );
     throw new Error(
       `SLACKAPIUTIL.renderModal: Failed to render modal (callback_id: ${view.callback_id}). Error: ${response.data.error}.`
+    );
+  }
+}
+
+/**
+ * Updates a modal in slack given the modal ID from renderModal
+ */
+export async function updateModal(
+  viewId: string,
+  view: SlackView
+): Promise<string> {
+  logger.info(`ENTERING SLACKAPIUTIL.updateModal`);
+  const response = await slackAPI.post('views.update', {
+    view_id: viewId,
+    view,
+  });
+
+  if (response.data.ok) {
+    logger.info(
+      `SLACKAPIUTIL.updateModal: Successfully updated modal (callback_id: ${view.callback_id}).`
+    );
+    return response.data.view.id;
+  } else {
+    logger.error(
+      `SLACKAPIUTIL.updateModal: Failed to update modal (callback_id: ${view.callback_id}). Error: ${response.data.error}.`
+    );
+    throw new Error(
+      `SLACKAPIUTIL.updateModal: Failed to update modal (callback_id: ${view.callback_id}). Error: ${response.data.error}.`
     );
   }
 }
