@@ -1,3 +1,5 @@
+import { SlackActionId } from '../slack_interaction_ids';
+
 // Legacy, pre-action ID voter status message object
 export const makeVoterStatusMessageWithoutActionIds = () => ({
   bot_id: 'B01BX6Q5LQ2',
@@ -209,10 +211,13 @@ export const makeVoterStatusMessageWithoutActionIds = () => ({
 // Voter status message object with action IDs
 export const makeVoterStatusMessageWithActionIds = () => {
   const message = makeVoterStatusMessageWithoutActionIds();
-  message.blocks[1].elements[0].action_id = 'VOLUNTEER_UPDATE';
-  message.blocks[2].elements[0].action_id = 'VOTER_STATUS_DROPDOWN';
-  message.blocks[2].elements[1].action_id = 'VOTER_STATUS_VOTED';
-  message.blocks[2].elements[2].action_id = 'VOTER_STATUS_REFUSED';
-  message.blocks[2].elements[3].action_id = 'VOTER_STATUS_SPAM';
+  message.blocks[1].elements[0].action_id = SlackActionId.VOLUNTEER_DROPDOWN;
+  message.blocks[2].elements[0].action_id = SlackActionId.VOTER_STATUS_DROPDOWN;
+  message.blocks[2].elements[1].action_id =
+    SlackActionId.VOTER_STATUS_VOTED_BUTTON;
+  message.blocks[2].elements[2].action_id =
+    SlackActionId.VOTER_STATUS_REFUSED_BUTTON;
+  message.blocks[2].elements[3].action_id =
+    SlackActionId.VOTER_STATUS_SPAM_BUTTON;
   return message;
 };

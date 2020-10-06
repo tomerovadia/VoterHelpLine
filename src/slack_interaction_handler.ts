@@ -347,12 +347,12 @@ export async function handleVolunteerUpdate({
       payload.message.blocks,
       payload.actions
         ? payload.actions[0].action_id
-        : SlackActionId.VOLUNTEER_UPDATE,
+        : SlackActionId.VOLUNTEER_DROPDOWN,
       payload.actions ? payload.actions[0].selected_user : null
     )
   ) {
     logger.error(
-      'SLACKINTERACTIONHANDLER.handleVoterStatusUpdate: Error updating VOLUNTEER_UPDATE'
+      'SLACKINTERACTIONHANDLER.handleVoterStatusUpdate: Error updating VOLUNTEER_DROPDOWN'
     );
   }
 

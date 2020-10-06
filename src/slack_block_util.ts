@@ -94,7 +94,7 @@ const volunteerSelectionPanel: SlackBlock = {
   elements: [
     {
       type: 'users_select',
-      action_id: SlackActionId.VOLUNTEER_UPDATE,
+      action_id: SlackActionId.VOLUNTEER_DROPDOWN,
       placeholder: {
         type: 'plain_text',
         text: 'Claim this voter',
@@ -177,7 +177,7 @@ export const voterStatusPanel: SlackBlock = {
         text: 'Voted',
         emoji: true,
       },
-      action_id: SlackActionId.VOTER_STATUS_VOTED,
+      action_id: SlackActionId.VOTER_STATUS_VOTED_BUTTON,
       value: 'VOTED',
       confirm: {
         title: {
@@ -207,7 +207,7 @@ export const voterStatusPanel: SlackBlock = {
         text: 'Refused',
         emoji: true,
       },
-      action_id: SlackActionId.VOTER_STATUS_REFUSED,
+      action_id: SlackActionId.VOTER_STATUS_REFUSED_BUTTON,
       value: 'REFUSED',
       confirm: {
         title: {
@@ -237,7 +237,7 @@ export const voterStatusPanel: SlackBlock = {
         text: 'Spam',
         emoji: true,
       },
-      action_id: SlackActionId.VOTER_STATUS_SPAM,
+      action_id: SlackActionId.VOTER_STATUS_SPAM_BUTTON,
       value: 'SPAM',
       confirm: {
         title: {
@@ -363,7 +363,7 @@ export function makeClosedVoterPanelBlocks(
       elements: [
         {
           type: 'button',
-          action_id: SlackActionId.CLOSED_VOTER_PANEL_UNDO,
+          action_id: SlackActionId.CLOSED_VOTER_PANEL_UNDO_BUTTON,
           style: 'danger',
           text: {
             type: 'plain_text',
