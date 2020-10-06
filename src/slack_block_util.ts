@@ -427,9 +427,17 @@ export function populateDropdownNewInitialValue(
         if (element.action_id === actionId) {
           if (element.type === 'static_select') {
             // Assume new options is already in the list of old options
-            element.initial_option = element.options.find(
+            const newOption = element.options.find(
               (o: SlackOption) => o.value === newInitialValue
             );
+            if (!newOption) {
+              logger.error(
+                `Option with value ${newInitialValue} was not found`
+              );
+              return false;
+            }
+
+            element.initial_option = newOption;
             // Javascript modifies the blocks by reference, return success
             return true;
           }
