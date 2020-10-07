@@ -50,7 +50,7 @@ async function slackInteractivityHandler(
     const redisHashKey = `${payload.channel.id}:${payload.message.ts}`;
     const redisData = await RedisApiUtil.getHash(redisClient, redisHashKey);
 
-    // Excempt message_action, which will be handled later by updating the Slack user's modal.
+    // Exempt message_action, which will be handled later by updating the Slack user's modal.
     if (!(payload.type === 'message_action')) {
       if (!originatingSlackChannelName) {
         throw new Error(
@@ -128,15 +128,15 @@ async function slackInteractivityHandler(
 
         if (!originatingSlackChannelName || !redisData) {
           modalPrivateMetadata.success = false;
-          modalPrivateMetadata.failureReason = 'not_active_voter_parent_thread';
+          modalPrivateMetadata.failureReason = 'invalid_shortcut_use';
           await DbApiUtil.logCommandToDb(modalPrivateMetadata);
           const slackView = SlackBlockUtil.getErrorSlackView(
             'not_active_voter_parent_thread',
-            'The Reset Demo shortcut is not valid on this message. Perhaps the voter has already been reset? Or this is not the first message in their thread?'
+            'This shortcut is not valid on this message.'
           );
           await SlackApiUtil.updateModal(viewId, slackView);
           logger.info(
-            `SLACKINTERACTIONHANDLER.receiveResetDemo: Volunteer tried to reset demo on an invalid Slack message.`
+            `SLACKINTERACTIONHANDLER.receiveResetDemo: Volunteer used a shortcut on an invalid message.`
           );
           return;
         }
