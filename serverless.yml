@@ -49,7 +49,7 @@ provider:
     LOG_FORMAT: json
 
   # Memory allocated to each lambda function
-  memorySize: 512
+  memorySize: 1024
 
   # Allow the app server to invoke the background worker
   iamRoleStatements:
@@ -113,6 +113,12 @@ custom:
     staging: 50
     prod: 500
 
+  # Provisioned concurrency for the app -- Slack requires responses in 3 seconds so cold starts
+  # can cause timeouts.
+  provisionedConcurrency:
+    staging: 2
+    prod: 25
+
 functions:
   app:
     handler: src/server_lambda.handler
@@ -120,6 +126,8 @@ functions:
       - http: ANY /
       - http: 'ANY {proxy+}'
     reservedConcurrency: ${self:custom.reservedConcurrency.${self:custom.stage}}
+    provisionedConcurrency: ${self:custom.provisionedConcurrency.${self:custom.stage}}
   worker:
     handler: src/async_jobs.backgroundLambdaHandler
     reservedConcurrency: ${self:custom.reservedConcurrency.${self:custom.stage}}
+    provisionedConcurrency: ${self:custom.provisionedConcurrency.${self:custom.stage}}
