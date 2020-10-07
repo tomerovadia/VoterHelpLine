@@ -4,6 +4,7 @@ import * as SlackApiUtil from './slack_api_util';
 import * as LoadBalancer from './load_balancer';
 import * as SlackBlockUtil from './slack_block_util';
 import * as SlackInteractionApiUtil from './slack_interaction_api_util';
+import { SlackActionId } from './slack_interaction_ids';
 import * as RedisApiUtil from './redis_api_util';
 import logger from './logger';
 import { VoterStatus } from './types';
@@ -222,10 +223,19 @@ export async function handleVoterStatusUpdate({
     } else {
       // Take the blocks and replace the initial_option with the new status, so that
       // even when Slack is refreshed this new status is shown.
-      SlackBlockUtil.populateDropdownNewInitialValue(
-        payload.message.blocks,
-        selectedVoterStatus as VoterStatus
-      );
+      if (
+        !SlackBlockUtil.populateDropdownNewInitialValue(
+          payload.message.blocks,
+          payload.actions
+            ? payload.actions[0].action_id
+            : SlackActionId.VOTER_STATUS_DROPDOWN,
+          selectedVoterStatus as VoterStatus
+        )
+      ) {
+        logger.error(
+          'SLACKINTERACTIONHANDLER.handleVoterStatusUpdate: Error updating VOTER_STATUS_DROPDOWN'
+        );
+      }
 
       // Replace the entire block so that the initial option change persists.
       await SlackInteractionApiUtil.replaceSlackMessageBlocks({
@@ -332,10 +342,19 @@ export async function handleVolunteerUpdate({
 
   // Take the blocks and replace the initial_user with the new user, so that
   // even when Slack is refreshed this new status is shown.
-  SlackBlockUtil.populateDropdownNewInitialValue(
-    payload.message.blocks,
-    payload.actions ? payload.actions[0].selected_user : null
-  );
+  if (
+    !SlackBlockUtil.populateDropdownNewInitialValue(
+      payload.message.blocks,
+      payload.actions
+        ? payload.actions[0].action_id
+        : SlackActionId.VOLUNTEER_DROPDOWN,
+      payload.actions ? payload.actions[0].selected_user : null
+    )
+  ) {
+    logger.error(
+      'SLACKINTERACTIONHANDLER.handleVoterStatusUpdate: Error updating VOLUNTEER_DROPDOWN'
+    );
+  }
 
   // Replace the entire block so that the initial user change persists.
   await SlackInteractionApiUtil.replaceSlackMessageBlocks({
