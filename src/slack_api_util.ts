@@ -174,7 +174,7 @@ export async function fetchSlackChannelName(
     );
     return response.data.channel.name;
   } else {
-    logger.error(
+    logger.debug(
       `SLACKAPIUTIL.fetchSlackChannelName: Failed to reveal Slack channel name (${channelId}). Error: ${response.data.error}.`
     );
     return null;
