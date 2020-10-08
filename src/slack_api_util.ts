@@ -212,9 +212,7 @@ export async function fetchSlackUserName(
     logger.error(
       `SLACKAPIUTIL.fetchSlackUserName: Failed to reveal Slack user name (${userId}). Error: response.data: ${JSON.stringify(
         response.data
-      )} data.response_metadata: ${JSON.stringify(
-        response.data.response_metadata
-      )}.`
+      )}`
     );
     return null;
   }
@@ -271,9 +269,7 @@ export async function fetchSlackChannelNamesAndIds(): Promise<SlackChannelNamesA
     logger.error(
       `SLACKAPIUTIL.fetchSlackChannelNamesAndIds: ERROR fetching Slack channel names and IDs. Error: response.data: ${JSON.stringify(
         response.data
-      )} data.response_metadata: ${JSON.stringify(
-        response.data.response_metadata
-      )}.`
+      )}`
     );
     return null;
   }
@@ -334,20 +330,12 @@ export async function renderModal(
     logger.error(
       `SLACKAPIUTIL.renderModal: Failed to render modal (callback_id: ${
         view.callback_id
-      }). Error: response.data: ${JSON.stringify(
-        response.data
-      )} data.response_metadata: ${JSON.stringify(
-        response.data.response_metadata
-      )}.`
+      }). Error: response.data: ${JSON.stringify(response.data)}`
     );
     throw new Error(
       `SLACKAPIUTIL.renderModal: Failed to render modal (callback_id: ${
         view.callback_id
-      }). Error: response.data: ${JSON.stringify(
-        response.data
-      )} data.response_metadata: ${JSON.stringify(
-        response.data.response_metadata
-      )}.`
+      }). Error: response.data: ${JSON.stringify(response.data)}`
     );
   }
 }
@@ -374,20 +362,12 @@ export async function updateModal(
     logger.error(
       `SLACKAPIUTIL.updateModal: Failed to update modal (callback_id: ${
         view.callback_id
-      }). response.data: ${JSON.stringify(
-        response.data
-      )} data.response_metadata: ${JSON.stringify(
-        response.data.response_metadata
-      )}.`
+      }). response.data: ${JSON.stringify(response.data)}`
     );
     throw new Error(
       `SLACKAPIUTIL.updateModal: Failed to update modal (callback_id: ${
         view.callback_id
-      }). response.data: ${JSON.stringify(
-        response.data
-      )} data.response_metadata: ${JSON.stringify(
-        response.data.response_metadata
-      )}.`
+      }). response.data: ${JSON.stringify(response.data)}`
     );
   }
 }
