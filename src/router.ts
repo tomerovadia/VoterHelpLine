@@ -136,28 +136,6 @@ const introduceNewVoterToSlackChannel = async (
     `ROUTER.introduceNewVoterToSlackChannel: Updating lastVoterMessageSecsFromEpoch to ${userInfo.lastVoterMessageSecsFromEpoch}`
   );
 
-  let messageToVoter;
-  if (process.env.CLIENT_ORGANIZATION === 'VOTE_AMERICA') {
-    messageToVoter = MessageConstants.STATE_QUESTION();
-  } else {
-    messageToVoter = MessageConstants.WELCOME_VOTER();
-  }
-  if (entryPoint === LoadBalancer.PULL_ENTRY_POINT) {
-    logger.debug(
-      `ROUTER.introduceNewVoterToSlackChannel: Entry point is PULL, so sending automated welcome to voter.`
-    );
-    // Welcome the voter
-    await TwilioApiUtil.sendMessage(
-      messageToVoter,
-      {
-        userPhoneNumber: userInfo.userPhoneNumber,
-        twilioPhoneNumber,
-        twilioCallbackURL,
-      },
-      DbApiUtil.populateAutomatedDbMessageEntry(userInfo)
-    );
-  }
-
   logger.debug(
     `ROUTER.introduceNewVoterToSlackChannel: Announcing new voter via new thread in ${slackChannelName}.`
   );
@@ -171,8 +149,42 @@ const introduceNewVoterToSlackChannel = async (
     blocks: slackBlocks,
   });
 
-  if (!response) {
-    throw new Error('Could not send introduction slack message');
+  let messageToVoter;
+  if (process.env.CLIENT_ORGANIZATION === 'VOTE_AMERICA') {
+    messageToVoter = MessageConstants.STATE_QUESTION();
+  } else {
+    messageToVoter = MessageConstants.WELCOME_VOTER();
+  }
+
+  if (response) {
+    if (entryPoint === LoadBalancer.PULL_ENTRY_POINT) {
+      logger.debug(
+        `ROUTER.introduceNewVoterToSlackChannel: Entry point is PULL, so sending automated welcome to voter.`
+      );
+      // Welcome the voter
+      await TwilioApiUtil.sendMessage(
+        messageToVoter,
+        {
+          userPhoneNumber: userInfo.userPhoneNumber,
+          twilioPhoneNumber,
+          twilioCallbackURL,
+        },
+        DbApiUtil.populateAutomatedDbMessageEntry(userInfo)
+      );
+    }
+  } else {
+    await TwilioApiUtil.sendMessage(
+      `There was an unexpected error sending your message. Please wait a few minutes and try again.`,
+      {
+        userPhoneNumber: userInfo.userPhoneNumber,
+        twilioPhoneNumber,
+        twilioCallbackURL,
+      },
+      DbApiUtil.populateAutomatedDbMessageEntry(userInfo)
+    );
+    throw new Error(
+      `Could not send introduction slack message with voter info for voter ${userInfo.userPhoneNumber} texting ${twilioPhoneNumber}`
+    );
   }
 
   logger.debug(`ROUTER.introduceNewVoterToSlackChannel: Successfully announced new voter via new thread in ${slackChannelName},

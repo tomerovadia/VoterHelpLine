@@ -72,9 +72,15 @@ export async function sendMessage(
 
     if (!response.data.ok) {
       logger.error(
-        `SLACKAPIUTIL.sendMessage: ERROR in sending Slack message: ${response.data.error}`
+        `SLACKAPIUTIL.sendMessage: ERROR in sending Slack message: ${JSON.stringify(
+          response.data
+        )}`
       );
-      return null;
+      throw new Error(
+        `SLACKAPIUTIL.sendMessage: ERROR in sending Slack message: ${JSON.stringify(
+          response.data
+        )}`
+      );
     }
 
     logger.info(`SLACKAPIUTIL.sendMessage: Successfully sent Slack message,
@@ -104,7 +110,9 @@ export async function sendMessage(
                   channel: ${options.channel},
                   thread_ts: ${options.parentMessageTs}`);
     logger.error(
-      `SLACKAPIUTIL.sendMessage: ERROR in sending Slack message. Error data from Slack: ${error}`
+      `SLACKAPIUTIL.sendMessage: ERROR in sending Slack message. Error data from Slack: ${JSON.stringify(
+        error
+      )}`
     );
     Sentry.captureException(error);
     if (databaseMessageEntry) {
@@ -115,7 +123,9 @@ export async function sendMessage(
         await DbApiUtil.logMessageToDb(databaseMessageEntry);
       } catch (error) {
         logger.info(
-          `SLACKAPIUTIL.sendMessage: failed to log message send failure to DB`
+          `SLACKAPIUTIL.sendMessage: failed to log message send failure to DB: ${JSON.stringify(
+            error
+          )}`
         );
         Sentry.captureException(error);
       }
@@ -174,8 +184,10 @@ export async function fetchSlackChannelName(
     );
     return response.data.channel.name;
   } else {
-    logger.debug(
-      `SLACKAPIUTIL.fetchSlackChannelName: Failed to reveal Slack channel name (${channelId}). Error: ${response.data.error}.`
+    logger.error(
+      `SLACKAPIUTIL.fetchSlackChannelName: Failed to reveal Slack channel name (${channelId}). Error: ${JSON.stringify(
+        response.data
+      )}.`
     );
     return null;
   }
@@ -198,7 +210,9 @@ export async function fetchSlackUserName(
     return response.data.user.real_name;
   } else {
     logger.error(
-      `SLACKAPIUTIL.fetchSlackUserName: Failed to reveal Slack user name (${userId}). Error: ${response.data.error}.`
+      `SLACKAPIUTIL.fetchSlackUserName: Failed to reveal Slack user name (${userId}). Error: response.data: ${JSON.stringify(
+        response.data
+      )}`
     );
     return null;
   }
@@ -253,7 +267,9 @@ export async function fetchSlackChannelNamesAndIds(): Promise<SlackChannelNamesA
     // return response.data.messages[0].blocks;
   } else {
     logger.error(
-      `SLACKAPIUTIL.fetchSlackChannelNamesAndIds: ERROR fetching Slack channel names and IDs. Error: ${response.data.error}.`
+      `SLACKAPIUTIL.fetchSlackChannelNamesAndIds: ERROR fetching Slack channel names and IDs. Error: response.data: ${JSON.stringify(
+        response.data
+      )}`
     );
     return null;
   }
@@ -312,10 +328,14 @@ export async function renderModal(
     return response.data.view.id;
   } else {
     logger.error(
-      `SLACKAPIUTIL.renderModal: Failed to render modal (callback_id: ${view.callback_id}). Error: ${response.data.error}.`
+      `SLACKAPIUTIL.renderModal: Failed to render modal (callback_id: ${
+        view.callback_id
+      }). Error: response.data: ${JSON.stringify(response.data)}`
     );
     throw new Error(
-      `SLACKAPIUTIL.renderModal: Failed to render modal (callback_id: ${view.callback_id}). Error: ${response.data.error}.`
+      `SLACKAPIUTIL.renderModal: Failed to render modal (callback_id: ${
+        view.callback_id
+      }). Error: response.data: ${JSON.stringify(response.data)}`
     );
   }
 }
@@ -340,10 +360,14 @@ export async function updateModal(
     return response.data.view.id;
   } else {
     logger.error(
-      `SLACKAPIUTIL.updateModal: Failed to update modal (callback_id: ${view.callback_id}). Error: ${response.data.error}.`
+      `SLACKAPIUTIL.updateModal: Failed to update modal (callback_id: ${
+        view.callback_id
+      }). response.data: ${JSON.stringify(response.data)}`
     );
     throw new Error(
-      `SLACKAPIUTIL.updateModal: Failed to update modal (callback_id: ${view.callback_id}). Error: ${response.data.error}.`
+      `SLACKAPIUTIL.updateModal: Failed to update modal (callback_id: ${
+        view.callback_id
+      }). response.data: ${JSON.stringify(response.data)}`
     );
   }
 }
