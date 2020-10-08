@@ -101,7 +101,7 @@ const handleVoterStatusUpdateHelper = async ({
   payload: Payload;
   selectedVoterStatus: VoterStatusUpdate;
   originatingSlackUserName: string;
-  slackChannelName: string;
+  slackChannelName: string | null;
   userPhoneNumber: string;
   twilioPhoneNumber: string;
 }) => {
@@ -156,7 +156,7 @@ export async function handleVoterStatusUpdate({
   payload: Payload;
   selectedVoterStatus: VoterStatusUpdate;
   originatingSlackUserName: string;
-  slackChannelName: string;
+  slackChannelName: string | null;
   userPhoneNumber: string;
   twilioPhoneNumber: string;
   redisClient: PromisifiedRedisClient;
@@ -290,7 +290,7 @@ export async function handleVolunteerUpdate({
 }: {
   payload: Payload;
   originatingSlackUserName: string;
-  slackChannelName: string;
+  slackChannelName: string | null;
   userPhoneNumber: string;
   twilioPhoneNumber: string;
 }): Promise<void> {
@@ -370,43 +370,22 @@ export async function handleVolunteerUpdate({
 export async function receiveResetDemo({
   payload,
   redisClient,
-  originatingSlackUserName,
-  slackChannelName,
-  userPhoneNumber,
+  modalPrivateMetadata,
   twilioPhoneNumber,
+  userId,
   viewId,
 }: {
   payload: SlackInteractionEventPayload;
   redisClient: PromisifiedRedisClient;
-  originatingSlackUserName: string;
-  slackChannelName: string;
-  userPhoneNumber: string;
+  modalPrivateMetadata: SlackModalPrivateMetadata;
   twilioPhoneNumber: string;
+  userId: string;
   viewId: string;
 }): Promise<void> {
   logger.info(`Entering SLACKINTERACTIONHANDLER.receiveResetDemo`);
   let slackView;
 
   try {
-    const MD5 = new Hashes.MD5();
-    const userId = MD5.hex(userPhoneNumber);
-
-    const commandType = 'RESET_DEMO';
-    // Ignore Prettier formatting because this object needs to adhere to JSON strigify requirements.
-    // prettier-ignore
-    const modalPrivateMetadata = {
-    "commandType": commandType,
-    "userId": userId,
-    "userPhoneNumber": userPhoneNumber,
-    "twilioPhoneNumber": twilioPhoneNumber,
-    "slackChannelId": payload.channel.id,
-    "slackParentMessageTs": payload.message.ts,
-    "originatingSlackUserName": originatingSlackUserName,
-    "originatingSlackUserId": payload.user.id,
-    "slackChannelName": slackChannelName,
-    "actionTs": payload.action_ts
-  } as SlackModalPrivateMetadata;
-
     const redisUserInfoKey = `${userId}:${twilioPhoneNumber}`;
     const userInfo = (await RedisApiUtil.getHash(
       redisClient,
@@ -452,7 +431,7 @@ export async function receiveResetDemo({
       // Store the relevant information in the modal so that when the requested action is confirmed
       // the data needed for the necessary actions is available.
       slackView = SlackBlockUtil.resetConfirmationSlackView(
-        commandType,
+        'RESET_DEMO',
         modalPrivateMetadata
       );
     }

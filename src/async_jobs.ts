@@ -15,6 +15,9 @@ import * as SlackInteractionHandler from './slack_interaction_handler';
 import * as Router from './router';
 import logger from './logger';
 import redisClient from './redis_client';
+import Hashes from 'jshashes';
+import * as DbApiUtil from './db_api_util';
+import * as SlackBlockUtil from './slack_block_util';
 
 import {
   SlackInteractionEventPayload,
@@ -43,20 +46,23 @@ async function slackInteractivityHandler(
     const originatingSlackChannelName = await SlackApiUtil.fetchSlackChannelName(
       payload.channel.id
     );
-    if (!originatingSlackChannelName) {
-      throw new Error(
-        `Could not get slack channel name for Slack channel ${payload.channel.id}`
-      );
-    }
 
     const redisHashKey = `${payload.channel.id}:${payload.message.ts}`;
     const redisData = await RedisApiUtil.getHash(redisClient, redisHashKey);
 
-    if (!redisData) {
-      logger.debug(
-        `SERVER POST /slack-interactivity: Received an interaction for a voter who no longer exists in Redis.`
-      );
-      return;
+    // Exempt message_action, which will be handled later by updating the Slack user's modal.
+    if (!(payload.type === 'message_action')) {
+      if (!originatingSlackChannelName) {
+        throw new Error(
+          `Could not get slack channel name for Slack channel ${payload.channel.id}`
+        );
+      }
+      if (!redisData) {
+        logger.debug(
+          `SERVER POST /slack-interactivity: Received an interaction for a voter who no longer exists in Redis.`
+        );
+        return;
+      }
     }
 
     switch (payload.type) {
@@ -103,14 +109,45 @@ async function slackInteractivityHandler(
           );
         }
 
+        const MD5 = new Hashes.MD5();
+
+        // Ignore Prettier formatting because this object needs to adhere to JSON strigify requirements.
+        // prettier-ignore
+        const modalPrivateMetadata = {
+          "commandType": 'RESET_DEMO',
+          "userId": redisData ? MD5.hex(redisData.userPhoneNumber) : null,
+          "userPhoneNumber": redisData ? redisData.userPhoneNumber : null,
+          "twilioPhoneNumber": redisData ? redisData.twilioPhoneNumber : null,
+          "slackChannelId": payload.channel.id,
+          "slackParentMessageTs": payload.message.ts,
+          "originatingSlackUserName": originatingSlackUserName,
+          "originatingSlackUserId": payload.user.id,
+          "slackChannelName": originatingSlackChannelName,
+          "actionTs": payload.action_ts
+        } as SlackModalPrivateMetadata;
+
+        if (!originatingSlackChannelName || !redisData) {
+          modalPrivateMetadata.success = false;
+          modalPrivateMetadata.failureReason = 'invalid_shortcut_use';
+          await DbApiUtil.logCommandToDb(modalPrivateMetadata);
+          const slackView = SlackBlockUtil.getErrorSlackView(
+            'not_active_voter_parent_thread',
+            'This shortcut is not valid on this message.'
+          );
+          await SlackApiUtil.updateModal(viewId, slackView);
+          logger.info(
+            `SLACKINTERACTIONHANDLER.receiveResetDemo: Volunteer used a shortcut on an invalid message.`
+          );
+          return;
+        }
+
         if (payload.callback_id === 'reset_demo') {
           await SlackInteractionHandler.receiveResetDemo({
             payload,
             redisClient,
-            originatingSlackUserName,
-            slackChannelName: originatingSlackChannelName,
-            userPhoneNumber: redisData ? redisData.userPhoneNumber : null,
+            modalPrivateMetadata,
             twilioPhoneNumber: redisData ? redisData.twilioPhoneNumber : null,
+            userId: MD5.hex(redisData.userPhoneNumber),
             viewId,
           });
           return;
