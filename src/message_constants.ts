@@ -64,9 +64,9 @@ export function CLARIFY_DISCLAIMER(): string {
 export function CLARIFY_HELPLINE_REQUEST(): string {
   switch (process.env.CLIENT_ORGANIZATION) {
     case 'VOTE_AMERICA':
-      return 'Reply “helpline” to be connected to the helpline, or “STOP” to opt out of texts.';
+      return 'Reply HELPLINE to be connected to the helpline, or STOP to opt out of texts.';
     default:
-      return 'Reply “helpline” to be connected to the helpline, or “STOP” to opt out of texts.';
+      return 'Reply HELPLINE to be connected to the helpline, or STOP to opt out of texts.';
   }
 }
 
