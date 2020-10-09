@@ -340,7 +340,8 @@ export async function handleNewVoter(
     if (selectedChannelName) {
       slackChannelName = selectedChannelName;
     } else {
-      // If LoadBalancer didn't find a Slack channel, then  #lobby remains as fallback.
+      // If LoadBalancer didn't find a Slack channel, then select #national or #demo-national as fallback.
+      slackChannelName = userInfo.isDemo ? 'demo-national' : 'national';
       logger.error(
         `ROUTER.handleNewVoter (${userInfo.userId}): ERROR LoadBalancer did not find a Slack channel for new PUSH voter. Using ${slackChannelName} as fallback.`
       );
@@ -760,9 +761,11 @@ export async function determineVoterState(
   let stateName = StateParser.determineState(userMessage);
 
   if (stateName == null) {
+    // If we've tried to determine their U.S. state enough times, choose the National channel
+    // and let the voter know a volunteer is being sought.
     if (userInfo.numStateSelectionAttempts >= 2) {
       stateName = 'National';
-      // Otherwise, let the voter know a volunteer is being sought.
+      // Otherwise, try to determine their U.S. state one more time.
     } else {
       logger.debug(
         `ROUTER.determineVoterState: StateParser could not determine U.S. state of voter from message ${userMessage}`
@@ -824,7 +827,9 @@ export async function determineVoterState(
   );
 
   if (!selectedStateChannelName) {
-    selectedStateChannelName = userInfo.isDemo ? '#demo-lobby' : '#lobby';
+    selectedStateChannelName = userInfo.isDemo
+      ? 'demo-national-0'
+      : 'national-0';
     logger.error(
       `ROUTER.determineVoterState: ERROR in selecting U.S. state channel. Defaulting to ${selectedStateChannelName}.`
     );

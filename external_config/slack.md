@@ -1,10 +1,50 @@
 # Slack Config
 
-## OAuth & Permissions
+## Slack Workspace
 
-### Scopes
+### VoteAmerica Initial Setup
 
-#### Bot Token Scopes
+#### Channels
+
+Important: The Slack bot must be given access to each of these channels.
+
+- demo-lobby
+- lobby
+- demo-national-0
+- national-0
+- demo-pacific-0
+- pacific-0
+- demo-mountain-0
+- mountain-0
+- demo-eastern-south-0
+- eastern-south-0
+- demo-eastern-north-0
+- eastern-north-0
+- demo-central-0
+- central-0
+
+#### Redis
+
+- RPUSH openPodsPullDemoNational demo-national-0
+- RPUSH openPodsPullNational national-0
+- RPUSH openPodsPullDemoPacific demo-pacific-0
+- RPUSH openPodsPullDemoMountain demo-mountain-0
+- RPUSH openPodsPullDemoEasternSouth demo-eastern-south-0
+- RPUSH openPodsPullDemoEasternNorth demo-eastern-north-0
+- RPUSH openPodsPullDemoCentral demo-central-0
+- RPUSH openPodsPullPacific pacific-0
+- RPUSH openPodsPullMountain mountain-0
+- RPUSH openPodsPullEasternSouth eastern-south-0
+- RPUSH openPodsPullEasternNorth eastern-north-0
+- RPUSH openPodsPullCentral central-0
+
+## Slack App
+
+### OAuth & Permissions
+
+#### Scopes
+
+##### Bot Token Scopes
 
 - app_mentions:read
 - channels:history
@@ -18,19 +58,19 @@
 - reactions:write
 - users:read
 
-## Event Subscriptions
+### Event Subscriptions
 
-### Subscribe to bot events
+#### Subscribe to bot events
 
 - app_mention
 - message.channels
 - message.groups
 
-## Interactivity & Shortcuts
+### Interactivity & Shortcuts
 
-### Shortcuts
+#### Shortcuts
 
-#### Reset Demo
+##### Reset Demo
 
 This should be added as a **messages** shortcut.
 
