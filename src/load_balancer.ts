@@ -57,19 +57,12 @@ export async function selectSlackChannel(
   let stateOrRegionName = stateName;
   // Translate stateName potentially into a region.
   if (process.env.CLIENT_ORGANIZATION === 'VOTE_AMERICA') {
-    const selectedRegionOrState = StateRegionConfig.stateToRegionMap[stateName];
-    if (selectedRegionOrState) {
-      stateOrRegionName = selectedRegionOrState;
-    } else {
-      logger.error(
-        `LOADBALANCER.selectSlackChannel: ERROR with stateToRegionMap: no value found for key (${stateName}).`
-      );
-    }
+    stateOrRegionName = StateRegionConfig.stateToRegionMap[stateName];
   }
 
   if (!stateOrRegionName) {
     logger.error(
-      `LOADBALANCER.selectSlackChannel: ERROR converting stateName (${stateName}) to region.`
+      `LOADBALANCER.selectSlackChannel: ERROR with stateToRegionMap: no value found for key (${stateName}).`
     );
     return null;
   }
