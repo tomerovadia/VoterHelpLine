@@ -45,7 +45,7 @@ export async function selectSlackChannel(
   );
   // If for some reason there's no stateName, Redis won't be able to provide
   // the needed info for determining a Slack channel. Caller should default
-  // to #national or #demo-national.
+  // to #national-0 or #demo-national-0.
   if (!stateName) {
     logger.debug(
       'LOADBALANCER.selectSlackChannel: U.S. state not provided, LoadBalancer returning null.'
@@ -53,10 +53,19 @@ export async function selectSlackChannel(
     return null;
   }
 
-  const stateOrRegionName =
-    process.env.CLIENT_ORGANIZATION === 'VOTE_AMERICA'
-      ? StateRegionConfig.stateToRegionMap[stateName]
-      : stateName;
+  // Default to stateName;
+  let stateOrRegionName = stateName;
+  // Translate stateName potentially into a region.
+  if (process.env.CLIENT_ORGANIZATION === 'VOTE_AMERICA') {
+    const selectedRegionOrState = StateRegionConfig.stateToRegionMap[stateName];
+    if (selectedRegionOrState) {
+      stateOrRegionName = selectedRegionOrState;
+    } else {
+      logger.error(
+        `LOADBALANCER.selectSlackChannel: ERROR with stateToRegionMap: no value found for key (${stateName}).`
+      );
+    }
+  }
 
   if (!stateOrRegionName) {
     logger.error(

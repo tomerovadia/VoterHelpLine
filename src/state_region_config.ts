@@ -50,4 +50,5 @@ export const stateToRegionMap: { [stateCode: string]: string } = {
   'West Virginia': 'Eastern South',
   Wisconsin: 'Central',
   Wyoming: 'Mountain',
+  National: 'National',
 };

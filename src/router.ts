@@ -827,7 +827,9 @@ export async function determineVoterState(
   );
 
   if (!selectedStateChannelName) {
-    selectedStateChannelName = userInfo.isDemo ? '#demo-national' : '#national';
+    selectedStateChannelName = userInfo.isDemo
+      ? 'demo-national-0'
+      : 'national-0';
     logger.error(
       `ROUTER.determineVoterState: ERROR in selecting U.S. state channel. Defaulting to ${selectedStateChannelName}.`
     );
