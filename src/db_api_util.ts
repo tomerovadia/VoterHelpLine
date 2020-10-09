@@ -439,8 +439,8 @@ export async function getSlackThreadsForVoter(
   try {
     const result = await client.query(
       `SELECT slack_channel, slack_parent_message_ts
-        FROM messages 
-        WHERE user_id = $1 
+        FROM messages
+        WHERE user_id = $1
           AND (to_phone_number = $2 OR from_phone_number = $2)
           AND slack_parent_message_ts IS NOT NULL
           AND NOT archived
@@ -628,7 +628,7 @@ export async function logTwilioStatusToDb(
         slackMessageTs: row.slack_message_ts,
       };
     } else {
-      logger.error(
+      logger.info(
         `DBAPIUTIL.logTwilioStatusToDb: No message with sid ${messageSid}`
       );
       return null;
