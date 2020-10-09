@@ -11,7 +11,7 @@ const DEDUPE_WINDOW_SECONDS = 60 * 60;
  * If there's an error talking to redis, it will return true (erring on the
  * side of permitting duplication if there's a problem with Redis).
  */
-export default async function deduplicate(key: string): Promise<boolean> {
+export default async function isFirstUseOfKey(key: string): Promise<boolean> {
   try {
     const res = await deduplicationRedisClient.setAsync(
       `deduplication:${key}`,
@@ -21,11 +21,7 @@ export default async function deduplicate(key: string): Promise<boolean> {
       'NX'
     );
 
-    if (res) {
-      return true;
-    } else {
-      return false;
-    }
+    return !!res;
   } catch (err) {
     logger.warn(`DEDUPLICATION: failed deduplicate message with key ${key}`);
     logger.warn(err);

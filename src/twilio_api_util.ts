@@ -2,7 +2,7 @@ import * as Sentry from '@sentry/node';
 import * as DbApiUtil from './db_api_util';
 import logger from './logger';
 import twilio from 'twilio';
-import deduplicate from './deduplication';
+import isFirstUseOfKey from './deduplication';
 
 const twilioClient = twilio(
   process.env.TWILIO_ACCOUNT_SID,
@@ -33,13 +33,15 @@ export async function sendMessage(
 
   if (
     options.deduplicationId &&
-    !(await deduplicate(options.deduplicationId))
+    !(await isFirstUseOfKey(options.deduplicationId))
   ) {
-    logger.warn(
-      `TWILIOAPIUTIL.sendMessage: Not sending duplicate Twilio message to ${options.userPhoneNumber}: ${message}`
-    );
-
     if (databaseMessageEntry) {
+      logger.warn(
+        'TWILIOAPIUTIL.sendMessage: Not sending duplicate Twilio message ' +
+          `triggered by Slack message ${databaseMessageEntry.slackMessageTs} in ` +
+          `channel ${databaseMessageEntry.slackChannel} to ${options.userPhoneNumber}: ${message}`
+      );
+
       databaseMessageEntry.successfullySent = false;
       databaseMessageEntry.twilioError = 'helpline_deduplication_filtered';
 
@@ -51,6 +53,10 @@ export async function sendMessage(
         );
         Sentry.captureException(error);
       }
+    } else {
+      logger.warn(
+        `TWILIOAPIUTIL.sendMessage: Not sending duplicate Twilio message to ${options.userPhoneNumber}: ${message}`
+      );
     }
 
     return;
