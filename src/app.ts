@@ -292,11 +292,10 @@ const handleIncomingTwilioMessage = async (
         `SERVER.handleIncomingTwilioMessage (${userId}): Voter is known but doesn't have a Slack thread yet.`
       );
       if (process.env.CLIENT_ORGANIZATION === 'VOTE_AMERICA') {
-        const userMessageNoPunctuation = userMessage.replace(
-          /[.,?/#!$%^&*;:{}=\-_`~()]/g,
-          ''
-        );
-        if (userMessageNoPunctuation.toLowerCase().trim() == 'helpline') {
+        const userMessageNoPunctuation = userMessage
+          .toLowerCase()
+          .replace(/[^a-zA-Z]/g, '');
+        if (userMessageNoPunctuation.startsWith('helpline')) {
           await Router.handleNewVoter(
             { userPhoneNumber, userMessage, userId },
             redisClient,
