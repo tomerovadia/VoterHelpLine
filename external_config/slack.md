@@ -6,6 +6,12 @@
 
 #### Channels
 
+Important: The Slack bot must be given access to each of these channels.
+
+- demo-lobby
+- lobby
+- demo-national-0
+- natinal-0
 - demo-pacific-0
 - pacific-0
 - demo-mountain-0
@@ -19,6 +25,8 @@
 
 #### Redis
 
+- RPUSH openPodsPullDemoNational demo-national-0
+- RPUSH openPodsPullNational national-0
 - RPUSH openPodsPullDemoPacific demo-pacific-0
 - RPUSH openPodsPullDemoMountain demo-mountain-0
 - RPUSH openPodsPullDemoEasternSouth demo-eastern-south-0
