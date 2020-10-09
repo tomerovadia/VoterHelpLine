@@ -20,7 +20,11 @@ export type PromisifiedRedisClient = typeof redisClient & {
   getAsync(key: string): Promise<string>;
   lrangeAsync(key: string, from: number, to: number): Promise<string[]>;
   rpushAsync(key: string, from: string[]): Promise<number>;
-  setAsync(key: string, value: string | number): Promise<void>;
+  setAsync(
+    key: string,
+    value: string | number,
+    ...args: (string | number)[]
+  ): Promise<'OK' | null>;
   hgetallAsync(key: string): Promise<{ [k: string]: string }>;
   hgetAsync(key: string, field: string): Promise<string>;
   hsetAsync(key: string, field: string, value: string | number): Promise<void>;
@@ -31,3 +35,15 @@ export type PromisifiedRedisClient = typeof redisClient & {
 };
 
 export default redisClient as PromisifiedRedisClient;
+
+const deduplicationRedisClient = redis.createClient(
+  (process.env.REDISCLOUD_URL_DEDUPLICATION ||
+    process.env.REDISCLOUD_URL) as string
+) as PromisifiedRedisClient;
+
+deduplicationRedisClient.on('error', function (err) {
+  logger.info('Redis deduplicaton client error', err);
+  Sentry.captureException(err);
+});
+
+export { deduplicationRedisClient };

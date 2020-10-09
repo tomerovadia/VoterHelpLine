@@ -2,6 +2,7 @@ import * as Sentry from '@sentry/node';
 import * as DbApiUtil from './db_api_util';
 import logger from './logger';
 import twilio from 'twilio';
+import isFirstUseOfKey from './deduplication';
 
 const twilioClient = twilio(
   process.env.TWILIO_ACCOUNT_SID,
@@ -14,6 +15,7 @@ export async function sendMessage(
     twilioPhoneNumber: string;
     userPhoneNumber: string;
     twilioCallbackURL: string;
+    deduplicationId?: string;
   },
   databaseMessageEntry?: DbApiUtil.DatabaseMessageEntry
 ): Promise<void> {
@@ -27,6 +29,37 @@ export async function sendMessage(
     databaseMessageEntry.fromPhoneNumber = options.twilioPhoneNumber;
     databaseMessageEntry.toPhoneNumber = options.userPhoneNumber;
     databaseMessageEntry.twilioSendTimestamp = new Date();
+  }
+
+  if (
+    options.deduplicationId &&
+    !(await isFirstUseOfKey(options.deduplicationId))
+  ) {
+    if (databaseMessageEntry) {
+      logger.warn(
+        'TWILIOAPIUTIL.sendMessage: Not sending duplicate Twilio message ' +
+          `triggered by Slack message ${databaseMessageEntry.slackMessageTs} in ` +
+          `channel ${databaseMessageEntry.slackChannel} to ${options.userPhoneNumber}: ${message}`
+      );
+
+      databaseMessageEntry.successfullySent = false;
+      databaseMessageEntry.twilioError = 'helpline_deduplication_filtered';
+
+      try {
+        await DbApiUtil.logMessageToDb(databaseMessageEntry);
+      } catch (error) {
+        logger.error(
+          'TWILIOAPIUTIL.sendMessage: failed to log message send duplication failure to DB'
+        );
+        Sentry.captureException(error);
+      }
+    } else {
+      logger.warn(
+        `TWILIOAPIUTIL.sendMessage: Not sending duplicate Twilio message to ${options.userPhoneNumber}: ${message}`
+      );
+    }
+
+    return;
   }
 
   try {

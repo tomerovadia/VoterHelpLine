@@ -42,6 +42,7 @@ provider:
     CLIENT_ORGANIZATION: ${ssm:helpline.${self:custom.stage}.client_organization~true}
     DEMO_PHONE_NUMBER: ${ssm:helpline.${self:custom.stage}.demo_phone_number~true}
     REDISCLOUD_URL: ${ssm:helpline.${self:custom.stage}.redis_url~true}
+    REDISCLOUD_URL_DEDUPLICATION: ${ssm:helpline.${self:custom.stage}.redis_deduplication_url~true}
     DATABASE_URL: ${ssm:helpline.${self:custom.stage}.database_url~true}
     LAMBDA_BACKGROUND_TASK_FUNCTION: helpline-${self:custom.stage}-worker
 

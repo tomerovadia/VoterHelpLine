@@ -1091,7 +1091,12 @@ export async function handleSlackVoterThreadMessage(
 
     await TwilioApiUtil.sendMessage(
       messageToSend,
-      { userPhoneNumber, twilioPhoneNumber, twilioCallbackURL },
+      {
+        userPhoneNumber,
+        twilioPhoneNumber,
+        twilioCallbackURL,
+        deduplicationId: `${reqBody.event.channel}:${reqBody.event.ts}`,
+      },
       outboundDbMessageEntry
     );
     // Slack message is from inactive Slack thread.
