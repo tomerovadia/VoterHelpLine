@@ -11,7 +11,7 @@ Important: The Slack bot must be given access to each of these channels.
 - demo-lobby
 - lobby
 - demo-national-0
-- natinal-0
+- national-0
 - demo-pacific-0
 - pacific-0
 - demo-mountain-0
