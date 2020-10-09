@@ -18,6 +18,7 @@ import * as SlackInteractionApiUtil from './slack_interaction_api_util';
 import * as SlackBlockUtil from './slack_block_util';
 import logger from './logger';
 import redisClient from './redis_client';
+import { SlackCallbackId } from './slack_interaction_ids';
 import { EntryPoint, Request, UserInfo } from './types';
 import {
   enqueueBackgroundTask,
@@ -607,13 +608,15 @@ app.post(
     const metadata: InteractivityHandlerMetadata = {};
 
     if (
-      payload.type === 'message_action' &&
-      payload.callback_id === 'reset_demo'
+      [
+        SlackCallbackId.RESET_DEMO,
+        SlackCallbackId.OPEN_CLOSE_CHANNELS,
+      ].includes(payload.callback_id as SlackCallbackId)
     ) {
-      // For message actions, we always show a confirmation modal. Because we
-      // have to show this modal within 3 seconds, we immediately make the call
-      // to show a loading state, and then pass the modal ID on to the async
-      // task to update the modal
+      // For certain actions, we always show a modal. Because we have to show
+      // this modal within 3 seconds, we immediately make the call to show a
+      // loading state, and then pass the modal ID on to the async task to
+      // update the modal
       metadata.viewId = await SlackApiUtil.renderModal(
         payload.trigger_id,
         SlackBlockUtil.loadingSlackView()

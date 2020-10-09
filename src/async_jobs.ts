@@ -12,6 +12,7 @@ import * as Sentry from '@sentry/node';
 import * as SlackApiUtil from './slack_api_util';
 import * as RedisApiUtil from './redis_api_util';
 import * as SlackInteractionHandler from './slack_interaction_handler';
+import { SlackActionId, SlackCallbackId } from './slack_interaction_ids';
 import * as Router from './router';
 import logger from './logger';
 import redisClient from './redis_client';
@@ -29,6 +30,18 @@ import { UserInfo } from './types';
 
 export type InteractivityHandlerMetadata = { viewId?: string };
 
+function getViewId(
+  payload: SlackInteractionEventPayload,
+  interactivityMetadata: InteractivityHandlerMetadata
+) {
+  if (payload.view && payload.view.id) return payload.view.id;
+
+  const { viewId } = interactivityMetadata;
+  if (viewId) return viewId;
+
+  throw new Error('slackInteractivityHandler called without viewId');
+}
+
 async function slackInteractivityHandler(
   payload: SlackInteractionEventPayload,
   interactivityMetadata: InteractivityHandlerMetadata
@@ -40,6 +53,52 @@ async function slackInteractivityHandler(
     throw new Error(
       `Could not get slack user name for slack user ${payload.user.id}`
     );
+  }
+
+  if (
+    payload.type === 'shortcut' &&
+    payload.callback_id === SlackCallbackId.OPEN_CLOSE_CHANNELS
+  ) {
+    logger.info(
+      `SERVER POST /slack-interactivity: Determined user interaction is a OPEN_CLOSE_CHANNELS  shortcut.`
+    );
+
+    await SlackInteractionHandler.handleOpenCloseChannels({
+      payload,
+      redisClient,
+      originatingSlackUserName,
+      viewId: getViewId(payload, interactivityMetadata),
+    });
+    return;
+  }
+
+  // Handle open/close modal actions
+  if (
+    payload.type === 'block_actions' &&
+    payload.actions &&
+    [
+      SlackActionId.OPEN_CLOSE_CHANNELS_FILTER_STATE,
+      SlackActionId.OPEN_CLOSE_CHANNELS_FILTER_TYPE,
+      SlackActionId.OPEN_CLOSE_CHANNELS_CHANNEL_STATE_DROPDOWN,
+    ].includes(payload.actions[0].action_id as SlackActionId)
+  ) {
+    logger.info(
+      `SERVER POST /slack-interactivity: Determined user interaction is in OPEN_CLOSE_CHANNELS modal`
+    );
+
+    const view = payload.view;
+    if (!view) {
+      throw new Error('OPEN_CLOSE_CHANNELS block_actions expected view');
+    }
+
+    await SlackInteractionHandler.handleOpenCloseChannels({
+      payload,
+      redisClient,
+      originatingSlackUserName,
+      viewId: getViewId(payload, interactivityMetadata),
+      action: payload.actions[0],
+    });
+    return;
   }
 
   if (payload.type === 'block_actions' || payload.type === 'message_action') {
@@ -76,7 +135,7 @@ async function slackInteractivityHandler(
           );
           await SlackInteractionHandler.handleVoterStatusUpdate({
             payload,
-            selectedVoterStatus,
+            selectedVoterStatus: selectedVoterStatus as SlackInteractionHandler.VoterStatusUpdate,
             originatingSlackUserName,
             slackChannelName: originatingSlackChannelName,
             userPhoneNumber: redisData ? redisData.userPhoneNumber : null,
@@ -141,14 +200,14 @@ async function slackInteractivityHandler(
           return;
         }
 
-        if (payload.callback_id === 'reset_demo') {
+        if (payload.callback_id === SlackCallbackId.RESET_DEMO) {
           await SlackInteractionHandler.receiveResetDemo({
             payload,
             redisClient,
             modalPrivateMetadata,
             twilioPhoneNumber: redisData ? redisData.twilioPhoneNumber : null,
             userId: MD5.hex(redisData.userPhoneNumber),
-            viewId,
+            viewId: getViewId(payload, interactivityMetadata),
           });
           return;
         }

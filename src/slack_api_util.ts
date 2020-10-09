@@ -277,7 +277,7 @@ export async function fetchSlackChannelNamesAndIds(): Promise<SlackChannelNamesA
 
 export async function updateSlackChannelNamesAndIdsInRedis(
   redisClient: PromisifiedRedisClient
-): Promise<void> {
+): Promise<SlackChannelNamesAndIds | null> {
   logger.info(`ENTERING SLACKAPIUTIL.updateSlackChannelNamesAndIdsInRedis`);
   const slackChannelNamesAndIds = await fetchSlackChannelNamesAndIds();
 
@@ -288,6 +288,20 @@ export async function updateSlackChannelNamesAndIdsInRedis(
       slackChannelNamesAndIds
     );
   }
+
+  return slackChannelNamesAndIds;
+}
+
+// Get Slack Channel Name / ID map, using cache if needed
+export async function getSlackChannelNamesAndIds(
+  redisClient: PromisifiedRedisClient
+): Promise<SlackChannelNamesAndIds | null> {
+  const slackChannelIds = await RedisApiUtil.getHash(
+    redisClient,
+    'slackPodChannelIds'
+  );
+  if (slackChannelIds) return slackChannelIds;
+  return updateSlackChannelNamesAndIdsInRedis(redisClient);
 }
 
 export async function addSlackMessageReaction(

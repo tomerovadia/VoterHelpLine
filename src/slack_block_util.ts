@@ -1,7 +1,10 @@
 import logger from './logger';
+import * as PodUtil from './pod_util';
 import { SlackActionId } from './slack_interaction_ids';
 import type { VoterStatus } from './types';
+import { SlackCallbackId } from './slack_interaction_ids';
 import { SlackModalPrivateMetadata } from './slack_interaction_handler';
+import { getStateConstants } from './state_constants';
 
 export type SlackBlock = {
   type: string;
@@ -12,28 +15,47 @@ export type SlackOption = {
   text: {
     type: 'plain_text' | 'mrkdwn';
     text: string;
-    emoji: boolean;
+    emoji?: boolean;
   };
   value: string;
+};
+
+export type SlackText = {
+  type: 'plain_text' | 'mrkdwn';
+  text: string;
+  emoji?: boolean;
+};
+
+export type SlackElement = {
+  type: string;
+  action_id?: string;
+  value?: string;
+  initial_option?: SlackOption;
+  initial_options?: SlackOption[];
+  initial_user?: string;
+  initial_users?: string[];
+  placeholder?: SlackText;
+  options?: SlackOption[];
+};
+
+export type SlackAction = SlackElement & {
+  block_id: string;
+  selected_option?: SlackOption;
+  selected_options?: SlackOption[];
+  selected_user?: string;
+  selected_users?: string[];
+  action_ts: string;
 };
 
 export type SlackView = {
   callback_id?: string;
   private_metadata?: string;
-  title: {
-    type: string;
-    text: string;
-  };
-  submit?: {
-    type: string;
-    text: string;
-  };
+  title: SlackText;
+  submit?: SlackText;
   blocks: {
     type: string;
-    text: {
-      type: string;
-      text: string;
-    };
+    text?: SlackText;
+    elements?: SlackElement[];
   }[];
   type: 'modal';
 };
@@ -333,6 +355,168 @@ export function getErrorSlackView(
   };
 }
 
+interface OpenCloseModalProps {
+  /** Selected state code, if any e.g. FL, NC, OH */
+  stateCode?: string;
+  /** Selected filter type, if any */
+  channelType?: PodUtil.CHANNEL_TYPE;
+  /** Channels to display, if any */
+  channelRows?: PodUtil.ChannelInfo[];
+}
+
+const getOptionForState = (stateCode: string): SlackOption => ({
+  text: {
+    type: 'plain_text',
+    text: getStateConstants()[stateCode],
+  },
+  value: stateCode,
+});
+
+const getOptionForChannelType = (value: PodUtil.CHANNEL_TYPE): SlackOption => {
+  const text = {
+    [PodUtil.CHANNEL_TYPE.NORMAL]: 'Normal',
+    [PodUtil.CHANNEL_TYPE.DEMO]: 'Demo',
+  }[value];
+  return {
+    text: {
+      type: 'plain_text',
+      text,
+    },
+    value,
+  };
+};
+
+const pullOption: SlackOption = {
+  text: {
+    type: 'plain_text',
+    text: 'Pull',
+  },
+  value: PodUtil.ENTRYPOINT_TYPE.PULL,
+};
+
+const pushOption: SlackOption = {
+  text: {
+    type: 'plain_text',
+    text: 'Push',
+  },
+  value: PodUtil.ENTRYPOINT_TYPE.PUSH,
+};
+
+export function getOpenCloseModal({
+  stateCode,
+  channelType,
+  channelRows = [],
+}: OpenCloseModalProps = {}): SlackView {
+  logger.info('ENTERING SLACKBLOCKUTIL.getOpenCloseModal');
+
+  // Create rows for each channel
+  const rows = channelRows.map(
+    ({ id, name, stateCode, entrypoints }): SlackBlock => {
+      const blockId = PodUtil.getBlockId(stateCode, name);
+      const text = id ? `*${name}*` : `*${name}* :warning: _channel not found_`;
+      const options: SlackOption[] = [pullOption, pushOption];
+      const initialOptions = entrypoints.map((type) => {
+        switch (type) {
+          case PodUtil.ENTRYPOINT_TYPE.PULL:
+            return pullOption;
+          case PodUtil.ENTRYPOINT_TYPE.PUSH:
+            return pushOption;
+        }
+        logger.error(
+          `SLACKBLOCKUTIL.getOpenCloseModal: Invalid entrypoint type for ${name}: ${type}`
+        );
+      });
+
+      const accessory = {
+        type: 'checkboxes',
+        action_id: SlackActionId.OPEN_CLOSE_CHANNELS_CHANNEL_STATE_DROPDOWN,
+        // Slack does not like an empty initial_options list
+        initial_options: initialOptions.length ? initialOptions : undefined,
+        options,
+      };
+
+      return {
+        type: 'section',
+        block_id: blockId,
+        text: {
+          type: 'mrkdwn',
+          text,
+        },
+        accessory,
+      };
+    }
+  );
+
+  // Empty state
+  if (!rows.length) {
+    if (stateCode && channelType) {
+      rows.push({
+        type: 'section',
+        text: {
+          type: 'mrkdwn',
+          text: `No channels found. You may need to create some. Channels follow this format: \`${PodUtil.getChannelNamePrefixForState(
+            stateCode,
+            channelType
+          )}0\``,
+        },
+      });
+    } else {
+      rows.push({
+        type: 'section',
+        text: {
+          type: 'mrkdwn',
+          text: 'Please select a state and channel type.',
+        },
+      });
+    }
+  }
+
+  return {
+    type: 'modal',
+    callback_id: SlackCallbackId.OPEN_CLOSE_CHANNELS_MODAL,
+    title: {
+      type: 'plain_text',
+      text: 'Open / Close Channels',
+    },
+    blocks: [
+      {
+        type: 'actions',
+        elements: [
+          {
+            type: 'static_select',
+            action_id: SlackActionId.OPEN_CLOSE_CHANNELS_FILTER_STATE,
+            placeholder: {
+              type: 'plain_text',
+              text: 'Select State',
+            },
+            initial_option: stateCode
+              ? getOptionForState(stateCode)
+              : undefined,
+            options: Object.keys(getStateConstants()).map((key) =>
+              getOptionForState(key)
+            ),
+          },
+          {
+            type: 'static_select',
+            action_id: SlackActionId.OPEN_CLOSE_CHANNELS_FILTER_TYPE,
+            placeholder: {
+              type: 'plain_text',
+              text: 'Select Type',
+            },
+            initial_option: channelType
+              ? getOptionForChannelType(channelType)
+              : undefined,
+            options: Object.keys(PodUtil.CHANNEL_TYPE).map((channelType) =>
+              getOptionForChannelType(channelType as PodUtil.CHANNEL_TYPE)
+            ),
+          },
+        ],
+      },
+      ...rows,
+    ],
+  };
+}
+
 export function getVoterStatusBlocks(messageText: string): SlackBlock[] {
   return [
     voterInfoSection(messageText),
@@ -412,12 +596,11 @@ export function replaceVoterPanelBlocks(
   return newBlocks;
 }
 
-// This function mutates the blocks input.
-export function populateDropdownNewInitialValue(
+// This function finds the element for a given action ID in a set of blocks
+export function findElementWithActionId(
   blocks: SlackBlock[],
-  actionId: SlackActionId,
-  newInitialValue: VoterStatus
-): boolean {
+  actionId: string
+): SlackElement | null {
   for (const i in blocks) {
     const block = blocks[i];
     if (block.type === 'actions') {
@@ -425,32 +608,54 @@ export function populateDropdownNewInitialValue(
       for (const j in elements) {
         const element = elements[j];
         if (element.action_id === actionId) {
-          if (element.type === 'static_select') {
-            // Assume new options is already in the list of old options
-            const newOption = element.options.find(
-              (o: SlackOption) => o.value === newInitialValue
-            );
-            if (!newOption) {
-              logger.error(
-                `Option with value ${newInitialValue} was not found`
-              );
-              return false;
-            }
-
-            element.initial_option = newOption;
-            // Javascript modifies the blocks by reference, return success
-            return true;
-          }
-          if (element.type === 'users_select') {
-            element.initial_user = newInitialValue;
-            // Javascript modifies the blocks by reference, return success
-            return true;
-          }
+          return element;
         }
       }
     }
   }
 
   // If we get here, we were unable to find the element with the specified action ID
+  return null;
+}
+
+// This function mutates the blocks input.
+export function populateDropdownNewInitialValue(
+  blocks: SlackBlock[],
+  actionId: string,
+  newInitialValue?: string | null
+): boolean {
+  const element = findElementWithActionId(blocks, actionId);
+  if (!element) return false;
+
+  if (element.type === 'static_select') {
+    // Assume new options is already in the list of old options
+
+    element.initial_option =
+      element.options &&
+      element.options.find((o: SlackOption) => o.value === newInitialValue);
+    if (newInitialValue && !element.initial_option) {
+      logger.error(`Option with value ${newInitialValue} was not found`);
+      return false;
+    }
+
+    // Javascript modifies the blocks by reference, return success
+    return true;
+  }
+
+  if (element.type === 'users_select') {
+    if (newInitialValue) {
+      element.initial_user = newInitialValue;
+    } else {
+      delete element.initial_user;
+    }
+
+    // Javascript modifies the blocks by reference, return success
+    return true;
+  }
+
+  // Unsupported element type, probably not what we'r looking for
+  logger.warn(
+    `Unexpected element type in populateDropdownNewInitialValue: ${element.type}`
+  );
   return false;
 }

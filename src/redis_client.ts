@@ -25,6 +25,7 @@ export type PromisifiedRedisClient = typeof redisClient & {
     value: string | number,
     ...args: (string | number)[]
   ): Promise<'OK' | null>;
+  lremAsync(key: string, count: number, value: string): Promise<number>;
   hgetallAsync(key: string): Promise<{ [k: string]: string }>;
   hgetAsync(key: string, field: string): Promise<string>;
   hsetAsync(key: string, field: string, value: string | number): Promise<void>;

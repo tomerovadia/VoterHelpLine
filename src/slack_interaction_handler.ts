@@ -2,6 +2,7 @@ import Hashes from 'jshashes';
 import * as DbApiUtil from './db_api_util';
 import * as SlackApiUtil from './slack_api_util';
 import * as LoadBalancer from './load_balancer';
+import * as PodUtil from './pod_util';
 import * as SlackBlockUtil from './slack_block_util';
 import * as SlackInteractionApiUtil from './slack_interaction_api_util';
 import { SlackActionId } from './slack_interaction_ids';
@@ -18,6 +19,8 @@ export type SlackInteractionEventPayload = {
   callback_id: string;
   trigger_id: string;
   view: {
+    id: string;
+    blocks: SlackBlockUtil.SlackBlock[];
     callback_id: string;
     private_metadata: string;
   };
@@ -27,7 +30,7 @@ export type SlackInteractionEventPayload = {
   channel: {
     id: string;
   };
-  actions: SlackBlockUtil.SlackBlock[];
+  actions: SlackBlockUtil.SlackAction[];
   user: {
     id: string;
   };
@@ -35,8 +38,13 @@ export type SlackInteractionEventPayload = {
     ts: string;
     blocks: SlackBlockUtil.SlackBlock[];
   };
-  automatedButtonSelection: boolean | undefined;
   action_ts: string;
+
+  // Not a Slack prop.
+  automatedButtonSelection: boolean | undefined;
+
+  // Added in cases where we've opened a loading modal. Not a Slack prop.
+  modalExternalId?: string;
 };
 
 export type SlackSyntheticPayload = {
@@ -226,7 +234,7 @@ export async function handleVoterStatusUpdate({
       if (
         !SlackBlockUtil.populateDropdownNewInitialValue(
           payload.message.blocks,
-          payload.actions
+          payload.actions && payload.actions[0].action_id
             ? payload.actions[0].action_id
             : SlackActionId.VOTER_STATUS_DROPDOWN,
           selectedVoterStatus as VoterStatus
@@ -297,6 +305,15 @@ export async function handleVolunteerUpdate({
   logger.info(
     `SLACKINTERACTIONHANDLER.handleVolunteerUpdate: Determined user interaction is a volunteer update`
   );
+  if (
+    !payload.actions ||
+    !payload.actions[0] ||
+    !payload.actions[0].selected_user
+  ) {
+    throw new Error(
+      'Expected seelcted_user in LACKINTERACTIONHANDLER.handleVolunteerUpdate'
+    );
+  }
   const selectedVolunteerSlackUserName = await SlackApiUtil.fetchSlackUserName(
     payload.actions && payload.actions[0].selected_user
   );
@@ -345,7 +362,7 @@ export async function handleVolunteerUpdate({
   if (
     !SlackBlockUtil.populateDropdownNewInitialValue(
       payload.message.blocks,
-      payload.actions
+      payload.actions && payload.actions[0].action_id
         ? payload.actions[0].action_id
         : SlackActionId.VOLUNTEER_DROPDOWN,
       payload.actions ? payload.actions[0].selected_user : null
@@ -547,4 +564,85 @@ export async function handleResetDemo(
   await DbApiUtil.logCommandToDb(modalPrivateMetadata);
 
   return;
+}
+
+export async function handleOpenCloseChannels({
+  payload,
+  viewId,
+  // originatingSlackUserName,
+  redisClient,
+  action,
+}: {
+  payload: SlackInteractionEventPayload;
+  viewId: string;
+  originatingSlackUserName: string;
+  redisClient: PromisifiedRedisClient;
+  action?: SlackBlockUtil.SlackAction;
+}): Promise<void> {
+  let stateCode: string | undefined;
+  let channelType: PodUtil.CHANNEL_TYPE | undefined;
+
+  if (action) {
+    // Populate state code for filtering
+    if (action.action_id === SlackActionId.OPEN_CLOSE_CHANNELS_FILTER_STATE) {
+      stateCode = action.selected_option?.value;
+    } else {
+      const viewState = SlackBlockUtil.findElementWithActionId(
+        payload.view.blocks,
+        SlackActionId.OPEN_CLOSE_CHANNELS_FILTER_STATE
+      );
+      stateCode = viewState?.initial_option?.value;
+    }
+
+    // Populate channel type for filtering purposes
+    if (action.action_id === SlackActionId.OPEN_CLOSE_CHANNELS_FILTER_TYPE) {
+      channelType = action.selected_option?.value as PodUtil.CHANNEL_TYPE;
+    } else {
+      const viewState = SlackBlockUtil.findElementWithActionId(
+        payload.view.blocks,
+        SlackActionId.OPEN_CLOSE_CHANNELS_FILTER_TYPE
+      );
+      channelType = viewState?.initial_option?.value as PodUtil.CHANNEL_TYPE;
+    }
+
+    // Open or close channel
+    if (
+      action.action_id ===
+      SlackActionId.OPEN_CLOSE_CHANNELS_CHANNEL_STATE_DROPDOWN
+    ) {
+      const { stateCode, channelName } = PodUtil.parseBlockId(action.block_id);
+
+      // TODO: There is a potential race condition if two people are editing the
+      // entrypoint at the same time. It should be relatively rare though.
+      const entrypoints =
+        (action.selected_options?.map(
+          (o: SlackBlockUtil.SlackOption) => o.value
+        ) as PodUtil.ENTRYPOINT_TYPE[]) || [];
+
+      await PodUtil.setChannelState(redisClient, {
+        stateCode,
+        channelName,
+        entrypoints,
+      });
+    }
+  } else {
+    // Start on normal channels by default
+    channelType = PodUtil.CHANNEL_TYPE.NORMAL;
+  }
+
+  const channelRows =
+    stateCode && channelType
+      ? await PodUtil.getPodChannelState(redisClient, {
+          stateCode,
+          channelType,
+        })
+      : undefined;
+
+  const slackView = SlackBlockUtil.getOpenCloseModal({
+    stateCode,
+    channelType,
+    channelRows,
+  });
+
+  await SlackApiUtil.updateModal(viewId, slackView);
 }
