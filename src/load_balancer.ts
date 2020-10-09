@@ -1,6 +1,7 @@
 import logger from './logger';
 import { PromisifiedRedisClient } from './redis_client';
 import { EntryPoint } from './types';
+import * as StateRegionConfig from './state_region_config';
 
 export const PULL_ENTRY_POINT = 'PULL';
 export const PUSH_ENTRY_POINT = 'PUSH';
@@ -44,24 +45,37 @@ export async function selectSlackChannel(
   );
   // If for some reason there's no stateName, Redis won't be able to provide
   // the needed info for determining a Slack channel. Caller should default
-  // to #lobby.
+  // to #national or #demo-national.
   if (!stateName) {
     logger.debug(
       'LOADBALANCER.selectSlackChannel: U.S. state not provided, LoadBalancer returning null.'
     );
     return null;
   }
-  const stateNameNoSpace = stateName.replace(/\s/g, '');
+
+  const stateOrRegionName =
+    process.env.CLIENT_ORGANIZATION === 'VOTE_AMERICA'
+      ? StateRegionConfig.stateToRegionMap[stateName]
+      : stateName;
+
+  if (!stateOrRegionName) {
+    logger.error(
+      `LOADBALANCER.selectSlackChannel: ERROR converting stateName (${stateName}) to region.`
+    );
+    return null;
+  }
+
+  const stateOrRegionNameNoSpace = stateOrRegionName.replace(/\s/g, '');
   const demoString = isDemo ? 'Demo' : '';
   const entryPointString = entryPoint === PULL_ENTRY_POINT ? 'Pull' : 'Push';
 
   // Key to Redis values of number of voters must follow this format.
-  const voterCounterKey = `voterCounter${entryPointString}${demoString}${stateNameNoSpace}`;
+  const voterCounterKey = `voterCounter${entryPointString}${demoString}${stateOrRegionNameNoSpace}`;
   logger.debug(
     `LOADBALANCER.selectSlackChannel: Determined voterCounterKey: ${voterCounterKey}`
   );
   // Keys to Redis lists of open pods must follow this format.
-  const openPodsKey = `openPods${entryPointString}${demoString}${stateNameNoSpace}`;
+  const openPodsKey = `openPods${entryPointString}${demoString}${stateOrRegionNameNoSpace}`;
   logger.debug(
     `LOADBALANCER.selectSlackChannel: Determined openPodsKey: ${openPodsKey}`
   );
