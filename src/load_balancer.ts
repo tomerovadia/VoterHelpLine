@@ -47,7 +47,7 @@ export async function selectSlackChannel(
   // the needed info for determining a Slack channel. Caller should default
   // to #national-0 or #demo-national-0.
   if (!stateName) {
-    logger.debug(
+    logger.error(
       'LOADBALANCER.selectSlackChannel: U.S. state not provided, LoadBalancer returning null.'
     );
     return null;
