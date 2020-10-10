@@ -29,7 +29,7 @@ export async function handleTwilioStatusCallback(req: Request): Promise<void> {
   // Update the Postgres DB with the message status and current timestamp
   const slackMessageInfo = await logTwilioStatusToDb(messageSid, messageStatus);
   if (!slackMessageInfo) {
-    logger.info(
+    logger.error(
       `TWILIO STATUS CALLBACK: No message with sid ${messageSid}; not updating slack`
     );
     return;
