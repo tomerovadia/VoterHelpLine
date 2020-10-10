@@ -36,7 +36,12 @@ export type ChannelInfo = {
 
 export const listStateAndRegions = memoize(() =>
   Object.values(getStateConstants())
-    .concat(uniq(Object.values(stateToRegionMap)))
+    // Add regions only for VOTE_AMERICA
+    .concat(
+      process.env.CLIENT_ORGANIZATION === 'VOTE_AMERICA'
+        ? uniq(Object.values(stateToRegionMap))
+        : []
+    )
     .sort()
 );
 
