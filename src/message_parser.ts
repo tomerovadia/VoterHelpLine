@@ -1,3 +1,9 @@
+import { EmojiConvertor } from 'emoji-js';
+const emoji = new EmojiConvertor();
+
+emoji.replace_mode = 'unified';
+emoji.allow_native = true;
+
 export default {
   processMessageText(userMessage: string): string | null {
     let processedUserMessage = userMessage;
@@ -28,6 +34,9 @@ export default {
       const newLink = arrayOfSingleLinks[i][1];
       processedUserMessage = processedUserMessage.replace(oldLink, newLink);
     }
+
+    // Replace emoji with unicode
+    processedUserMessage = emoji.replace_colons(processedUserMessage);
 
     // If nothing was changed, return null. Important for DB logging.
     return userMessage == processedUserMessage ? null : processedUserMessage;
