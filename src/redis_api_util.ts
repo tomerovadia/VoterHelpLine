@@ -100,6 +100,6 @@ export function deleteKeys(
   keys: string[]
 ): Promise<number> {
   logger.debug(`ENTERING REDISAPIUTIL.deleteKeys`);
-  redisClient.mget();
+
   return redisClient.delAsync(...keys);
 }
