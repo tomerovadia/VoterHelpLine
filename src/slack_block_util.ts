@@ -4,7 +4,6 @@ import { SlackActionId } from './slack_interaction_ids';
 import type { VoterStatus } from './types';
 import { SlackCallbackId } from './slack_interaction_ids';
 import { SlackModalPrivateMetadata } from './slack_interaction_handler';
-import { getStateConstants } from './state_constants';
 
 export type SlackBlock = {
   type: string;
@@ -356,20 +355,20 @@ export function getErrorSlackView(
 }
 
 interface OpenCloseModalProps {
-  /** Selected state code, if any e.g. FL, NC, OH */
-  stateCode?: string;
+  /** Selected state or region */
+  stateOrRegionName?: string;
   /** Selected filter type, if any */
   channelType?: PodUtil.CHANNEL_TYPE;
   /** Channels to display, if any */
   channelRows?: PodUtil.ChannelInfo[];
 }
 
-const getOptionForState = (stateCode: string): SlackOption => ({
+const getOptionForStateOrRegion = (stateOrRegionName: string): SlackOption => ({
   text: {
     type: 'plain_text',
-    text: getStateConstants()[stateCode],
+    text: stateOrRegionName,
   },
-  value: stateCode,
+  value: stateOrRegionName,
 });
 
 const getOptionForChannelType = (value: PodUtil.CHANNEL_TYPE): SlackOption => {
@@ -403,17 +402,19 @@ const pushOption: SlackOption = {
 };
 
 export function getOpenCloseModal({
-  stateCode,
-  channelType,
+  stateOrRegionName: selectedStateOrRegionName,
+  channelType: selectedChannelType,
   channelRows = [],
 }: OpenCloseModalProps = {}): SlackView {
   logger.info('ENTERING SLACKBLOCKUTIL.getOpenCloseModal');
 
   // Create rows for each channel
   const rows = channelRows.map(
-    ({ id, name, stateCode, entrypoints }): SlackBlock => {
-      const blockId = PodUtil.getBlockId(stateCode, name);
-      const text = id ? `*${name}*` : `*${name}* :warning: _channel not found_`;
+    ({ id, channelName, stateOrRegionName, entrypoints }): SlackBlock => {
+      const blockId = PodUtil.getBlockId(stateOrRegionName, channelName);
+      const text = id
+        ? `*${channelName}*`
+        : `*${channelName}* :warning: _channel not found_`;
       const options: SlackOption[] = [pullOption, pushOption];
       const initialOptions = entrypoints.map((type) => {
         switch (type) {
@@ -423,7 +424,7 @@ export function getOpenCloseModal({
             return pushOption;
         }
         logger.error(
-          `SLACKBLOCKUTIL.getOpenCloseModal: Invalid entrypoint type for ${name}: ${type}`
+          `SLACKBLOCKUTIL.getOpenCloseModal: Invalid entrypoint type for ${channelName}: ${type}`
         );
       });
 
@@ -449,14 +450,14 @@ export function getOpenCloseModal({
 
   // Empty state
   if (!rows.length) {
-    if (stateCode && channelType) {
+    if (selectedStateOrRegionName && selectedChannelType) {
       rows.push({
         type: 'section',
         text: {
           type: 'mrkdwn',
-          text: `No channels found. You may need to create some. Channels follow this format: \`${PodUtil.getChannelNamePrefixForState(
-            stateCode,
-            channelType
+          text: `No channels found. You may need to create some. Channels follow this format: \`${PodUtil.getChannelNamePrefixForStateOrRegionName(
+            selectedStateOrRegionName,
+            selectedChannelType
           )}0\``,
         },
       });
@@ -489,11 +490,11 @@ export function getOpenCloseModal({
               type: 'plain_text',
               text: 'Select State',
             },
-            initial_option: stateCode
-              ? getOptionForState(stateCode)
+            initial_option: selectedStateOrRegionName
+              ? getOptionForStateOrRegion(selectedStateOrRegionName)
               : undefined,
-            options: Object.keys(getStateConstants()).map((key) =>
-              getOptionForState(key)
+            options: PodUtil.listStateAndRegions().map((stateOrRegionName) =>
+              getOptionForStateOrRegion(stateOrRegionName)
             ),
           },
           {
@@ -503,8 +504,8 @@ export function getOpenCloseModal({
               type: 'plain_text',
               text: 'Select Type',
             },
-            initial_option: channelType
-              ? getOptionForChannelType(channelType)
+            initial_option: selectedChannelType
+              ? getOptionForChannelType(selectedChannelType)
               : undefined,
             options: Object.keys(PodUtil.CHANNEL_TYPE).map((channelType) =>
               getOptionForChannelType(channelType as PodUtil.CHANNEL_TYPE)

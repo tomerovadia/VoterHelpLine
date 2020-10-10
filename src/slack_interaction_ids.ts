@@ -25,4 +25,4 @@ export enum SlackActionId {
 }
 
 // Prefixes per-state blocks in open-close channel modal
-export const OPEN_CLOSE_CHANNELS_BLOCK_ID_PREFIX = 'OPEN_CLOSE_CHANNELS_';
+export const OPEN_CLOSE_CHANNELS_BLOCK_ID_PREFIX = 'OPEN_CLOSE_CHANNELS:';

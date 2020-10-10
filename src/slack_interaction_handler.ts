@@ -579,19 +579,19 @@ export async function handleOpenCloseChannels({
   redisClient: PromisifiedRedisClient;
   action?: SlackBlockUtil.SlackAction;
 }): Promise<void> {
-  let stateCode: string | undefined;
+  let stateOrRegionName: string | undefined;
   let channelType: PodUtil.CHANNEL_TYPE | undefined;
 
   if (action) {
     // Populate state code for filtering
     if (action.action_id === SlackActionId.OPEN_CLOSE_CHANNELS_FILTER_STATE) {
-      stateCode = action.selected_option?.value;
+      stateOrRegionName = action.selected_option?.value;
     } else {
       const viewState = SlackBlockUtil.findElementWithActionId(
         payload.view.blocks,
         SlackActionId.OPEN_CLOSE_CHANNELS_FILTER_STATE
       );
-      stateCode = viewState?.initial_option?.value;
+      stateOrRegionName = viewState?.initial_option?.value;
     }
 
     // Populate channel type for filtering purposes
@@ -610,7 +610,9 @@ export async function handleOpenCloseChannels({
       action.action_id ===
       SlackActionId.OPEN_CLOSE_CHANNELS_CHANNEL_STATE_DROPDOWN
     ) {
-      const { stateCode, channelName } = PodUtil.parseBlockId(action.block_id);
+      const { stateOrRegionName, channelName } = PodUtil.parseBlockId(
+        action.block_id
+      );
 
       // TODO: There is a potential race condition if two people are editing the
       // entrypoint at the same time. It should be relatively rare though.
@@ -620,7 +622,7 @@ export async function handleOpenCloseChannels({
         ) as PodUtil.ENTRYPOINT_TYPE[]) || [];
 
       await PodUtil.setChannelState(redisClient, {
-        stateCode,
+        stateOrRegionName,
         channelName,
         entrypoints,
       });
@@ -631,15 +633,15 @@ export async function handleOpenCloseChannels({
   }
 
   const channelRows =
-    stateCode && channelType
+    stateOrRegionName && channelType
       ? await PodUtil.getPodChannelState(redisClient, {
-          stateCode,
+          stateOrRegionName,
           channelType,
         })
       : undefined;
 
   const slackView = SlackBlockUtil.getOpenCloseModal({
-    stateCode,
+    stateOrRegionName,
     channelType,
     channelRows,
   });
