@@ -4,6 +4,7 @@
 export enum SlackCallbackId {
   OPEN_CLOSE_CHANNELS = 'open_close_channels',
   OPEN_CLOSE_CHANNELS_MODAL = 'open_close_channels_modal',
+  OPEN_CLOSE_CHANNELS_ERROR_MODAL = 'open_close_channels_error_modal',
   RESET_DEMO = 'reset_demo',
   RESET_DEMO_MODAL = 'reset_demo_modal',
 }

@@ -5,7 +5,7 @@ import * as LoadBalancer from './load_balancer';
 import * as PodUtil from './pod_util';
 import * as SlackBlockUtil from './slack_block_util';
 import * as SlackInteractionApiUtil from './slack_interaction_api_util';
-import { SlackActionId } from './slack_interaction_ids';
+import { SlackActionId, SlackCallbackId } from './slack_interaction_ids';
 import * as RedisApiUtil from './redis_api_util';
 import logger from './logger';
 import { VoterStatus } from './types';
@@ -579,10 +579,33 @@ export async function handleOpenCloseChannels({
   redisClient: PromisifiedRedisClient;
   action?: SlackBlockUtil.SlackAction;
 }): Promise<void> {
+  logger.info('Entering SLACKINTERACTIONHANDLER.handleOpenCloseChannels');
+
+  // Auth check
+  const isAdmin = await SlackApiUtil.isMemberOfAdminChannel(payload.user.id);
+  if (!isAdmin) {
+    logger.warn(
+      `SLACKINTERACTIONHANDLER.handleOpenCloseChannels: ${payload.user.id} is not an admin`
+    );
+    await SlackApiUtil.updateModal(
+      viewId,
+      SlackBlockUtil.getErrorSlackView(
+        SlackCallbackId.OPEN_CLOSE_CHANNELS_ERROR_MODAL,
+        'You must have access to the admin channel to do that'
+      )
+    );
+    return;
+  }
+
+  // Process action to decide what to render
   let stateOrRegionName: string | undefined;
   let channelType: PodUtil.CHANNEL_TYPE | undefined;
 
   if (action) {
+    logger.info(
+      `SLACKINTERACTIONHANDLER.handleOpenCloseChannels: processing action ${action.action_id}`
+    );
+
     // Populate state code for filtering
     if (action.action_id === SlackActionId.OPEN_CLOSE_CHANNELS_FILTER_STATE) {
       stateOrRegionName = action.selected_option?.value;
