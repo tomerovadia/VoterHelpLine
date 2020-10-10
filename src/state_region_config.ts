@@ -37,7 +37,7 @@ export const stateToRegionMap: { [stateCode: string]: string } = {
   Ohio: 'Eastern North',
   Oklahoma: 'Central',
   Oregon: 'Pacific',
-  Pennsylvania: 'Eastern North',
+  Pennsylvania: 'Pennsylvania',
   'Rhode Island': 'Eastern North',
   'South Carolina': 'Eastern South',
   'South Dakota': 'Central',
