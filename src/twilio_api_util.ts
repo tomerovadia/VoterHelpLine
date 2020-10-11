@@ -17,46 +17,35 @@ export async function sendMessage(
     twilioCallbackURL: string;
     deduplicationId?: string;
   },
-  databaseMessageEntry?: DbApiUtil.DatabaseMessageEntry
+  databaseMessageEntry: DbApiUtil.DatabaseMessageEntry
 ): Promise<void> {
   logger.info(`ENTERING TWILIOAPIUTIL.sendMessage`);
 
-  if (databaseMessageEntry) {
-    logger.info(
-      `TWILIOAPIUTIL.sendMessage: This Twilio message send will log to DB (databaseMessageEntry is not null).`
-    );
-    databaseMessageEntry.message = message;
-    databaseMessageEntry.fromPhoneNumber = options.twilioPhoneNumber;
-    databaseMessageEntry.toPhoneNumber = options.userPhoneNumber;
-    databaseMessageEntry.twilioSendTimestamp = new Date();
-  }
+  databaseMessageEntry.message = message;
+  databaseMessageEntry.fromPhoneNumber = options.twilioPhoneNumber;
+  databaseMessageEntry.toPhoneNumber = options.userPhoneNumber;
+  databaseMessageEntry.twilioSendTimestamp = new Date();
 
   if (
     options.deduplicationId &&
     !(await isFirstUseOfKey(options.deduplicationId))
   ) {
-    if (databaseMessageEntry) {
-      logger.warn(
-        'TWILIOAPIUTIL.sendMessage: Not sending duplicate Twilio message ' +
-          `triggered by Slack message ${databaseMessageEntry.slackMessageTs} in ` +
-          `channel ${databaseMessageEntry.slackChannel} to ${options.userPhoneNumber}: ${message}`
-      );
+    logger.warn(
+      'TWILIOAPIUTIL.sendMessage: Not sending duplicate Twilio message ' +
+        `triggered by Slack message ${databaseMessageEntry.slackMessageTs} in ` +
+        `channel ${databaseMessageEntry.slackChannel} to ${options.userPhoneNumber}: ${message}`
+    );
 
-      databaseMessageEntry.successfullySent = false;
-      databaseMessageEntry.twilioError = 'helpline_deduplication_filtered';
+    databaseMessageEntry.successfullySent = false;
+    databaseMessageEntry.twilioError = 'helpline_deduplication_filtered';
 
-      try {
-        await DbApiUtil.logMessageToDb(databaseMessageEntry);
-      } catch (error) {
-        logger.error(
-          'TWILIOAPIUTIL.sendMessage: failed to log message send duplication failure to DB'
-        );
-        Sentry.captureException(error);
-      }
-    } else {
-      logger.warn(
-        `TWILIOAPIUTIL.sendMessage: Not sending duplicate Twilio message to ${options.userPhoneNumber}: ${message}`
+    try {
+      await DbApiUtil.logMessageToDb(databaseMessageEntry);
+    } catch (error) {
+      logger.error(
+        'TWILIOAPIUTIL.sendMessage: failed to log message send duplication failure to DB'
       );
+      Sentry.captureException(error);
     }
 
     return;
@@ -76,18 +65,16 @@ export async function sendMessage(
                   from: ${options.twilioPhoneNumber},
                   to: ${options.userPhoneNumber}\n`);
 
-    if (databaseMessageEntry) {
-      databaseMessageEntry.twilioMessageSid = response.sid;
-      databaseMessageEntry.successfullySent = true;
+    databaseMessageEntry.twilioMessageSid = response.sid;
+    databaseMessageEntry.successfullySent = true;
 
-      try {
-        await DbApiUtil.logMessageToDb(databaseMessageEntry);
-      } catch (error) {
-        logger.error(
-          'TWILIOAPIUTIL.sendMessage: failed to log message send success to DB'
-        );
-        Sentry.captureException(error);
-      }
+    try {
+      await DbApiUtil.logMessageToDb(databaseMessageEntry);
+    } catch (error) {
+      logger.error(
+        'TWILIOAPIUTIL.sendMessage: failed to log message send success to DB'
+      );
+      Sentry.captureException(error);
     }
   } catch (error) {
     logger.error(`TWILIOAPIUTIL.sendMessage: ERROR in sending Twilio message,
@@ -104,20 +91,18 @@ export async function sendMessage(
     );
     Sentry.captureException(error);
 
-    if (databaseMessageEntry) {
-      // TODO: populate twilioMessageSid, which exists even for unsuccessful sends
-      // Not sure how to find it.
-      databaseMessageEntry.successfullySent = false;
-      databaseMessageEntry.twilioError = twilioError;
+    // TODO: populate twilioMessageSid, which exists even for unsuccessful sends
+    // Not sure how to find it.
+    databaseMessageEntry.successfullySent = false;
+    databaseMessageEntry.twilioError = twilioError;
 
-      try {
-        await DbApiUtil.logMessageToDb(databaseMessageEntry);
-      } catch (error) {
-        logger.error(
-          'TWILIOAPIUTIL.sendMessage: failed to log message send failure to DB'
-        );
-        Sentry.captureException(error);
-      }
+    try {
+      await DbApiUtil.logMessageToDb(databaseMessageEntry);
+    } catch (error) {
+      logger.error(
+        'TWILIOAPIUTIL.sendMessage: failed to log message send failure to DB'
+      );
+      Sentry.captureException(error);
     }
 
     throw error;
