@@ -8,7 +8,7 @@ export const stateToRegionMap: { [stateCode: string]: string } = {
   Connecticut: 'Eastern North',
   Delaware: 'Eastern North',
   'District of Columbia': 'Eastern South',
-  Florida: 'Eastern South',
+  Florida: 'Florida',
   Georgia: 'Eastern South',
   Hawaii: 'Pacific',
   Idaho: 'Mountain',
