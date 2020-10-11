@@ -1002,11 +1002,15 @@ export async function handleClearedVoter(
       } > : ${MINS_BEFORE_WELCOME_BACK_MESSAGE}), sending welcome back message.`
     );
     const welcomeBackMessage = MessageConstants.WELCOME_BACK();
-    await TwilioApiUtil.sendMessage(welcomeBackMessage, {
-      userPhoneNumber: userOptions.userPhoneNumber,
-      twilioPhoneNumber,
-      twilioCallbackURL,
-    });
+    await TwilioApiUtil.sendMessage(
+      welcomeBackMessage,
+      {
+        userPhoneNumber: userOptions.userPhoneNumber,
+        twilioPhoneNumber,
+        twilioCallbackURL,
+      },
+      DbApiUtil.populateAutomatedDbMessageEntry(userInfo)
+    );
     await SlackApiUtil.sendMessage(
       `*Automated Message:* ${welcomeBackMessage}`,
       activeChannelMessageParams
