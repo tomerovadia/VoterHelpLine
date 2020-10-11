@@ -247,28 +247,53 @@ export async function fetchSlackMessageBlocks(
 
 export async function fetchSlackChannelNamesAndIds(): Promise<SlackChannelNamesAndIds | null> {
   logger.info(`ENTERING SLACKAPIUTIL.fetchSlackChannelNamesAndIds`);
-  const response = await slackAPI.get('conversations.list', {
+  const firstPageResponse = await slackAPI.get('conversations.list', {
     params: {
       token: process.env.SLACK_BOT_ACCESS_TOKEN,
       types: 'private_channel',
     },
   });
 
-  if (response.data.ok) {
+  if (firstPageResponse.data.ok) {
     logger.info(
-      `SLACKAPIUTIL.fetchSlackChannelNamesAndIds: Successfully fetched Slack channel names and IDs.`
+      `SLACKAPIUTIL.fetchSlackChannelNamesAndIds: Successfully fetched first page of Slack channel names and IDs.`
     );
+
+    let channels = firstPageResponse.data.channels;
+    let cursor = firstPageResponse.data.response_metadata.next_cursor;
+    // Slack will return a (falsy) empty string when there is no next page.
+    while (cursor) {
+      const subsequentPageResponse = await slackAPI.get('conversations.list', {
+        params: {
+          token: process.env.SLACK_BOT_ACCESS_TOKEN,
+          types: 'private_channel',
+          cursor,
+        },
+      });
+
+      if (subsequentPageResponse.data.ok) {
+        cursor = subsequentPageResponse.data.response_metadata.next_cursor;
+        channels = channels.concat(subsequentPageResponse.data.channels);
+      } else {
+        logger.error(
+          `SLACKAPIUTIL.fetchSlackChannelNamesAndIds: ERROR fetching subsequent page of Slack channel names and IDs. Error: response.data: ${JSON.stringify(
+            firstPageResponse.data
+          )}`
+        );
+        break;
+      }
+    }
+
     const slackChannelNamesAndIds = {} as SlackChannelNamesAndIds;
-    for (const idx in response.data.channels) {
-      const channel = response.data.channels[idx];
+    for (const idx in channels) {
+      const channel = channels[idx];
       slackChannelNamesAndIds[channel.name] = channel.id;
     }
     return slackChannelNamesAndIds;
-    // return response.data.messages[0].blocks;
   } else {
     logger.error(
-      `SLACKAPIUTIL.fetchSlackChannelNamesAndIds: ERROR fetching Slack channel names and IDs. Error: response.data: ${JSON.stringify(
-        response.data
+      `SLACKAPIUTIL.fetchSlackChannelNamesAndIds: ERROR fetching initial page of Slack channel names and IDs. Error: response.data: ${JSON.stringify(
+        firstPageResponse.data
       )}`
     );
     return null;
