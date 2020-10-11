@@ -269,6 +269,7 @@ export async function fetchSlackChannelNamesAndIds(): Promise<SlackChannelNamesA
   let channels = firstPageResponse.data.channels;
   let cursor = firstPageResponse.data.response_metadata.next_cursor;
   // Slack will return a (falsy) empty string when there is no next page.
+  // See 'Pagination' on this reference: https://api.slack.com/methods/conversations.list
   while (cursor) {
     logger.info(
       `SLACKAPIUTIL.fetchSlackChannelNamesAndIds: Fetching subsequent page of Slack channel names and IDs (cursor: ${cursor}).`
