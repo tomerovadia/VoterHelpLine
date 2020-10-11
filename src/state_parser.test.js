@@ -1,5 +1,9 @@
 const StateParser = require('./state_parser');
 
+beforeEach(() => {
+  process.env.CLIENT_ORGANIZATION = 'VOTE_AMERICA';
+});
+
 test('Identifies exact state abbreviation.', () => {
   expect(StateParser.determineState('NC')).toBe('North Carolina');
 });
@@ -139,4 +143,16 @@ test('Handles abbreviation of only name part, with period.', () => {
   expect(StateParser.determineState('I want to vote in N.Carolina')).toBe(
     'North Carolina'
   );
+});
+
+test('Prioritizes OK lower than everything else except IN', () => {
+  expect(StateParser.determineState("OK, I'm in IN")).toBe('Indiana');
+});
+
+test('Prioritizes IN lower than everything else', () => {
+  expect(
+    StateParser.determineState(
+      "OK, I'm registered to vote in NJ but I live in MD"
+    )
+  ).toBe('Maryland');
 });
