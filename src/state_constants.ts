@@ -16,7 +16,6 @@ export function getStateConstants(): { [stateCode: string]: string } {
         HI: 'Hawaii',
         ID: 'Idaho',
         IL: 'Illinois',
-        IN: 'Indiana',
         IA: 'Iowa',
         KS: 'Kansas',
         KY: 'Kentucky',
@@ -38,7 +37,6 @@ export function getStateConstants(): { [stateCode: string]: string } {
         NC: 'North Carolina',
         ND: 'North Dakota',
         OH: 'Ohio',
-        OK: 'Oklahoma',
         OR: 'Oregon',
         PA: 'Pennsylvania',
         RI: 'Rhode Island',
@@ -53,6 +51,8 @@ export function getStateConstants(): { [stateCode: string]: string } {
         WV: 'West Virginia',
         WI: 'Wisconsin',
         WY: 'Wyoming',
+        IN: 'Indiana',
+        OK: 'Oklahoma',
       };
     case 'VOTER_HELP_LINE':
       return {
