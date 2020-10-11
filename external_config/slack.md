@@ -37,6 +37,10 @@ Important: The Slack bot must be given access to each of these channels.
 - RPUSH openPodsPullEasternSouth eastern-south-0
 - RPUSH openPodsPullEasternNorth eastern-north-0
 - RPUSH openPodsPullCentral central-0
+- RPUSH openPodsPullPennsylvania pennsylvania-0
+- RPUSH openPodsPullDemoPennsylvania demo-pennsylvania-0
+- RPUSH openPodsPullFlorida florida-0
+- RPUSH openPodsPullDemoFlorida demo-florida-0
 
 ## Slack App
 
