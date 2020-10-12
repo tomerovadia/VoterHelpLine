@@ -95,6 +95,7 @@ async function slackInteractivityHandler(
       redisClient,
       originatingSlackUserName,
       viewId: getViewId(payload, interactivityMetadata),
+      values: payload?.view?.state?.values,
       action: payload.actions[0],
     });
     return;
@@ -115,6 +116,28 @@ async function slackInteractivityHandler(
       originatingSlackUserName,
       viewId: getViewId(payload, interactivityMetadata),
       values: payload?.view?.state?.values,
+      isSubmission: true,
+    });
+    return;
+  }
+
+  // Confirmation modal submission
+  if (
+    payload.type === 'view_submission' &&
+    payload.view?.callback_id ===
+      SlackCallbackId.OPEN_CLOSE_CHANNELS_CONFIRM_MODAL
+  ) {
+    logger.info(
+      `SERVER POST /slack-interactivity: Determined user interaction is a OPEN_CLOSE_CHANNELS_MODAL_CONFIRM submission.`
+    );
+
+    await SlackInteractionHandler.handleOpenCloseChannels({
+      payload,
+      redisClient,
+      originatingSlackUserName,
+      viewId: payload?.view?.root_view_id,
+      values: JSON.parse(payload?.view?.private_metadata),
+      isSubmission: true,
     });
     return;
   }

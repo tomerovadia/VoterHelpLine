@@ -36,6 +36,7 @@ export type SlackInteractionEventPayload = {
     blocks: SlackBlockUtil.SlackBlock[];
     callback_id: string;
     private_metadata: string;
+    root_view_id: string;
     state?: {
       values: SlackInteractionEventValuesPayload;
     };
@@ -589,6 +590,7 @@ export async function handleOpenCloseChannels({
   redisClient,
   action,
   values,
+  isSubmission,
 }: {
   payload: SlackInteractionEventPayload;
   viewId: string;
@@ -596,6 +598,7 @@ export async function handleOpenCloseChannels({
   redisClient: PromisifiedRedisClient;
   action?: SlackBlockUtil.SlackAction;
   values?: SlackInteractionEventValuesPayload;
+  isSubmission?: boolean;
 }): Promise<void> {
   logger.info('Entering SLACKINTERACTIONHANDLER.handleOpenCloseChannels');
 
@@ -618,6 +621,7 @@ export async function handleOpenCloseChannels({
   // Process action to decide what to render
   let stateOrRegionName: string | undefined;
   let channelType: PodUtil.CHANNEL_TYPE = PodUtil.CHANNEL_TYPE.NORMAL;
+  const channelInfo: PodUtil.ChannelInfo[] = [];
   let flashMessage: string | undefined;
 
   if (action) {
@@ -626,31 +630,8 @@ export async function handleOpenCloseChannels({
     );
   }
 
-  // Populate state code for filtering
-  if (action?.action_id === SlackActionId.OPEN_CLOSE_CHANNELS_FILTER_STATE) {
-    stateOrRegionName = action.selected_option?.value;
-  } else if (payload.view) {
-    const viewState = SlackBlockUtil.findElementWithActionId(
-      payload.view.blocks,
-      SlackActionId.OPEN_CLOSE_CHANNELS_FILTER_STATE
-    );
-    stateOrRegionName = viewState?.initial_option?.value;
-  }
-
-  // Populate channel type for filtering purposes
-  if (action?.action_id === SlackActionId.OPEN_CLOSE_CHANNELS_FILTER_TYPE) {
-    channelType = action.selected_option?.value as PodUtil.CHANNEL_TYPE;
-  } else if (payload.view) {
-    const viewState = SlackBlockUtil.findElementWithActionId(
-      payload.view.blocks,
-      SlackActionId.OPEN_CLOSE_CHANNELS_FILTER_TYPE
-    );
-    channelType = viewState?.initial_option?.value as PodUtil.CHANNEL_TYPE;
-  }
-
-  // Handle submission
-  if (stateOrRegionName && channelType && values) {
-    const channelInfo: PodUtil.ChannelInfo[] = [];
+  // Populate filters + data from values
+  if (values) {
     Object.keys(values).forEach((blockId) => {
       Object.keys(values[blockId]).forEach((actionId) => {
         if (
@@ -661,9 +642,20 @@ export async function handleOpenCloseChannels({
           );
           const { entrypoint, channelName } = PodUtil.parseBlockId(blockId);
           channelInfo.push({ entrypoint, channelName, weight });
+        } else if (
+          actionId === SlackActionId.OPEN_CLOSE_CHANNELS_FILTER_STATE
+        ) {
+          stateOrRegionName = values[blockId][actionId].selected_option?.value;
+        } else if (actionId === SlackActionId.OPEN_CLOSE_CHANNELS_FILTER_TYPE) {
+          channelType = values[blockId][actionId].selected_option
+            ?.value as PodUtil.CHANNEL_TYPE;
         }
       });
     });
+  }
+
+  // Handle submission
+  if (stateOrRegionName && channelType && channelInfo.length && isSubmission) {
     await PodUtil.setChannelWeights(
       redisClient,
       { stateOrRegionName, channelType },
@@ -713,4 +705,41 @@ export async function handleOpenCloseChannels({
   });
 
   await SlackApiUtil.updateModal(viewId, slackView);
+}
+
+export function maybeGetConfirmationModal(
+  payload: SlackInteractionEventPayload
+): SlackBlockUtil.SlackView | null {
+  const values = payload.view?.state?.values;
+  if (!values) return null;
+
+  let hasAtLeastOnePull = false;
+  let hasAtLeastOnePush = false;
+
+  Object.keys(values).forEach((blockId) => {
+    Object.keys(values[blockId]).forEach((actionId) => {
+      if (
+        actionId === SlackActionId.OPEN_CLOSE_CHANNELS_CHANNEL_STATE_DROPDOWN
+      ) {
+        const { entrypoint } = PodUtil.parseBlockId(blockId);
+        const weight = parseInt(
+          values[blockId][actionId].selected_option?.value || '0'
+        );
+        if (weight > 0) {
+          if (entrypoint === PodUtil.ENTRYPOINT_TYPE.PUSH) {
+            hasAtLeastOnePush = true;
+          } else {
+            hasAtLeastOnePull = true;
+          }
+        }
+      }
+    });
+  });
+
+  if (hasAtLeastOnePull && hasAtLeastOnePush) return null;
+  return SlackBlockUtil.openCloseConfirmationView({
+    hasAtLeastOnePull,
+    hasAtLeastOnePush,
+    values,
+  });
 }

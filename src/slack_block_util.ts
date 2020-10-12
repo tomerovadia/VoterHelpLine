@@ -53,6 +53,7 @@ export type SlackView = {
   private_metadata?: string;
   title: SlackText;
   submit?: SlackText;
+  close?: SlackText;
   blocks: {
     type: string;
     text?: SlackText;
@@ -624,6 +625,67 @@ export function makeClosedVoterPanelBlocks(
     });
   }
   return blocks;
+}
+
+interface OpenCloseConfirmationProps {
+  hasAtLeastOnePull: boolean;
+  hasAtLeastOnePush: boolean;
+  values: any;
+}
+
+export function openCloseConfirmationView({
+  hasAtLeastOnePull,
+  hasAtLeastOnePush,
+  values,
+}: OpenCloseConfirmationProps): SlackView {
+  const blocks: SlackBlock[] = [
+    {
+      type: 'section',
+      text: {
+        type: 'mrkdwn',
+        text: 'Are you sure you want to continue?',
+      },
+    },
+  ];
+  if (!hasAtLeastOnePull) {
+    blocks.push({
+      type: 'section',
+      text: {
+        type: 'mrkdwn',
+        text:
+          ':warning: There are no *pull* entrypoints associated with this state or region.',
+      },
+    });
+  }
+  if (!hasAtLeastOnePush) {
+    blocks.push({
+      type: 'section',
+      text: {
+        type: 'mrkdwn',
+        text:
+          ':warning: There are no *push* entrypoints associated with this state or region.',
+      },
+    });
+  }
+
+  return {
+    type: 'modal',
+    callback_id: SlackCallbackId.OPEN_CLOSE_CHANNELS_CONFIRM_MODAL,
+    title: {
+      type: 'plain_text',
+      text: 'Please confirm',
+    },
+    blocks,
+    private_metadata: JSON.stringify(values),
+    submit: {
+      type: 'plain_text',
+      text: 'Continue',
+    },
+    close: {
+      type: 'plain_text',
+      text: 'Back',
+    },
+  };
 }
 
 export function replaceVoterPanelBlocks(

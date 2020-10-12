@@ -7,6 +7,7 @@ import axios, { AxiosResponse } from 'axios';
 import { Pool } from 'pg';
 
 import * as SlackApiUtil from './slack_api_util';
+import * as SlackInteractionHandler from './slack_interaction_handler';
 import * as TwilioApiUtil from './twilio_api_util';
 import * as Router from './router';
 import * as DbApiUtil from './db_api_util';
@@ -629,19 +630,35 @@ app.post(
 
     if (
       payload.type === 'view_submission' &&
-      [SlackCallbackId.OPEN_CLOSE_CHANNELS_MODAL].includes(
-        payload.view?.callback_id as SlackCallbackId
-      )
+      (payload.view?.callback_id as SlackCallbackId) ===
+        SlackCallbackId.OPEN_CLOSE_CHANNELS_MODAL
     ) {
-      logger.info(
-        `SERVER POST /slack-interactivity: Determined ${payload.view?.callback_id} updates the view in modal`
+      // Check if we need to render a confirmation modal. This needs to happen
+      // synchronously to avoid 3 second timeout.
+      const confirmationModal = SlackInteractionHandler.maybeGetConfirmationModal(
+        payload
       );
+      if (confirmationModal) {
+        logger.info(
+          `SERVER POST /slack-interactivity: Determined ${payload.view?.callback_id} pushes a view onto modal`
+        );
 
-      // Need a synchronous response within 3 seconds, so show loading state again.
-      res.json({
-        response_action: 'update',
-        view: SlackBlockUtil.loadingSlackView(),
-      });
+        res.json({
+          response_action: 'push',
+          view: confirmationModal,
+        });
+        return; // Return early to avoid background task
+      } else {
+        logger.info(
+          `SERVER POST /slack-interactivity: Determined ${payload.view?.callback_id} updates the view in modal`
+        );
+
+        // This will change, so show loading state again.
+        res.json({
+          response_action: 'update',
+          view: SlackBlockUtil.loadingSlackView(),
+        });
+      }
     }
 
     await enqueueBackgroundTask('slackInteractivityHandler', payload, metadata);
