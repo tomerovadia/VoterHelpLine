@@ -1569,11 +1569,11 @@ describe('handleClearedVoter', () => {
     });
   });
 
-  test("Sends voter a welcome back text if it's been longer than 1 hour", () => {
+  test("Sends voter a welcome back text if it's been longer than 24 hours", () => {
     expect.assertions(2);
-    const oneHourAndOneMinInSecs = 60 * 60 + 60;
+    const twentyFourHoursAndOneMinInSecs = 60 * 60 * 24 + 60;
     const mockLastVoterMessageSecsFromEpoch = Math.round(
-      Date.now() / 1000 - oneHourAndOneMinInSecs
+      Date.now() / 1000 - twentyFourHoursAndOneMinInSecs
     );
     const userInfo = {
       activeChannelId: 'CNORTHCAROLINACHANNELID',
