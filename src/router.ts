@@ -17,7 +17,7 @@ import { EntryPoint, UserInfo } from './types';
 import { PromisifiedRedisClient } from './redis_client';
 import * as Sentry from '@sentry/node';
 
-const MINS_BEFORE_WELCOME_BACK_MESSAGE = 60;
+const MINS_BEFORE_WELCOME_BACK_MESSAGE = 60 * 24;
 export const NUM_STATE_SELECTION_ATTEMPTS_LIMIT = 2;
 
 type UserOptions = {
