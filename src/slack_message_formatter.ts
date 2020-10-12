@@ -2,8 +2,12 @@ import { HistoricalMessage } from './types';
 import logger from './logger';
 
 const formatMessageBlock = (msg: string, formatchar: string) => {
-  return msg.split('\n').map(x => x ? formatchar + x + formatchar : x).map(x => '>' + x).join('\n')
-}
+  return msg
+    .split('\n')
+    .map((x) => (x ? formatchar + x + formatchar : x))
+    .map((x) => '>' + x)
+    .join('\n');
+};
 
 export function formatMessageHistory(
   messageObjects: HistoricalMessage[],
@@ -15,9 +19,19 @@ export function formatMessageHistory(
     // See https://api.slack.com/reference/surfaces/formatting#visual-styles
     const specialSlackTimestamp = `<!date^${timeSinceEpochSecs}^{time} {date_short}|${messageObject.timestamp}>`;
     if (messageObject.direction == 'INBOUND') {
-      return `:bust_in_silhouette: *Voter ${userId}*  ` + specialSlackTimestamp + '\n' + formatMessageBlock(messageObject.message, '*');
+      return (
+        `:bust_in_silhouette: *Voter ${userId}*  ` +
+        specialSlackTimestamp +
+        '\n' +
+        formatMessageBlock(messageObject.message, '*')
+      );
     } else {
-      return ':gear: *Helpline*  ' + specialSlackTimestamp + '\n' + formatMessageBlock(messageObject.message, '_');
+      return (
+        ':gear: *Helpline*  ' +
+        specialSlackTimestamp +
+        '\n' +
+        formatMessageBlock(messageObject.message, '_')
+      );
     }
   });
 
