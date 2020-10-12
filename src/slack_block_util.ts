@@ -5,6 +5,8 @@ import { SlackActionId } from './slack_interaction_ids';
 import type { VoterStatus } from './types';
 import { SlackCallbackId } from './slack_interaction_ids';
 import { SlackModalPrivateMetadata } from './slack_interaction_handler';
+import { getStateConstants } from './state_constants';
+import { regionsList } from './state_region_config';
 
 export type SlackBlock = {
   type: string;
@@ -480,9 +482,29 @@ export function getOpenCloseModal({
         initial_option: selectedStateOrRegionName
           ? getOptionForStateOrRegion(selectedStateOrRegionName)
           : undefined,
-        options: PodUtil.listStateAndRegions().map((stateOrRegionName) =>
-          getOptionForStateOrRegion(stateOrRegionName)
-        ),
+        option_groups: regionsList.length
+          ? [
+              {
+                label: {
+                  type: 'plain_text',
+                  text: 'Regions',
+                },
+                options: regionsList.map(getOptionForStateOrRegion),
+              },
+              {
+                label: {
+                  type: 'plain_text',
+                  text: 'States',
+                },
+                options: Object.values(getStateConstants()).map(
+                  getOptionForStateOrRegion
+                ),
+              },
+            ]
+          : undefined,
+        options: regionsList.length
+          ? undefined
+          : Object.values(getStateConstants()).map(getOptionForStateOrRegion),
       },
       {
         type: 'static_select',

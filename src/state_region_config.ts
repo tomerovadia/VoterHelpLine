@@ -1,3 +1,5 @@
+import { uniq } from 'lodash';
+
 export const stateToRegionMap: { [stateCode: string]: string } = {
   Alabama: 'Central',
   Alaska: 'Pacific',
@@ -52,3 +54,8 @@ export const stateToRegionMap: { [stateCode: string]: string } = {
   Wyoming: 'Mountain',
   National: 'National',
 };
+
+export const regionsList =
+  process.env.CLIENT_ORGANIZATION === 'VOTE_AMERICA'
+    ? uniq(Object.values(stateToRegionMap))
+    : [];

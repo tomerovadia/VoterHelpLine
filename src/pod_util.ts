@@ -1,11 +1,11 @@
-import { memoize, sortBy, times, uniq } from 'lodash';
+import { memoize, sortBy, times } from 'lodash';
 import { PromisifiedRedisClient } from './redis_client';
 import logger from './logger';
 import * as RedisApiUtil from './redis_api_util';
 import * as SlackApiUtil from './slack_api_util';
 import { OPEN_CLOSE_CHANNELS_BLOCK_ID_PREFIX } from './slack_interaction_ids';
 import { getStateConstants } from './state_constants';
-import { stateToRegionMap } from './state_region_config';
+import { regionsList } from './state_region_config';
 
 export enum CHANNEL_TYPE {
   DEMO = 'DEMO',
@@ -36,14 +36,7 @@ export type ChannelInfo = {
 };
 
 export const listStateAndRegions = memoize(() =>
-  Object.values(getStateConstants())
-    // Add regions only for VOTE_AMERICA
-    .concat(
-      process.env.CLIENT_ORGANIZATION === 'VOTE_AMERICA'
-        ? uniq(Object.values(stateToRegionMap))
-        : []
-    )
-    .sort()
+  Object.values(getStateConstants()).concat(regionsList).sort()
 );
 
 const getValidStateAndRegionsSet = memoize(
