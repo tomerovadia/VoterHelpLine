@@ -613,6 +613,10 @@ app.post(
         SlackCallbackId.OPEN_CLOSE_CHANNELS,
       ].includes(payload.callback_id as SlackCallbackId)
     ) {
+      logger.info(
+        `SERVER POST /slack-interactivity: Determined ${payload.callback_id} opens a modal`
+      );
+
       // For certain actions, we always show a modal. Because we have to show
       // this modal within 3 seconds, we immediately make the call to show a
       // loading state, and then pass the modal ID on to the async task to
@@ -623,13 +627,33 @@ app.post(
       );
     }
 
+    if (
+      payload.type === 'view_submission' &&
+      [SlackCallbackId.OPEN_CLOSE_CHANNELS_MODAL].includes(
+        payload.view?.callback_id as SlackCallbackId
+      )
+    ) {
+      logger.info(
+        `SERVER POST /slack-interactivity: Determined ${payload.view?.callback_id} updates the view in modal`
+      );
+
+      // Need a synchronous response within 3 seconds, so show loading state again.
+      res.json({
+        response_action: 'update',
+        view: SlackBlockUtil.loadingSlackView(),
+      });
+    }
+
     await enqueueBackgroundTask('slackInteractivityHandler', payload, metadata);
 
-    // Use res.end instead of res.sendStatus because the latter sends the code as
-    // a string in the body, and modal responses require an empty body in some cases.
-    // See https://api.slack.com/surfaces/modals/using#close_current_view.
-    res.writeHead(200);
-    res.end();
+    // res.headersSent check because res.json may make this unnecessary
+    if (!res.headersSent) {
+      // Use res.end instead of res.sendStatus because the latter sends the code as
+      // a string in the body, and modal responses require an empty body in some cases.
+      // See https://api.slack.com/surfaces/modals/using#close_current_view.
+      res.writeHead(200);
+      res.end();
+    }
   })
 );
 

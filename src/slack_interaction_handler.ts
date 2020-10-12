@@ -14,6 +14,19 @@ import { UserInfo, SlackThreadInfo } from './types';
 
 export type VoterStatusUpdate = VoterStatus | 'UNDO';
 
+type SlackInteractionEventValuesPayload = Record<
+  string,
+  Record<
+    string,
+    {
+      type: string;
+      value?: string;
+      selected_option?: SlackBlockUtil.SlackOption;
+      selected_options?: SlackBlockUtil.SlackOption[];
+    }
+  >
+>;
+
 export type SlackInteractionEventPayload = {
   type: string;
   callback_id: string;
@@ -23,6 +36,9 @@ export type SlackInteractionEventPayload = {
     blocks: SlackBlockUtil.SlackBlock[];
     callback_id: string;
     private_metadata: string;
+    state?: {
+      values: SlackInteractionEventValuesPayload;
+    };
   };
   container: {
     thread_ts: string;
@@ -569,15 +585,17 @@ export async function handleResetDemo(
 export async function handleOpenCloseChannels({
   payload,
   viewId,
-  // originatingSlackUserName,
+  originatingSlackUserName,
   redisClient,
   action,
+  values,
 }: {
   payload: SlackInteractionEventPayload;
   viewId: string;
   originatingSlackUserName: string;
   redisClient: PromisifiedRedisClient;
   action?: SlackBlockUtil.SlackAction;
+  values?: SlackInteractionEventValuesPayload;
 }): Promise<void> {
   logger.info('Entering SLACKINTERACTIONHANDLER.handleOpenCloseChannels');
 
@@ -599,74 +617,99 @@ export async function handleOpenCloseChannels({
 
   // Process action to decide what to render
   let stateOrRegionName: string | undefined;
-  let channelType: PodUtil.CHANNEL_TYPE | undefined;
+  let channelType: PodUtil.CHANNEL_TYPE = PodUtil.CHANNEL_TYPE.NORMAL;
+  let flashMessage: string | undefined;
 
   if (action) {
     logger.info(
       `SLACKINTERACTIONHANDLER.handleOpenCloseChannels: processing action ${action.action_id}`
     );
-
-    // Populate state code for filtering
-    if (action.action_id === SlackActionId.OPEN_CLOSE_CHANNELS_FILTER_STATE) {
-      stateOrRegionName = action.selected_option?.value;
-    } else {
-      const viewState = SlackBlockUtil.findElementWithActionId(
-        payload.view.blocks,
-        SlackActionId.OPEN_CLOSE_CHANNELS_FILTER_STATE
-      );
-      stateOrRegionName = viewState?.initial_option?.value;
-    }
-
-    // Populate channel type for filtering purposes
-    if (action.action_id === SlackActionId.OPEN_CLOSE_CHANNELS_FILTER_TYPE) {
-      channelType = action.selected_option?.value as PodUtil.CHANNEL_TYPE;
-    } else {
-      const viewState = SlackBlockUtil.findElementWithActionId(
-        payload.view.blocks,
-        SlackActionId.OPEN_CLOSE_CHANNELS_FILTER_TYPE
-      );
-      channelType = viewState?.initial_option?.value as PodUtil.CHANNEL_TYPE;
-    }
-
-    // Open or close channel
-    if (
-      action.action_id ===
-      SlackActionId.OPEN_CLOSE_CHANNELS_CHANNEL_STATE_DROPDOWN
-    ) {
-      const { stateOrRegionName, channelName } = PodUtil.parseBlockId(
-        action.block_id
-      );
-
-      // TODO: There is a potential race condition if two people are editing the
-      // entrypoint at the same time. It should be relatively rare though.
-      const entrypoints =
-        (action.selected_options?.map(
-          (o: SlackBlockUtil.SlackOption) => o.value
-        ) as PodUtil.ENTRYPOINT_TYPE[]) || [];
-
-      await PodUtil.setChannelState(redisClient, {
-        stateOrRegionName,
-        channelName,
-        entrypoints,
-      });
-    }
-  } else {
-    // Start on normal channels by default
-    channelType = PodUtil.CHANNEL_TYPE.NORMAL;
   }
 
-  const channelRows =
+  // Populate state code for filtering
+  if (action?.action_id === SlackActionId.OPEN_CLOSE_CHANNELS_FILTER_STATE) {
+    stateOrRegionName = action.selected_option?.value;
+  } else if (payload.view) {
+    const viewState = SlackBlockUtil.findElementWithActionId(
+      payload.view.blocks,
+      SlackActionId.OPEN_CLOSE_CHANNELS_FILTER_STATE
+    );
+    stateOrRegionName = viewState?.initial_option?.value;
+  }
+
+  // Populate channel type for filtering purposes
+  if (action?.action_id === SlackActionId.OPEN_CLOSE_CHANNELS_FILTER_TYPE) {
+    channelType = action.selected_option?.value as PodUtil.CHANNEL_TYPE;
+  } else if (payload.view) {
+    const viewState = SlackBlockUtil.findElementWithActionId(
+      payload.view.blocks,
+      SlackActionId.OPEN_CLOSE_CHANNELS_FILTER_TYPE
+    );
+    channelType = viewState?.initial_option?.value as PodUtil.CHANNEL_TYPE;
+  }
+
+  // Handle submission
+  if (stateOrRegionName && channelType && values) {
+    const channelInfo: PodUtil.ChannelInfo[] = [];
+    Object.keys(values).forEach((blockId) => {
+      Object.keys(values[blockId]).forEach((actionId) => {
+        if (
+          actionId === SlackActionId.OPEN_CLOSE_CHANNELS_CHANNEL_STATE_DROPDOWN
+        ) {
+          const weight = parseInt(
+            values[blockId][actionId].selected_option?.value || '0'
+          );
+          const { entrypoint, channelName } = PodUtil.parseBlockId(blockId);
+          channelInfo.push({ entrypoint, channelName, weight });
+        }
+      });
+    });
+    await PodUtil.setChannelWeights(
+      redisClient,
+      { stateOrRegionName, channelType },
+      channelInfo
+    );
+    logger.info(
+      'SLACKINTERACTIONHANDLER.handleOpenCloseChannels: setChannelWeights success'
+    );
+    flashMessage = ':white_check_mark: _Channels updated_';
+
+    // Post a message in the admin thread recording this status change.
+    const channelString = channelInfo
+      .map(
+        ({ channelName, weight, entrypoint }) =>
+          `• ${entrypoint} \`${channelName}\` - *${weight}*`
+      )
+      .sort()
+      .join('\n');
+    const timeSinceEpochSecs = Math.round(Date.now() / 1000);
+    // See https://api.slack.com/reference/surfaces/formatting#visual-styles
+    const specialSlackTimestamp = `<!date^${timeSinceEpochSecs}^{date_num} {time_secs}|${new Date()}>`;
+    await SlackApiUtil.sendMessage(
+      `*Operator:* Channel weights changed by *${originatingSlackUserName}* at *${specialSlackTimestamp}*:\n${channelString}`,
+      {
+        channel: process.env.ADMIN_CONTROL_ROOM_SLACK_CHANNEL_ID as string,
+      }
+    );
+  }
+
+  const { push, pull } =
     stateOrRegionName && channelType
       ? await PodUtil.getPodChannelState(redisClient, {
           stateOrRegionName,
           channelType,
         })
-      : undefined;
+      : {
+          push: [],
+          pull: [],
+        };
 
   const slackView = SlackBlockUtil.getOpenCloseModal({
     stateOrRegionName,
     channelType,
-    channelRows,
+    pushRows: push,
+    pullRows: pull,
+    flashMessage,
   });
 
   await SlackApiUtil.updateModal(viewId, slackView);

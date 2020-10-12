@@ -1,3 +1,4 @@
+import { times } from 'lodash';
 import logger from './logger';
 import * as PodUtil from './pod_util';
 import { SlackActionId } from './slack_interaction_ids';
@@ -48,6 +49,7 @@ export type SlackAction = SlackElement & {
 
 export type SlackView = {
   callback_id?: string;
+  external_id?: string;
   private_metadata?: string;
   title: SlackText;
   submit?: SlackText;
@@ -359,8 +361,12 @@ interface OpenCloseModalProps {
   stateOrRegionName?: string;
   /** Selected filter type, if any */
   channelType?: PodUtil.CHANNEL_TYPE;
-  /** Channels to display, if any */
-  channelRows?: PodUtil.ChannelInfo[];
+  /** Pull channels to display, if any */
+  pullRows?: PodUtil.ChannelInfo[];
+  /** Push channels to display, if any */
+  pushRows?: PodUtil.ChannelInfo[];
+  /** Optional status message of some kind */
+  flashMessage?: string;
 }
 
 const getOptionForStateOrRegion = (stateOrRegionName: string): SlackOption => ({
@@ -385,71 +391,117 @@ const getOptionForChannelType = (value: PodUtil.CHANNEL_TYPE): SlackOption => {
   };
 };
 
-const pullOption: SlackOption = {
+// Weights for dropdown for each channel
+const getOptionForWeight = (n: number): SlackOption => ({
   text: {
     type: 'plain_text',
-    text: 'Pull',
+    text: String(n),
   },
-  value: PodUtil.ENTRYPOINT_TYPE.PULL,
-};
+  value: String(n),
+});
 
-const pushOption: SlackOption = {
-  text: {
-    type: 'plain_text',
-    text: 'Push',
-  },
-  value: PodUtil.ENTRYPOINT_TYPE.PUSH,
+const weightOptions: SlackOption[] = times(10, getOptionForWeight);
+
+const getBlocksForChannelInfo = (entrypoint: PodUtil.ENTRYPOINT_TYPE) => ({
+  id,
+  channelName,
+  weight,
+}: PodUtil.ChannelInfo): SlackBlock => {
+  const blockId = PodUtil.getBlockId({
+    channelName,
+    entrypoint,
+  });
+  const text = id
+    ? channelName
+    : `${channelName} :warning: _channel not found_`;
+
+  const accessory = {
+    type: 'static_select',
+    action_id: SlackActionId.OPEN_CLOSE_CHANNELS_CHANNEL_STATE_DROPDOWN,
+    initial_option: getOptionForWeight(weight),
+    options: weightOptions,
+  };
+
+  return {
+    type: 'section',
+    block_id: blockId,
+    text: {
+      type: 'mrkdwn',
+      text,
+    },
+    accessory,
+  };
 };
 
 export function getOpenCloseModal({
   stateOrRegionName: selectedStateOrRegionName,
   channelType: selectedChannelType,
-  channelRows = [],
+  pullRows = [],
+  pushRows = [],
+  flashMessage,
 }: OpenCloseModalProps = {}): SlackView {
   logger.info('ENTERING SLACKBLOCKUTIL.getOpenCloseModal');
 
-  // Create rows for each channel
-  const rows = channelRows.map(
-    ({ id, channelName, stateOrRegionName, entrypoints }): SlackBlock => {
-      const blockId = PodUtil.getBlockId(stateOrRegionName, channelName);
-      const text = id
-        ? `*${channelName}*`
-        : `*${channelName}* :warning: _channel not found_`;
-      const options: SlackOption[] = [pullOption, pushOption];
-      const initialOptions = entrypoints.map((type) => {
-        switch (type) {
-          case PodUtil.ENTRYPOINT_TYPE.PULL:
-            return pullOption;
-          case PodUtil.ENTRYPOINT_TYPE.PUSH:
-            return pushOption;
-        }
-        logger.error(
-          `SLACKBLOCKUTIL.getOpenCloseModal: Invalid entrypoint type for ${channelName}: ${type}`
-        );
-      });
-
-      const accessory = {
-        type: 'checkboxes',
-        action_id: SlackActionId.OPEN_CLOSE_CHANNELS_CHANNEL_STATE_DROPDOWN,
-        // Slack does not like an empty initial_options list
-        initial_options: initialOptions.length ? initialOptions : undefined,
-        options,
-      };
-
-      return {
-        type: 'section',
-        block_id: blockId,
-        text: {
-          type: 'mrkdwn',
-          text,
-        },
-        accessory,
-      };
-    }
+  // Create rows for each channel + entrypoint type
+  const pullBlocks = pullRows.map(
+    getBlocksForChannelInfo(PodUtil.ENTRYPOINT_TYPE.PULL)
+  );
+  const pushBlocks = pushRows.map(
+    getBlocksForChannelInfo(PodUtil.ENTRYPOINT_TYPE.PUSH)
   );
 
+  let rows: SlackBlock[] = [];
+  if (flashMessage) {
+    rows.push({
+      type: 'section',
+      text: {
+        type: 'mrkdwn',
+        text: flashMessage,
+      },
+    });
+
+    rows.push({
+      type: 'divider',
+    });
+  }
+
+  // Selectors
+  rows.push({
+    type: 'actions',
+    elements: [
+      {
+        type: 'static_select',
+        action_id: SlackActionId.OPEN_CLOSE_CHANNELS_FILTER_STATE,
+        placeholder: {
+          type: 'plain_text',
+          text: 'Select State',
+        },
+        initial_option: selectedStateOrRegionName
+          ? getOptionForStateOrRegion(selectedStateOrRegionName)
+          : undefined,
+        options: PodUtil.listStateAndRegions().map((stateOrRegionName) =>
+          getOptionForStateOrRegion(stateOrRegionName)
+        ),
+      },
+      {
+        type: 'static_select',
+        action_id: SlackActionId.OPEN_CLOSE_CHANNELS_FILTER_TYPE,
+        placeholder: {
+          type: 'plain_text',
+          text: 'Select Type',
+        },
+        initial_option: selectedChannelType
+          ? getOptionForChannelType(selectedChannelType)
+          : undefined,
+        options: Object.keys(PodUtil.CHANNEL_TYPE).map((channelType) =>
+          getOptionForChannelType(channelType as PodUtil.CHANNEL_TYPE)
+        ),
+      },
+    ],
+  });
+
   // Empty state
-  if (!rows.length) {
+  if (!pullBlocks.length && !pushBlocks.length) {
     if (selectedStateOrRegionName && selectedChannelType) {
       rows.push({
         type: 'section',
@@ -470,6 +522,27 @@ export function getOpenCloseModal({
         },
       });
     }
+  } else {
+    if (pullBlocks.length) {
+      rows.push({
+        type: 'header',
+        text: {
+          type: 'plain_text',
+          text: 'Pull',
+        },
+      });
+      rows = rows.concat(pullBlocks);
+    }
+    if (pushBlocks.length) {
+      rows.push({
+        type: 'header',
+        text: {
+          type: 'plain_text',
+          text: 'Push',
+        },
+      });
+      rows = rows.concat(pushBlocks);
+    }
   }
 
   return {
@@ -479,42 +552,14 @@ export function getOpenCloseModal({
       type: 'plain_text',
       text: 'Open / Close Channels',
     },
-    blocks: [
-      {
-        type: 'actions',
-        elements: [
-          {
-            type: 'static_select',
-            action_id: SlackActionId.OPEN_CLOSE_CHANNELS_FILTER_STATE,
-            placeholder: {
-              type: 'plain_text',
-              text: 'Select State',
-            },
-            initial_option: selectedStateOrRegionName
-              ? getOptionForStateOrRegion(selectedStateOrRegionName)
-              : undefined,
-            options: PodUtil.listStateAndRegions().map((stateOrRegionName) =>
-              getOptionForStateOrRegion(stateOrRegionName)
-            ),
-          },
-          {
-            type: 'static_select',
-            action_id: SlackActionId.OPEN_CLOSE_CHANNELS_FILTER_TYPE,
-            placeholder: {
-              type: 'plain_text',
-              text: 'Select Type',
-            },
-            initial_option: selectedChannelType
-              ? getOptionForChannelType(selectedChannelType)
-              : undefined,
-            options: Object.keys(PodUtil.CHANNEL_TYPE).map((channelType) =>
-              getOptionForChannelType(channelType as PodUtil.CHANNEL_TYPE)
-            ),
-          },
-        ],
-      },
-      ...rows,
-    ],
+    submit:
+      pullBlocks.length || pushBlocks.length
+        ? {
+            type: 'plain_text',
+            text: 'Save',
+          }
+        : undefined,
+    blocks: rows,
   };
 }
 

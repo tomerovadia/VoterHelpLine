@@ -79,7 +79,6 @@ async function slackInteractivityHandler(
     [
       SlackActionId.OPEN_CLOSE_CHANNELS_FILTER_STATE,
       SlackActionId.OPEN_CLOSE_CHANNELS_FILTER_TYPE,
-      SlackActionId.OPEN_CLOSE_CHANNELS_CHANNEL_STATE_DROPDOWN,
     ].includes(payload.actions[0].action_id as SlackActionId)
   ) {
     logger.info(
@@ -101,10 +100,38 @@ async function slackInteractivityHandler(
     return;
   }
 
-  if (payload.type === 'block_actions' || payload.type === 'message_action') {
-    const originatingSlackChannelName = await SlackApiUtil.fetchSlackChannelName(
-      payload.channel.id
+  // Handle open/close modal submission
+  if (
+    payload.type === 'view_submission' &&
+    payload.view?.callback_id === SlackCallbackId.OPEN_CLOSE_CHANNELS_MODAL
+  ) {
+    logger.info(
+      `SERVER POST /slack-interactivity: Determined user interaction is a OPEN_CLOSE_CHANNELS_MODAL submission.`
     );
+
+    await SlackInteractionHandler.handleOpenCloseChannels({
+      payload,
+      redisClient,
+      originatingSlackUserName,
+      viewId: getViewId(payload, interactivityMetadata),
+      values: payload?.view?.state?.values,
+    });
+    return;
+  }
+
+  if (
+    payload.type === 'block_actions' &&
+    payload.actions[0].action_id ===
+      SlackActionId.OPEN_CLOSE_CHANNELS_CHANNEL_STATE_DROPDOWN
+  ) {
+    // Noop -- this gets handled with submission
+    return;
+  }
+
+  if (payload.type === 'block_actions' || payload.type === 'message_action') {
+    const originatingSlackChannelName =
+      payload.channel &&
+      (await SlackApiUtil.fetchSlackChannelName(payload.channel.id));
 
     const redisHashKey = `${payload.channel.id}:${payload.message.ts}`;
     const redisData = await RedisApiUtil.getHash(redisClient, redisHashKey);
