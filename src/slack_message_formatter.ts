@@ -25,12 +25,19 @@ export function formatMessageHistory(
         '\n' +
         formatMessageBlock(messageObject.message, '*')
       );
-    } else {
+    } else if (messageObject.automated) {
       return (
         ':gear: *Helpline*  ' +
         specialSlackTimestamp +
         '\n' +
         formatMessageBlock(messageObject.message, '_')
+      );
+    } else {
+      return (
+        ':adult: *Helpline*  ' +
+        specialSlackTimestamp +
+        '\n' +
+        formatMessageBlock(messageObject.message, '')
       );
     }
   });
