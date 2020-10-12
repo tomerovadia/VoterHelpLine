@@ -980,7 +980,7 @@ export async function handleClearedVoter(
   userInfo.lastVoterMessageSecsFromEpoch = nowSecondsEpoch;
 
   await SlackApiUtil.sendMessage(
-    `*${userId.substring(0, 5)}:* ${userOptions.userMessage}`,
+    `${userOptions.userMessage}`,
     activeChannelMessageParams,
     inboundDbMessageEntry,
     userInfo
