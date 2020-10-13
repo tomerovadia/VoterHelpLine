@@ -26,6 +26,8 @@ type SlackSendMessageResponse = {
 type SlackSendMessageOptions = {
   channel: string;
   parentMessageTs?: string;
+  parse?: boolean;
+  unfurl_links?: boolean;
   blocks?: SlackBlock[];
 };
 
@@ -199,6 +201,64 @@ export function copyUserInfoToDbMessageEntry(
   dbMessageEntry.isDemo = userInfo.isDemo;
   dbMessageEntry.lastVoterMessageSecsFromEpoch =
     userInfo.lastVoterMessageSecsFromEpoch;
+}
+
+export async function fetchSlackChannelMap(): Promise<
+  [Record<string, string>, Record<string, string>]
+> {
+  const response = await slackAPI.get('conversations.list', {
+    params: {
+      limit: 1000,
+      types: 'public_channel,private_channel',
+      token: process.env.SLACK_BOT_ACCESS_TOKEN,
+    },
+  });
+
+  var fw: Record<string, string> = {};
+  var bw: Record<string, string> = {};
+  if (response.data.ok) {
+    for (const info of response.data.channels) {
+      const name = info['name'] as string;
+      const id = info['id'] as string;
+      fw[name] = id;
+      bw[id] = name;
+    }
+  } else {
+    logger.error(
+      `SLACKAPIUTIL.fetchSlackChannelId: Failed to list Slack channels. Error: ${JSON.stringify(
+        response.data
+      )}.`
+    );
+  }
+  return [fw, bw];
+}
+
+export async function fetchSlackChannelId(
+  channelName: string
+): Promise<string | null> {
+  const response = await slackAPI.get('conversations.list', {
+    params: {
+      limit: 1000,
+      types: 'public_channel,private_channel',
+      token: process.env.SLACK_BOT_ACCESS_TOKEN,
+    },
+  });
+
+  if (response.data.ok) {
+    for (const info of response.data.channels) {
+      if (info['name'] == channelName) {
+        return info['id'];
+      }
+    }
+    return null;
+  } else {
+    logger.error(
+      `SLACKAPIUTIL.fetchSlackChannelId: Failed to list Slack channels. Error: ${JSON.stringify(
+        response.data
+      )}.`
+    );
+    return null;
+  }
 }
 
 export async function fetchSlackChannelName(

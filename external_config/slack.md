@@ -79,6 +79,7 @@ Important: The Slack bot must be given access to each of these channels.
 - *Command:* /unclaimed
 - *Request URL:* base URL + /slack-command
 - *Short Description:* List unclaimed voters in a channel
+- *Usage Hint:* optional: pass channel name, or * for all channels
 
 
 #### Shortcuts

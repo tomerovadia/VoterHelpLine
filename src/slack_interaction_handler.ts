@@ -383,24 +383,63 @@ export async function handleCommandUnclaimed(
   channelName: string,
   text: string
 ): Promise<void> {
+  const outputChannelId = channelId;
   const MD5 = new Hashes.MD5();
-  const threads = await DbApiUtil.getUnclaimedVoters(channelId);
+
+  let channelFw: Record<string, string> = {};
+  let channelBw: Record<string, string> = {};
+  if (text) {
+    [channelFw, channelBw] = await SlackApiUtil.fetchSlackChannelMap();
+  }
+  if (text && text != '*') {
+    if (text[0] == '#') {
+      text = text.substr(1);
+    }
+    if (!(text in channelFw)) {
+      await SlackApiUtil.sendMessage(`Channel #${channelName} not found`, {
+        channel: outputChannelId,
+      });
+      return;
+    }
+    channelName = text;
+    channelId = channelFw[channelName];
+  }
+
+  const threads = await DbApiUtil.getUnclaimedVoters(
+    text === '*' ? null : channelId
+  );
   const lines: string[] = [
-    `Unclaimed voters in ` + (text === '*' ? 'all channels' : channelName),
+    `${threads.length} unclaimed voters in ` +
+      (text === '*' ? 'all channels' : `#${channelName}`),
   ];
   for (const x of threads) {
     const url = await SlackApiUtil.getThreadPermalink(
       x.channelId,
       x.slackParentMessageTs
     );
-    lines.push(
-      `:bust_in_silhouette: ${MD5.hex(
-        x.userPhoneNumber || ''
-      )} - age ${prettyTimeInterval(x.age || 0)} - <${url}|Open>`
-    );
+    if (text === '*') {
+      let channelName = x.channelId;
+      if (x.channelId in channelBw) {
+        channelName = `#${channelBw[x.channelId]}`;
+      }
+      lines.push(
+        `:bust_in_silhouette: ${MD5.hex(
+          x.userPhoneNumber || ''
+        )} - age ${prettyTimeInterval(
+          x.age || 0
+        )} - ${channelName} - <${url}|Open>`
+      );
+    } else {
+      lines.push(
+        `:bust_in_silhouette: ${MD5.hex(
+          x.userPhoneNumber || ''
+        )} - age ${prettyTimeInterval(x.age || 0)} - <${url}|Open>`
+      );
+    }
   }
   await SlackApiUtil.sendMessage(lines.join('\n'), {
-    channel: channelId,
+    channel: outputChannelId,
+    unfurl_links: false,
   });
 }
 
