@@ -27,14 +27,14 @@ export function formatMessageHistory(
       );
     } else if (messageObject.automated) {
       return (
-        ':gear: *Helpline*  ' +
+        ':gear: *Helpline (Automated)*  ' +
         specialSlackTimestamp +
         '\n' +
         formatMessageBlock(messageObject.message, '_')
       );
     } else {
       return (
-        ':adult: *Helpline*  ' +
+        `:adult: *${messageObject.originating_slack_user_name} (Volunteer)*  ` +
         specialSlackTimestamp +
         '\n' +
         formatMessageBlock(messageObject.message, '')
