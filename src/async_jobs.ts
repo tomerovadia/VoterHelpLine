@@ -122,12 +122,15 @@ async function slackInteractivityHandler(
         );
 
         if (payload.callback_id === 'set_needs_attention') {
-          await DbApiUtil.setThreadNeedsAttentionToDb(payload.message.ts, true);
+          await DbApiUtil.setThreadNeedsAttentionToDb(
+            payload.message.thread_ts || payload.message.ts,
+            true
+          );
           return;
         }
         if (payload.callback_id === 'clear_needs_attention') {
           await DbApiUtil.setThreadNeedsAttentionToDb(
-            payload.message.ts,
+            payload.message.thread_ts || payload.message.ts,
             false
           );
           return;

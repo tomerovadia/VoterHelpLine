@@ -33,6 +33,7 @@ export type SlackInteractionEventPayload = {
   };
   message: {
     ts: string;
+    thread_ts: string | null;
     blocks: SlackBlockUtil.SlackBlock[];
   };
   automatedButtonSelection: boolean | undefined;
