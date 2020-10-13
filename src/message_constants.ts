@@ -70,6 +70,11 @@ export function CLARIFY_HELPLINE_REQUEST(): string {
   }
 }
 
+// Only used by VOTE_AMERICA.
+export function WELCOME_AND_STATE_QUESTION(): string {
+  return 'Welcome to VoteAmerica! We are excited to help you vote and can connect you to a trained volunteer to help answer your questions.\n\nTo match you with the most knowledgeable volunteer, in which U.S. state are you looking to vote? (Msg & data rates may apply)\n\nReply STOP to unsubscribe from VoteAmerica texts.';
+}
+
 export function STATE_QUESTION(): string {
   switch (process.env.CLIENT_ORGANIZATION) {
     case 'VOTE_AMERICA':

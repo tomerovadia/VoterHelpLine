@@ -26,6 +26,7 @@ import {
 import { handleTwilioStatusCallback } from './twilio_status_callback_handler';
 import { SlackInteractionEventPayload } from './slack_interaction_handler';
 import { TwilioRequestBody } from './twilio_util';
+import * as KeywordParser from './keyword_parser';
 
 const app = express();
 
@@ -304,7 +305,8 @@ const handleIncomingTwilioMessage = async (
             twilioPhoneNumber,
             inboundDbMessageEntry,
             entryPoint,
-            twilioCallbackURL
+            twilioCallbackURL,
+            false /* includeWelcome */
           );
           return;
         } else {
@@ -405,7 +407,7 @@ const handleIncomingTwilioMessage = async (
       `SERVER.handleIncomingTwilioMessage (${userId}): Voter is new to us (Redis returned no userInfo for redisHashKey ${redisHashKey})`
     );
 
-    if (userMessage.toLowerCase().trim() === 'stop') {
+    if (KeywordParser.isStopKeyword(userMessage)) {
       logger.info(
         `SERVER.handleIncomingTwilioMessage: Received STOP text from phone number: ${userPhoneNumber}.`
       );
@@ -424,14 +426,26 @@ const handleIncomingTwilioMessage = async (
     }
 
     if (process.env.CLIENT_ORGANIZATION === 'VOTE_AMERICA') {
-      await Router.welcomePotentialVoter(
-        { userPhoneNumber, userMessage, userId },
-        redisClient,
-        twilioPhoneNumber,
-        inboundDbMessageEntry,
-        entryPoint,
-        twilioCallbackURL
-      );
+        if (KeywordParser.isHelplineKeyword(userMessage)) {
+          await Router.handleNewVoter(
+            { userPhoneNumber, userMessage, userId },
+            redisClient,
+            twilioPhoneNumber,
+            inboundDbMessageEntry,
+            entryPoint,
+            twilioCallbackURL,
+            true /* includeWelcome */
+          );
+        } else {
+          await Router.welcomePotentialVoter(
+            { userPhoneNumber, userMessage, userId },
+            redisClient,
+            twilioPhoneNumber,
+            inboundDbMessageEntry,
+            entryPoint,
+            twilioCallbackURL
+          );
+        }
     } else {
       await Router.handleNewVoter(
         { userPhoneNumber, userMessage, userId },
