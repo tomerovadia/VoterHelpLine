@@ -389,8 +389,8 @@ export async function receiveShowNeedsAttention({
   const threads =
     (await DbApiUtil.getThreadsNeedingAttentionFor(payload.user.id)) || [];
 
-  let urls: string[] = [];
-  for (let x of threads) {
+  const urls: string[] = [];
+  for (const x of threads) {
     urls.push(
       await SlackApiUtil.getThreadPermalink(x.channelId, x.slackParentMessageTs)
     );
