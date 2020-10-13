@@ -102,6 +102,18 @@ async function slackInteractivityHandler(
           `SERVER POST /slack-interactivity: Determined user interaction is a message shortcut.`
         );
 
+        if (payload.callback_id === 'set_needs_attention') {
+          await DbApiUtil.setThreadNeedsAttentionToDb(payload.message.ts, true);
+          return;
+        }
+        if (payload.callback_id === 'clear_needs_attention') {
+          await DbApiUtil.setThreadNeedsAttentionToDb(
+            payload.message.ts,
+            false
+          );
+          return;
+        }
+
         const { viewId } = interactivityMetadata;
         if (!viewId) {
           throw new Error(

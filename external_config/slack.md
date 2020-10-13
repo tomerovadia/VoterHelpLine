@@ -81,3 +81,17 @@ This should be added as a **messages** shortcut.
 - **Name:** Reset Demo
 - **Short Description:** Closes this conversation, allowing the volunteer to message the demo line again as a new mock voter.
 - **Callback ID:** reset_demo
+
+##### Add to ToDo
+
+- Messages shortcut
+- **Name:** Add to ToDo
+- **Short Description:** Add this thread to your ToDo
+- **Callback ID:** set_needs_attention
+
+##### Remove from ToDo
+
+- Messages shortcut
+- **Name:** Remove from ToDo
+- **Short Description**: Remove this thread from your ToDo
+- **Callback ID**: clear_needs_attention
