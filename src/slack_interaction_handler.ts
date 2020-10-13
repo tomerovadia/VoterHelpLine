@@ -378,6 +378,32 @@ export function prettyTimeInterval(seconds: number): string {
   return `${Math.round(seconds / 60 / 60 / 24)}d`;
 }
 
+export async function handleCommandUnclaimed(
+  channelId: string,
+  channelName: string,
+  text: string
+): Promise<void> {
+  const MD5 = new Hashes.MD5();
+  const threads = await DbApiUtil.getUnclaimedVoters(channelId);
+  const lines: string[] = [
+    `Unclaimed voters in ` + (text === '*' ? 'all channels' : channelName),
+  ];
+  for (const x of threads) {
+    const url = await SlackApiUtil.getThreadPermalink(
+      x.channelId,
+      x.slackParentMessageTs
+    );
+    lines.push(
+      `:bust_in_silhouette: ${MD5.hex(
+        x.userPhoneNumber || ''
+      )} - age ${prettyTimeInterval(x.age || 0)} - <${url}|Open>`
+    );
+  }
+  await SlackApiUtil.sendMessage(lines.join('\n'), {
+    channel: channelId,
+  });
+}
+
 export async function receiveShowNeedsAttention({
   payload,
   viewId,

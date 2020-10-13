@@ -72,6 +72,15 @@ Important: The Slack bot must be given access to each of these channels.
 
 ### Interactivity & Shortcuts
 
+#### Slash commands
+
+##### Unclaimed
+
+- *Command:* /unclaimed
+- *Request URL:* base URL + /slack-command
+- *Short Description:* List unclaimed voters in a channel
+
+
 #### Shortcuts
 
 ##### Reset Demo

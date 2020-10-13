@@ -165,6 +165,36 @@ export async function getThreadLatestMessage(
   }
 }
 
+export async function getUnclaimedVoters(
+  channelId: string
+): Promise<ThreadInfo[]> {
+  const client = await pool.connect();
+  try {
+    const result = await client.query(
+      `SELECT
+         t.slack_parent_message_ts as id, t.channel_id, t.user_phone_number, t.user_id, EXTRACT(EPOCH FROM now() - t.updated_at) as age
+        FROM threads t
+        WHERE t.channel_id = $1
+          AND NOT EXISTS (SELECT FROM volunteer_voter_claims c WHERE t.user_id=c.user_id
+                                  AND t.user_phone_number=c.user_phone_number)`,
+      [channelId]
+    );
+    logger.info(result.rows.length);
+    return result.rows.map((x) => ({
+      slackParentMessageTs: x['id'],
+      channelId: x['channel_id'],
+      userPhoneNumber: x['user_phone_number'],
+      userId: x['user_id'],
+      age: x['age'],
+    }));
+  } catch (error) {
+    logger.info('Failed to query unclaimed threads; ignoring for now!');
+    return [];
+  } finally {
+    client.release();
+  }
+}
+
 export async function getThreadsNeedingAttentionFor(
   slackUserId: string
 ): Promise<ThreadInfo[]> {

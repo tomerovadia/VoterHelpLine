@@ -29,6 +29,26 @@ import { UserInfo } from './types';
 
 export type InteractivityHandlerMetadata = { viewId?: string };
 
+async function slackCommandHandler(
+  channelId: string,
+  channelName: string,
+  command: string,
+  text: string
+) {
+  logger.info(`channel ${channelId} command ${command} text ${text}`);
+  switch (command) {
+    case '/unclaimed': {
+      await SlackInteractionHandler.handleCommandUnclaimed(
+        channelId,
+        channelName,
+        text
+      );
+      return;
+    }
+  }
+  throw new Error(`Unrecognized command ${command}`);
+}
+
 async function slackInteractivityHandler(
   payload: SlackInteractionEventPayload,
   interactivityMetadata: InteractivityHandlerMetadata
@@ -316,6 +336,7 @@ const BACKGROUND_TASKS = {
   slackInteractivityHandler,
   slackMessageEventHandler,
   slackAppMentionEventHandler,
+  slackCommandHandler,
 };
 
 export async function enqueueBackgroundTask(
