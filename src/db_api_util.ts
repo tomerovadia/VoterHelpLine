@@ -205,14 +205,20 @@ export async function logMessageToDb(
     if (databaseMessageEntry.direction === 'INBOUND') {
       await client.query(
         'UPDATE threads SET needs_attention = true WHERE slack_parent_message_ts = $1;',
-        [
-          databaseMessageEntry.slackParentMessageTs,
-        ]
+        [databaseMessageEntry.slackParentMessageTs]
       );
-    } else if (!databaseMessageEntry.automated) {
+    } else if (
+      !databaseMessageEntry.automated &&
+      databaseMessageEntry.userId &&
+      databaseMessageEntry.toPhoneNumber &&
+      (await getVoterHasVolunteer(
+        databaseMessageEntry.userId,
+        databaseMessageEntry.toPhoneNumber
+      ))
+    ) {
       await client.query(
         'UPDATE threads SET needs_attention = false WHERE slack_parent_message_ts = $1;',
-        [ databaseMessageEntry.slackParentMessageTs ]
+        [databaseMessageEntry.slackParentMessageTs]
       );
     }
   } finally {
