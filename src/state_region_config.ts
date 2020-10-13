@@ -42,7 +42,7 @@ export const stateToRegionMap: { [stateCode: string]: string } = {
   'South Carolina': 'Eastern South',
   'South Dakota': 'Central',
   Tennessee: 'Eastern South',
-  Texas: 'Central',
+  Texas: 'Texas',
   Utah: 'Mountain',
   Vermont: 'Eastern North',
   Virginia: 'Eastern South',
