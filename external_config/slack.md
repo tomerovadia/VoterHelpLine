@@ -95,3 +95,10 @@ This should be added as a **messages** shortcut.
 - **Name:** Remove from ToDo
 - **Short Description**: Remove this thread from your ToDo
 - **Callback ID**: clear_needs_attention
+
+##### ToDo
+
+- Global shortcut
+- **Name:** ToDo
+- **Short Description:** Show voters needing attention
+- **Callback ID:** show_needs_attention

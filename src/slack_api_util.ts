@@ -33,6 +33,39 @@ type SlackChannelNamesAndIds = {
   [channelId: string]: string; // mapping of channel ID to channel name
 };
 
+export async function getThreadPermalink(
+  channel: string,
+  thread_ts: string
+): Promise<string> {
+  try {
+    // Pick the newest message in the thread
+    const message_ts =
+      (await DbApiUtil.getThreadLatestMessage(thread_ts)) || thread_ts;
+
+    const response = await slackAPI.get('chat.getPermalink', {
+      params: {
+        channel: channel,
+        message_ts: message_ts,
+        token: process.env.SLACK_BOT_ACCESS_TOKEN,
+      },
+    });
+    if (!response.data.ok) {
+      logger.error(
+        `SLACKAPIUTIL.getThreadPermalink: ERROR: ${JSON.stringify(
+          response.data
+        )}`
+      );
+    }
+    logger.info(response.data.permalink);
+    return response.data.permalink;
+  } catch (error) {
+    logger.error(`SLACKAPIUTIL.getThreadPermalink: ERROR in getting permalink message,
+                  channel: ${channel},
+                  message_ts: ${thread_ts}`);
+    throw error;
+  }
+}
+
 export async function sendMessage(
   message: string,
   options: SlackSendMessageOptions

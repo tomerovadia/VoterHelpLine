@@ -364,31 +364,55 @@ export async function handleVolunteerUpdate({
   });
 }
 
-
+export function prettyTimeInterval(seconds: number): string {
+  if (seconds < 60) {
+    return `${Math.round(seconds)}s`;
+  }
+  if (seconds < 60 * 60) {
+    return `${Math.round(seconds / 60)}m`;
+  }
+  if (seconds < 60 * 60 * 24) {
+    return `${Math.round(seconds / 60 / 60)}h`;
+  }
+  return `${Math.round(seconds / 60 / 60 / 24)}d`;
+}
 
 export async function receiveShowNeedsAttention({
   payload,
-  redisClient,
-  modalPrivateMetadata,
-  twilioPhoneNumber,
-  userId,
   viewId,
 }: {
   payload: SlackInteractionEventPayload;
-  redisClient: PromisifiedRedisClient;
-  modalPrivateMetadata: SlackModalPrivateMetadata;
-  twilioPhoneNumber: string;
-  userId: string;
   viewId: string;
 }): Promise<void> {
   logger.info(`Entering SLACKINTERACTIONHANDLER.receiveShowNeedsAttention`);
-  await SlackApiUtil.updateModal(
-    viewId,
-    SlackBlockUtil.getErrorSlackView(
-      'hi there',
-      'foo bar baz'
-    )
-  );
+  const MD5 = new Hashes.MD5();
+  const threads =
+    (await DbApiUtil.getThreadsNeedingAttentionFor(payload.user.id)) || [];
+
+  let urls: string[] = [];
+  for (let x of threads) {
+    urls.push(
+      await SlackApiUtil.getThreadPermalink(x.channelId, x.slackParentMessageTs)
+    );
+  }
+
+  const slackView: SlackBlockUtil.SlackView = {
+    title: {
+      type: 'plain_text',
+      text: 'Voters needing attention',
+    },
+    blocks: threads.map((x) => ({
+      type: 'section',
+      text: {
+        type: 'mrkdwn',
+        text: `${MD5.hex(x.userPhoneNumber || '')} - age ${prettyTimeInterval(
+          x.age || 0
+        )} - <${urls.pop()}|Open>`,
+      },
+    })),
+    type: 'modal',
+  };
+  await SlackApiUtil.updateModal(viewId, slackView);
 }
 
 // This function receives the initial request to reset a demo

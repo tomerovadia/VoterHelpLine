@@ -42,6 +42,25 @@ async function slackInteractivityHandler(
     );
   }
 
+  if (payload.type === 'shortcut') {
+    const { viewId } = interactivityMetadata;
+    if (!viewId) {
+      throw new Error(
+        'slackInteractivityHandler called for message_action without viewId'
+      );
+    }
+    switch (payload.callback_id) {
+      case 'show_needs_attention': {
+        await SlackInteractionHandler.receiveShowNeedsAttention({
+          payload,
+          viewId,
+        });
+        return;
+      }
+    }
+    throw new Error(`Unrecognized shortcut ${payload.callback_id}`);
+  }
+
   if (payload.type === 'block_actions' || payload.type === 'message_action') {
     const originatingSlackChannelName = await SlackApiUtil.fetchSlackChannelName(
       payload.channel.id

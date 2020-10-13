@@ -1,4 +1,5 @@
 import { Pool } from 'pg';
+import { AddOnResultContext } from 'twilio/lib/rest/api/v2010/account/recording/addOnResult';
 import { TextDecoder } from 'util';
 import logger from './logger';
 import {
@@ -89,9 +90,18 @@ export type DatabaseCommandEntry = {
 
 export type DatabaseThreadEntry = {
   slackParentMessageTs: string | null;
+  channelId: string | null;
   userId: string | null;
   userPhoneNumber: string | null;
   needsAttention: boolean | null;
+};
+
+export type ThreadInfo = {
+  slackParentMessageTs: string;
+  channelId: string;
+  userId: string | null;
+  userPhoneNumber: string | null;
+  age: number | null;
 };
 
 export async function newThreadToDb(
@@ -100,15 +110,18 @@ export async function newThreadToDb(
   const client = await pool.connect();
   try {
     await client.query(
-      'INSERT INTO threads (slack_parent_message_ts, user_id, user_phone_number, needs_attention) VALUES ($1, $2, $3, $4)',
+      'INSERT INTO threads (slack_parent_message_ts, channel_id, user_id, user_phone_number, needs_attention, updated_at) VALUES ($1, $2, $3, $4, $5, NOW())',
       [
         databaseThreadEntry.slackParentMessageTs,
+        databaseThreadEntry.channelId,
         databaseThreadEntry.userId,
         databaseThreadEntry.userPhoneNumber,
         databaseThreadEntry.needsAttention,
       ]
     );
     logger.info('DBAPIUTIL.newThreadToDb: Successfully created thread');
+  } catch (error) {
+    logger.info('Failed to update threads; ignoring for now!');
   } finally {
     client.release();
   }
@@ -127,6 +140,58 @@ export async function setThreadNeedsAttentionToDb(
     logger.info(
       `DBAPIUTIL.setThreadNeedsAttentionToDb: Set thread ${slackParentMessageTs} needs_attention=${needsAttention}`
     );
+  } catch (error) {
+    logger.info('Failed to update threads; ignoring for now!');
+  } finally {
+    client.release();
+  }
+}
+
+export async function getThreadLatestMessage(
+  slackParentMessageTs: string
+): Promise<string | null> {
+  const client = await pool.connect();
+  try {
+    const result = await client.query(
+      `SELECT slack_message_ts FROM messages
+      WHERE slack_parent_message_ts=$1 AND slack_message_ts IS NOT NULL
+      ORDER BY COALESCE(slack_send_timestamp, slack_receive_timestamp) DESC LIMIT 1`,
+      [slackParentMessageTs]
+    );
+    if (result.rows.length > 0) {
+      return result.rows[0]['slack_message_ts'];
+    }
+    return null;
+  } finally {
+    client.release();
+  }
+}
+
+export async function getThreadsNeedingAttentionFor(
+  slackUserId: string
+): Promise<ThreadInfo[]> {
+  const client = await pool.connect();
+  try {
+    const result = await client.query(
+      `SELECT
+         t.slack_parent_message_ts as id, t.channel_id, t.user_phone_number, t.user_id, EXTRACT(EPOCH FROM now() - t.updated_at) as age
+        FROM threads t, volunteer_voter_claims c
+        WHERE t.needs_attention
+          AND t.user_id=c.user_id
+          AND t.user_phone_number=c.user_phone_number
+          AND c.volunteer_slack_user_id=$1`,
+      [slackUserId]
+    );
+    return result.rows.map((x) => ({
+      slackParentMessageTs: x['id'],
+      channelId: x['channel_id'],
+      userPhoneNumber: x['user_phone_number'],
+      userId: x['user_id'],
+      age: x['age'],
+    }));
+  } catch (error) {
+    logger.info('Failed to query threads; ignoring for now!');
+    return [];
   } finally {
     client.release();
   }
@@ -153,6 +218,9 @@ export async function getThreadNeedsAttentionFor(
       return result.rows[0].needs_attention;
     }
     return false;
+  } catch (error) {
+    logger.info('Failed to query threads; assuming needs_attention for now!');
+    return true;
   } finally {
     client.release();
   }
@@ -202,7 +270,7 @@ export async function logMessageToDb(
     // Update thread status
     if (databaseMessageEntry.direction === 'INBOUND') {
       await client.query(
-        'UPDATE threads SET needs_attention = true WHERE slack_parent_message_ts = $1;',
+        'UPDATE threads SET needs_attention = true, updated_at=NOW() WHERE slack_parent_message_ts = $1;',
         [databaseMessageEntry.slackParentMessageTs]
       );
     } else if (
@@ -215,10 +283,17 @@ export async function logMessageToDb(
       ))
     ) {
       await client.query(
-        'UPDATE threads SET needs_attention = false WHERE slack_parent_message_ts = $1;',
+        'UPDATE threads SET needs_attention = false, updated_at=NOW() WHERE slack_parent_message_ts = $1;',
+        [databaseMessageEntry.slackParentMessageTs]
+      );
+    } else {
+      await client.query(
+        'UPDATE threads SET updated_at=NOW() WHERE slack_parent_message_ts = $1;',
         [databaseMessageEntry.slackParentMessageTs]
       );
     }
+  } catch (error) {
+    logger.info('Failed to update threads; ignoring for now!');
   } finally {
     // Make sure to release the client before any error handling,
     // just in case the error handling itself throws an error.
