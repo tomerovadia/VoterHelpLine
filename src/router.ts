@@ -17,7 +17,7 @@ import { EntryPoint, UserInfo } from './types';
 import { PromisifiedRedisClient } from './redis_client';
 import * as Sentry from '@sentry/node';
 
-const MINS_BEFORE_WELCOME_BACK_MESSAGE = 60;
+const MINS_BEFORE_WELCOME_BACK_MESSAGE = 60 * 24;
 export const NUM_STATE_SELECTION_ATTEMPTS_LIMIT = 2;
 
 type UserOptions = {
@@ -249,7 +249,7 @@ const introduceNewVoterToSlackChannel = async (
       `ROUTER.introduceNewVoterToSlackChannel: Passing voter message to Slack, slackChannelName: ${slackChannelName}, parentMessageTs: ${response.data.ts}.`
     );
     await SlackApiUtil.sendMessage(
-      `*${userInfo.userId.substring(0, 5)}:* ${userMessage}`,
+      `${userMessage}`,
       { parentMessageTs: response.data.ts, channel: response.data.channel },
       inboundDbMessageEntry,
       userInfo
@@ -752,7 +752,7 @@ export async function determineVoterState(
     `ROUTER.determineVoterState: Passing voter message to Slack, slackChannelName: ${lobbyChannelId}, parentMessageTs: ${lobbyParentMessageTs}.`
   );
   await SlackApiUtil.sendMessage(
-    `*${userId.substring(0, 5)}:* ${userMessage}`,
+    `${userMessage}`,
     { parentMessageTs: lobbyParentMessageTs, channel: lobbyChannelId },
     inboundDbMessageEntry,
     userInfo
@@ -913,7 +913,7 @@ export async function handleDisclaimer(
   userInfo.lastVoterMessageSecsFromEpoch = Math.round(Date.now() / 1000);
 
   await SlackApiUtil.sendMessage(
-    `*${userId.substring(0, 5)}:* ${userMessage}`,
+    `${userMessage}`,
     slackLobbyMessageParams,
     inboundDbMessageEntry,
     userInfo
@@ -980,7 +980,7 @@ export async function handleClearedVoter(
   userInfo.lastVoterMessageSecsFromEpoch = nowSecondsEpoch;
 
   await SlackApiUtil.sendMessage(
-    `*${userId.substring(0, 5)}:* ${userOptions.userMessage}`,
+    `${userOptions.userMessage}`,
     activeChannelMessageParams,
     inboundDbMessageEntry,
     userInfo

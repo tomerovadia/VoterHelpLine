@@ -25,6 +25,7 @@ import {
 } from './async_jobs';
 import { handleTwilioStatusCallback } from './twilio_status_callback_handler';
 import { SlackInteractionEventPayload } from './slack_interaction_handler';
+import { TwilioRequestBody } from './twilio_util';
 
 const app = express();
 
@@ -217,7 +218,8 @@ const handleIncomingTwilioMessage = async (
 ) => {
   logger.info('Entering SERVER.handleIncomingTwilioMessage');
 
-  const userPhoneNumber = req.body.From;
+  const reqBody = req.body as TwilioRequestBody;
+  const userPhoneNumber = reqBody.From;
 
   const inboundTextsBlocked = await RedisApiUtil.getHashField(
     redisClient,
@@ -232,8 +234,8 @@ const handleIncomingTwilioMessage = async (
     return;
   }
 
-  const twilioPhoneNumber = req.body.To;
-  const userMessage = req.body.Body;
+  const twilioPhoneNumber = reqBody.To;
+  const userMessage = TwilioUtil.formatAttachments(reqBody);
   const MD5 = new Hashes.MD5();
   const userId = MD5.hex(userPhoneNumber);
   logger.info(`SERVER.handleIncomingTwilioMessage: Receiving Twilio message from ${entryPoint} entry point voter,
@@ -246,7 +248,7 @@ const handleIncomingTwilioMessage = async (
     userMessage,
     userPhoneNumber,
     twilioPhoneNumber,
-    twilioMessageSid: req.body.SmsMessageSid,
+    twilioMessageSid: reqBody.SmsMessageSid,
     entryPoint: LoadBalancer.PUSH_ENTRY_POINT,
   });
 
