@@ -94,7 +94,6 @@ export type DatabaseThreadEntry = {
   needsAttention: boolean | null;
 };
 
-
 export async function newThreadToDb(
   databaseThreadEntry: DatabaseThreadEntry
 ): Promise<void> {
@@ -109,7 +108,7 @@ export async function newThreadToDb(
         databaseThreadEntry.needsAttention,
       ]
     );
-    logger.info("DBAPIUTIL.newThreadToDb: Successfully created thread");
+    logger.info('DBAPIUTIL.newThreadToDb: Successfully created thread');
   } finally {
     client.release();
   }
@@ -123,19 +122,18 @@ export async function setThreadNeedsAttentionToDb(
   try {
     await client.query(
       'UPDATE threads SET needs_attention = $1 WHERE slack_parent_message_ts = $2;',
-      [
-        needsAttention,
-        slackParentMessageTs,
-      ]
+      [needsAttention, slackParentMessageTs]
     );
-    logger.info(`DBAPIUTIL.setThreadNeedsAttentionToDb: Set thread ${slackParentMessageTs} needs_attention=${needsAttention}`);
+    logger.info(
+      `DBAPIUTIL.setThreadNeedsAttentionToDb: Set thread ${slackParentMessageTs} needs_attention=${needsAttention}`
+    );
   } finally {
     client.release();
   }
 }
 
 export async function getThreadNeedsAttentionFor(
-  slackParentMessageTs: string,
+  slackParentMessageTs: string
 ): Promise<boolean> {
   logger.info(`ENTERING DBAPIUTIL.getThreadNeedsAttentionFor`);
   logger.info(
@@ -145,9 +143,9 @@ export async function getThreadNeedsAttentionFor(
   const client = await pool.connect();
   try {
     const result = await client.query(
-      'SELECT needs_attention FROM threads WHERE slack_parent_message_ts = $1', [
-      slackParentMessageTs
-    ]);
+      'SELECT needs_attention FROM threads WHERE slack_parent_message_ts = $1',
+      [slackParentMessageTs]
+    );
     logger.info(
       `DBAPIUTIL.getMessageHistoryFor: Successfully looked up message history in PostgreSQL.`
     );
@@ -680,6 +678,22 @@ export async function logVolunteerVoterClaimToDb(
     logger.info(
       `DBAPIUTIL.logVolunteerVoterClaimToDb: Successfully inserted volunteer voter claim into PostgreSQL database.`
     );
+  } finally {
+    client.release();
+  }
+}
+
+export async function getVoterHasVolunteer(
+  userId: string,
+  userPhoneNumber: string
+): Promise<boolean> {
+  const client = await pool.connect();
+  try {
+    const result = await client.query(
+      'SELECT * FROM volunteer_voter_claims WHERE user_id = $1 AND user_phone_number = $2',
+      [userId, userPhoneNumber]
+    );
+    return result.rows.length > 0;
   } finally {
     client.release();
   }

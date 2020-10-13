@@ -572,8 +572,13 @@ const routeVoterToSlackChannel = async (
   }
 
   // The old thread no longer needs attention
-  const needsAttention = await DbApiUtil.getThreadNeedsAttentionFor(userInfo[userInfo.activeChannelId]);
-  await DbApiUtil.setThreadNeedsAttentionToDb(userInfo[userInfo.activeChannelId], false);
+  const needsAttention = await DbApiUtil.getThreadNeedsAttentionFor(
+    userInfo[userInfo.activeChannelId]
+  );
+  await DbApiUtil.setThreadNeedsAttentionToDb(
+    userInfo[userInfo.activeChannelId],
+    false
+  );
 
   // Remove the voter status panel from the old thread, in which the voter is no longer active.
   // Note: First we need to fetch the old thread parent message blocks, for both 1. the
@@ -724,8 +729,11 @@ const routeVoterToSlackChannel = async (
     `timestampOfLastMessageInThread: ${timestampOfLastMessageInThread}`
   );
 
-  await DbApiUtil.setThreadNeedsAttentionToDb(userInfo[destinationSlackChannelId], needsAttention);
-  
+  await DbApiUtil.setThreadNeedsAttentionToDb(
+    userInfo[destinationSlackChannelId],
+    needsAttention
+  );
+
   await SlackApiUtil.sendMessage(
     `*Operator:* Voter *${userId}* was routed from *${adminCommandParams.previousSlackChannelName}* back to this thread by *${adminCommandParams.routingSlackUserName}*. Messages sent here will again relay to the voter.`,
     {
