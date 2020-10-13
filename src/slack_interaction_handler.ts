@@ -364,6 +364,33 @@ export async function handleVolunteerUpdate({
   });
 }
 
+
+
+export async function receiveShowNeedsAttention({
+  payload,
+  redisClient,
+  modalPrivateMetadata,
+  twilioPhoneNumber,
+  userId,
+  viewId,
+}: {
+  payload: SlackInteractionEventPayload;
+  redisClient: PromisifiedRedisClient;
+  modalPrivateMetadata: SlackModalPrivateMetadata;
+  twilioPhoneNumber: string;
+  userId: string;
+  viewId: string;
+}): Promise<void> {
+  logger.info(`Entering SLACKINTERACTIONHANDLER.receiveShowNeedsAttention`);
+  await SlackApiUtil.updateModal(
+    viewId,
+    SlackBlockUtil.getErrorSlackView(
+      'hi there',
+      'foo bar baz'
+    )
+  );
+}
+
 // This function receives the initial request to reset a demo
 // and response by creating a modal populated with data needed
 // to reset the demo if the Slack user confirms.

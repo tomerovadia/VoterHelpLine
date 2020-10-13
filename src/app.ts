@@ -607,8 +607,9 @@ app.post(
     const metadata: InteractivityHandlerMetadata = {};
 
     if (
-      payload.type === 'message_action' &&
-      payload.callback_id === 'reset_demo'
+      (payload.type === 'message_action' &&
+       payload.callback_id === 'reset_demo') ||
+       payload.type === 'shortcut'
     ) {
       // For message actions, we always show a confirmation modal. Because we
       // have to show this modal within 3 seconds, we immediately make the call
