@@ -195,6 +195,14 @@ const introduceNewVoterToSlackChannel = async (
   // using the ID version of the channel.
   userInfo[response.data.channel] = response.data.ts;
 
+  // Create the thread
+  await DbApiUtil.newThreadToDb({
+    slackParentMessageTs: response.data.ts,
+    userId: userInfo.userId,
+    userPhoneNumber: userInfo.userPhoneNumber,
+    needsAttention: true,
+  });
+
   // Set active channel to this first channel, since the voter is new.
   // Makes sure subsequent messages from the voter go to this channel, unless
   // this active channel is changed.
@@ -563,6 +571,10 @@ const routeVoterToSlackChannel = async (
     );
   }
 
+  // The old thread no longer needs attention
+  const needsAttention = await DbApiUtil.getThreadNeedsAttentionFor(userInfo[userInfo.activeChannelId]);
+  await DbApiUtil.setThreadNeedsAttentionToDb(userInfo[userInfo.activeChannelId], false);
+
   // Remove the voter status panel from the old thread, in which the voter is no longer active.
   // Note: First we need to fetch the old thread parent message blocks, for both 1. the
   // text to be preserved when changing the parent message, and for 2. the other
@@ -631,6 +643,14 @@ const routeVoterToSlackChannel = async (
 
     // Remember the voter's thread in this channel.
     userInfo[response.data.channel] = response.data.ts;
+
+    // Create the thread
+    await DbApiUtil.newThreadToDb({
+      slackParentMessageTs: response.data.ts,
+      userId: userInfo.userId,
+      userPhoneNumber: userInfo.userPhoneNumber,
+      needsAttention: needsAttention,
+    });
 
     // Be able to identify phone number using NEW Slack channel identifying info.
     await RedisApiUtil.setHash(
@@ -704,6 +724,8 @@ const routeVoterToSlackChannel = async (
     `timestampOfLastMessageInThread: ${timestampOfLastMessageInThread}`
   );
 
+  await DbApiUtil.setThreadNeedsAttentionToDb(userInfo[destinationSlackChannelId], needsAttention);
+  
   await SlackApiUtil.sendMessage(
     `*Operator:* Voter *${userId}* was routed from *${adminCommandParams.previousSlackChannelName}* back to this thread by *${adminCommandParams.routingSlackUserName}*. Messages sent here will again relay to the voter.`,
     {

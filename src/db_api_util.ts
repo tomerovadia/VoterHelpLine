@@ -1,4 +1,5 @@
 import { Pool } from 'pg';
+import { TextDecoder } from 'util';
 import logger from './logger';
 import {
   MessageDirection,
@@ -86,6 +87,79 @@ export type DatabaseCommandEntry = {
   failureReason?: string | null;
 };
 
+export type DatabaseThreadEntry = {
+  slackParentMessageTs: string | null;
+  userId: string | null;
+  userPhoneNumber: string | null;
+  needsAttention: boolean | null;
+};
+
+
+export async function newThreadToDb(
+  databaseThreadEntry: DatabaseThreadEntry
+): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query(
+      'INSERT INTO threads (slack_parent_message_ts, user_id, user_phone_number, needs_attention) VALUES ($1, $2, $3, $4)',
+      [
+        databaseThreadEntry.slackParentMessageTs,
+        databaseThreadEntry.userId,
+        databaseThreadEntry.userPhoneNumber,
+        databaseThreadEntry.needsAttention,
+      ]
+    );
+    logger.info("DBAPIUTIL.newThreadToDb: Successfully created thread");
+  } finally {
+    client.release();
+  }
+}
+
+export async function setThreadNeedsAttentionToDb(
+  slackParentMessageTs: string,
+  needsAttention: boolean
+): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query(
+      'UPDATE threads SET needs_attention = $1 WHERE slack_parent_message_ts = $2;',
+      [
+        needsAttention,
+        slackParentMessageTs,
+      ]
+    );
+    logger.info(`DBAPIUTIL.setThreadNeedsAttentionToDb: Set thread ${slackParentMessageTs} needs_attention=${needsAttention}`);
+  } finally {
+    client.release();
+  }
+}
+
+export async function getThreadNeedsAttentionFor(
+  slackParentMessageTs: string,
+): Promise<boolean> {
+  logger.info(`ENTERING DBAPIUTIL.getThreadNeedsAttentionFor`);
+  logger.info(
+    `DBAPIUTIL.getThreadNeedsAttentionFor: Looking up thread:${slackParentMessageTs}`
+  );
+
+  const client = await pool.connect();
+  try {
+    const result = await client.query(
+      'SELECT needs_attention FROM threads WHERE slack_parent_message_ts = $1', [
+      slackParentMessageTs
+    ]);
+    logger.info(
+      `DBAPIUTIL.getMessageHistoryFor: Successfully looked up message history in PostgreSQL.`
+    );
+    if (result.rows.length > 0) {
+      return result.rows[0].needs_attention;
+    }
+    return false;
+  } finally {
+    client.release();
+  }
+}
+
 export async function logMessageToDb(
   databaseMessageEntry: DatabaseMessageEntry
 ): Promise<void> {
@@ -123,10 +197,24 @@ export async function logMessageToDb(
         databaseMessageEntry.archived,
       ]
     );
-
     logger.info(
       `DBAPIUTIL.logMessageToDb: Successfully inserted message into PostgreSQL database.`
     );
+
+    // Update thread status
+    if (databaseMessageEntry.direction === 'INBOUND') {
+      await client.query(
+        'UPDATE threads SET needs_attention = true WHERE slack_parent_message_ts = $1;',
+        [
+          databaseMessageEntry.slackParentMessageTs,
+        ]
+      );
+    } else if (!databaseMessageEntry.automated) {
+      await client.query(
+        'UPDATE threads SET needs_attention = false WHERE slack_parent_message_ts = $1;',
+        [ databaseMessageEntry.slackParentMessageTs ]
+      );
+    }
   } finally {
     // Make sure to release the client before any error handling,
     // just in case the error handling itself throws an error.
