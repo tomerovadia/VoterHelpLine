@@ -803,10 +803,10 @@ export async function getVoterHasVolunteer(
   const client = await pool.connect();
   try {
     const result = await client.query(
-      'SELECT * FROM volunteer_voter_claims WHERE user_id = $1 AND user_phone_number = $2',
+      'SELECT EXISTS(SELECT 1 FROM volunteer_voter_claims WHERE user_id = $1 AND user_phone_number = $2) AS exists',
       [userId, userPhoneNumber]
     );
-    return result.rows.length > 0;
+    return result.rows.length > 0 && result.rows[0]['exists'];
   } finally {
     client.release();
   }
