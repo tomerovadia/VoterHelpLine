@@ -497,7 +497,7 @@ export async function handleCommandNeedsAttention(
   userName: string,
   text: string
 ): Promise<void> {
-  var arg = text;
+  let arg = text;
   if (arg && !SlackApiUtil.isMemberOfAdminChannel(userId)) {
     arg = '';
   }
@@ -545,7 +545,6 @@ export async function handleCommandNeedsAttention(
         channelId
       );
 
-      const urls: string[] = [];
       for (const x of threads) {
         const messageTs =
           (await DbApiUtil.getThreadLatestMessageTs(
