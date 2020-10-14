@@ -18,24 +18,28 @@ CREATE INDEX ON threads (updated_at);
 INSERT INTO threads
 WITH foo AS (
     SELECT
-        slack_parent_message_ts
+        m.slack_parent_message_ts
         , slack_channel as channel_id
-        , user_id
+        , m.user_id
         , CASE WHEN direction='INBOUND' THEN from_phone_number ELSE to_phone_number END as user_phone_number
         , COALESCE(slack_send_timestamp, slack_receive_timestamp) as updated_at
         , direction
         , automated
         , archived
-        , row_number() OVER (PARTITION BY slack_parent_message_ts ORDER BY COALESCE(slack_send_timestamp, slack_receive_timestamp) DESC) as rn
-    FROM messages
-    WHERE slack_parent_message_ts IS NOT NULL AND slack_channel IS NOT NULL
+        , row_number() OVER (PARTITION BY m.slack_parent_message_ts ORDER BY COALESCE(slack_send_timestamp, slack_receive_timestamp) DESC) as rn
+        , c.volunteer_slack_user_id
+    FROM messages m
+    LEFT JOIN volunteer_voter_claims c ON (
+        m.slack_parent_message_ts=c.slack_parent_message_ts
+    )
+    WHERE m.slack_parent_message_ts IS NOT NULL AND slack_channel IS NOT NULL
 )
 SELECT
     slack_parent_message_ts
     , channel_id
     , user_id
     , user_phone_number
-    , CASE WHEN direction='INBOUND' THEN true ELSE false END as needs_attention
+    , CASE WHEN direction='INBOUND' OR volunteer_slack_user_id IS NULL) THEN true ELSE false END as needs_attention
     , updated_at
 FROM foo
 WHERE rn = 1
