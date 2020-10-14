@@ -655,7 +655,8 @@ export async function getUnclaimedVoters(
           AND NOT EXISTS (
             SELECT FROM volunteer_voter_claims c
             WHERE t.user_id=c.user_id
-          )`,
+          )
+        ORDER BY t.updated_at`,
         [channelId]
       );
     } else {
@@ -671,7 +672,8 @@ export async function getUnclaimedVoters(
           AND NOT EXISTS (
             SELECT FROM volunteer_voter_claims c
             WHERE t.user_id=c.user_id
-          )`
+          )
+        ORDER BY t.updated_at`
       );
     }
     return result.rows.map((x) => ({
@@ -706,7 +708,8 @@ export async function getThreadsNeedingAttentionFor(
           AND EXISTS (
             SELECT FROM volunteer_voter_claims c
             WHERE t.user_id=c.user_id AND c.volunteer_slack_user_id=$1
-          )`,
+          )
+        ORDER BY updated_at`,
       [slackUserId]
     );
     return result.rows.map((x) => ({
