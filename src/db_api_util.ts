@@ -543,10 +543,7 @@ export async function updateThreadStatusFromMessage(
       !databaseMessageEntry.automated &&
       databaseMessageEntry.userId &&
       databaseMessageEntry.toPhoneNumber &&
-      (await getVoterHasVolunteer(
-        databaseMessageEntry.userId,
-        databaseMessageEntry.toPhoneNumber
-      ))
+      (await getVoterHasVolunteer(databaseMessageEntry.userId))
     ) {
       await client.query(
         'UPDATE threads SET needs_attention = false, updated_at=NOW() WHERE slack_parent_message_ts = $1;',
@@ -701,7 +698,6 @@ export async function getThreadsNeedingAttentionFor(
       `SELECT
         slack_parent_message_ts
         , slack_channel_id
-        , user_phone_number
         , user_id
         , EXTRACT(EPOCH FROM now() - updated_at) as age
         FROM threads t
@@ -709,14 +705,13 @@ export async function getThreadsNeedingAttentionFor(
           needs_attention
           AND EXISTS (
             SELECT FROM volunteer_voter_claims c
-            WHERE t.user_id=c.user_id AND t.user_phone_number=c.user_phone_number AND c.volunteer_slack_user_id=$1
+            WHERE t.user_id=c.user_id AND c.volunteer_slack_user_id=$1
           )`,
       [slackUserId]
     );
     return result.rows.map((x) => ({
       slackParentMessageTs: x['slack_parent_message_ts'],
       channelId: x['slack_channel_id'],
-      userPhoneNumber: x['user_phone_number'],
       userId: x['user_id'],
       lastUpdateAge: x['last_update_age'],
     }));
@@ -861,13 +856,12 @@ export async function logVolunteerVoterClaimToDb(
 
 export async function getVoterHasVolunteer(
   userId: string,
-  userPhoneNumber: string
 ): Promise<boolean> {
   const client = await pool.connect();
   try {
     const result = await client.query(
-      'SELECT EXISTS(SELECT 1 FROM volunteer_voter_claims WHERE user_id = $1 AND user_phone_number = $2) AS exists',
-      [userId, userPhoneNumber]
+      'SELECT EXISTS(SELECT 1 FROM volunteer_voter_claims WHERE user_id = $1) AS exists',
+      [userId]
     );
     return result.rows.length > 0 && result.rows[0]['exists'];
   } finally {
