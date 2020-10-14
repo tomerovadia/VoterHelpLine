@@ -28,6 +28,7 @@ type SlackSendMessageOptions = {
   parentMessageTs?: string;
   parse?: boolean;
   unfurl_links?: boolean;
+  unfurl_media?: boolean;
   blocks?: SlackBlock[];
 };
 
