@@ -596,7 +596,7 @@ export async function setThreadHistoryTs(
   }
 }
 
-export async function getThreadLatestMessage(
+export async function getThreadLatestMessageTs(
   slackParentMessageTs: string,
   slackChannelId: string
 ): Promise<string | null> {
