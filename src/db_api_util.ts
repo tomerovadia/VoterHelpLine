@@ -697,18 +697,24 @@ export async function getThreadsNeedingAttentionFor(
   const client = await pool.connect();
   try {
     const result = await client.query(
-      `SELECT
+      `WITH claims AS (
+        SELECT
+          user_id
+          , volunteer_slack_user_id
+          , row_number () OVER (PARTITION BY user_id ORDER BY created_at DESC) AS rn
+        FROM volunteer_voter_claims
+      )
+      SELECT
         slack_parent_message_ts
         , slack_channel_id
-        , user_id
+        , t.user_id
         , EXTRACT(EPOCH FROM now() - updated_at) as age
-        FROM threads t
+        FROM threads t, claims c
         WHERE
           needs_attention
-          AND EXISTS (
-            SELECT FROM volunteer_voter_claims c
-            WHERE t.user_id=c.user_id AND c.volunteer_slack_user_id=$1
-          )
+          AND t.user_id=c.user_id
+          AND c.rn=1
+          AND c.volunteer_slack_user_id=$1
         ORDER BY updated_at`,
       [slackUserId]
     );
