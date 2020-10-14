@@ -92,23 +92,26 @@ This should be added as a **messages** shortcut.
 - **Short Description:** Closes this conversation, allowing the volunteer to message the demo line again as a new mock voter.
 - **Callback ID:** reset_demo
 
-##### Add to ToDo
+##### Set Needs Attention
 
-- Messages shortcut
-- **Name:** Add to ToDo
-- **Short Description:** Add this thread to your ToDo
+This should be added as a **messages** shortcut.
+
+- **Name:** Set Needs Attention
+- **Short Description:** Add this thread to your Needs Attention list
 - **Callback ID:** set_needs_attention
 
-##### Remove from ToDo
+##### Clear Needs Attention
 
-- Messages shortcut
-- **Name:** Remove from ToDo
-- **Short Description**: Remove this thread from your ToDo
+This should be added as a **messages** shortcut.
+
+- **Name:** Clear Needs Attention
+- **Short Description**: Remove this thread from your Needs Attention list
 - **Callback ID**: clear_needs_attention
 
 ##### ToDo
 
-- Global shortcut
-- **Name:** ToDo
+This should be added as a **Global** shortcut.
+
+- **Name:** Needs Attention
 - **Short Description:** Show voters needing attention
 - **Callback ID:** show_needs_attention
