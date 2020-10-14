@@ -680,6 +680,7 @@ export async function getUnclaimedVoters(
   }
 }
 
+// Return a list of ThreadInfo's for all threads needing attention
 export async function getThreadsNeedingAttentionFor(
   slackUserId: string
 ): Promise<ThreadInfo[]> {
@@ -716,6 +717,7 @@ export async function getThreadsNeedingAttentionFor(
   }
 }
 
+// Return the needs_attention status for a specific thread
 export async function getThreadNeedsAttentionFor(
   slackParentMessageTs: string,
   slackChannelId: string
