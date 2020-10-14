@@ -38,6 +38,7 @@ const requireModules = () => {
   DbApiUtil.newThreadToDb = jest.fn();
   DbApiUtil.setThreadNeedsAttentionToDb = jest.fn();
   DbApiUtil.getThreadNeedsAttentionFor = jest.fn();
+  DbApiUtil.setThreadHistoryTs = jest.fn();
 
   SlackBlockUtil.populateDropdownWithLatestVoterStatus = jest.fn();
 };

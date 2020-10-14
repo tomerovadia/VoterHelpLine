@@ -145,19 +145,44 @@ export async function setThreadNeedsAttentionToDb(
   }
 }
 
+export async function setThreadHistoryTs(
+  slackParentMessageTs: string,
+  historyTs: string
+): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query(
+      'UPDATE threads SET history_ts = $1 WHERE slack_parent_message_ts = $2;',
+      [historyTs, slackParentMessageTs]
+    );
+  } catch (error) {
+    logger.info('Failed to update threads; ignoring for now!');
+  } finally {
+    client.release();
+  }
+}
+
 export async function getThreadLatestMessage(
   slackParentMessageTs: string
 ): Promise<string | null> {
   const client = await pool.connect();
   try {
     const result = await client.query(
-      `SELECT slack_message_ts FROM messages
-      WHERE slack_parent_message_ts=$1 AND slack_message_ts IS NOT NULL
-      ORDER BY COALESCE(slack_send_timestamp, slack_receive_timestamp) DESC LIMIT 1`,
+      `SELECT
+        t.history_ts
+        , m.slack_message_ts
+      FROM threads t
+      LEFT JOIN messages m ON (
+        t.slack_parent_message_ts=m.slack_parent_message_ts
+        AND m.slack_message_ts IS NOT NULL
+      )
+      WHERE
+        t.slack_parent_message_ts=$1
+      ORDER BY COALESCE(m.slack_send_timestamp, m.slack_receive_timestamp) DESC LIMIT 1`,
       [slackParentMessageTs]
     );
     if (result.rows.length > 0) {
-      return result.rows[0]['slack_message_ts'];
+      return result.rows[0]['slack_message_ts'] || result.rows[0]['history_ts'];
     }
     return null;
   } finally {

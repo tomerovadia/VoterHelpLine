@@ -402,13 +402,19 @@ const postUserMessageHistoryToSlack = async (
     userId.substring(0, 5)
   );
 
-  await SlackApiUtil.sendMessage(
+  const msgInfo = await SlackApiUtil.sendMessage(
     `*Operator:* ${messageHistoryContextText}\n\n${formattedMessageHistory}`,
     {
       parentMessageTs: destinationSlackParentMessageTs,
       channel: destinationSlackChannelId,
     }
   );
+  if (msgInfo) {
+    await DbApiUtil.setThreadHistoryTs(
+      destinationSlackParentMessageTs,
+      msgInfo.data.ts
+    );
+  }
 };
 
 // This helper handles all tasks associated with routing a voter to a new

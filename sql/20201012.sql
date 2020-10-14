@@ -7,6 +7,7 @@ CREATE TABLE threads (
 	user_phone_number text,
     needs_attention bool,
     updated_at timestamp without time zone,
+    history_ts text,
     PRIMARY KEY (slack_parent_message_ts)
 );
 CREATE INDEX ON threads (channel_id);
@@ -39,8 +40,9 @@ SELECT
     , channel_id
     , user_id
     , user_phone_number
-    , CASE WHEN direction='INBOUND' OR volunteer_slack_user_id IS NULL) THEN true ELSE false END as needs_attention
+    , CASE WHEN direction='INBOUND' OR volunteer_slack_user_id IS NULL THEN true ELSE false END as needs_attention
     , updated_at
+    , NULL
 FROM foo
 WHERE rn = 1
 ;
