@@ -10,6 +10,7 @@ import logger from './logger';
 import { VoterStatus } from './types';
 import { PromisifiedRedisClient } from './redis_client';
 import { UserInfo, SlackThreadInfo } from './types';
+import redisClient from './redis_client';
 
 export type VoterStatusUpdate = VoterStatus | 'UNDO';
 
@@ -385,23 +386,27 @@ export async function handleCommandUnclaimed(
 ): Promise<void> {
   const outputChannelId = channelId;
 
-  let channelFw: Record<string, string> = {};
-  let channelBw: Record<string, string> = {};
-  if (text) {
-    [channelFw, channelBw] = await SlackApiUtil.fetchSlackChannelMap();
+  const slackChannelIds = text
+    ? await RedisApiUtil.getHash(redisClient, 'slackPodChannelIds')
+    : {};
+  let slackChannelNames: Record<string, string> = {};
+  for (const name in slackChannelIds) {
+    slackChannelNames[slackChannelIds[name]] = name;
   }
+
+  logger.info(JSON.stringify(slackChannelIds));
   if (text && text != '*') {
     if (text[0] == '#') {
       text = text.substr(1);
     }
-    if (!(text in channelFw)) {
+    if (!(text in slackChannelIds)) {
       await SlackApiUtil.sendMessage(`Channel #${channelName} not found`, {
         channel: outputChannelId,
       });
       return;
     }
     channelName = text;
-    channelId = channelFw[channelName];
+    channelId = slackChannelIds[channelName];
   }
 
   const threads = await DbApiUtil.getUnclaimedVoters(
@@ -418,8 +423,8 @@ export async function handleCommandUnclaimed(
     );
     if (text === '*') {
       let channelName = x.channelId;
-      if (x.channelId in channelBw) {
-        channelName = `#${channelBw[x.channelId]}`;
+      if (slackChannelNames && x.channelId in slackChannelNames) {
+        channelName = `#${slackChannelNames[x.channelId]}`;
       }
       lines.push(
         `:bust_in_silhouette: ${x.userId} - age ${prettyTimeInterval(
@@ -428,7 +433,9 @@ export async function handleCommandUnclaimed(
       );
     } else {
       lines.push(
-        `:bust_in_silhouette: ${x.userId} - age ${prettyTimeInterval(x.lastUpdateAge || 0)} - <${url}|Open>`
+        `:bust_in_silhouette: ${x.userId} - age ${prettyTimeInterval(
+          x.lastUpdateAge || 0
+        )} - <${url}|Open>`
       );
     }
   }
