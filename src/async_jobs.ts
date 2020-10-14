@@ -144,6 +144,7 @@ async function slackInteractivityHandler(
         if (payload.callback_id === 'set_needs_attention') {
           await DbApiUtil.setThreadNeedsAttentionToDb(
             payload.message.thread_ts || payload.message.ts,
+            payload.channel.id,
             true
           );
           return;
@@ -151,6 +152,7 @@ async function slackInteractivityHandler(
         if (payload.callback_id === 'clear_needs_attention') {
           await DbApiUtil.setThreadNeedsAttentionToDb(
             payload.message.thread_ts || payload.message.ts,
+            payload.channel.id,
             false
           );
           return;

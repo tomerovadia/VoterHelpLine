@@ -412,6 +412,7 @@ const postUserMessageHistoryToSlack = async (
   if (msgInfo) {
     await DbApiUtil.setThreadHistoryTs(
       destinationSlackParentMessageTs,
+      destinationSlackChannelId,
       msgInfo.data.ts
     );
   }
@@ -580,10 +581,12 @@ const routeVoterToSlackChannel = async (
 
   // The old thread no longer needs attention
   const needsAttention = await DbApiUtil.getThreadNeedsAttentionFor(
-    userInfo[userInfo.activeChannelId]
+    userInfo[userInfo.activeChannelId],
+    userInfo.activeChannelId
   );
   await DbApiUtil.setThreadNeedsAttentionToDb(
     userInfo[userInfo.activeChannelId],
+    userInfo.activeChannelId,
     false
   );
 
@@ -739,6 +742,7 @@ const routeVoterToSlackChannel = async (
 
   await DbApiUtil.setThreadNeedsAttentionToDb(
     userInfo[destinationSlackChannelId],
+    destinationSlackChannelId,
     needsAttention
   );
 

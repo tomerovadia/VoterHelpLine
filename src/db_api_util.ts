@@ -559,13 +559,14 @@ export async function logThreadToDb(
 
 export async function setThreadNeedsAttentionToDb(
   slackParentMessageTs: string,
+  slackChannelId: string,
   needsAttention: boolean
 ): Promise<void> {
   const client = await pool.connect();
   try {
     await client.query(
-      'UPDATE threads SET needs_attention = $1 WHERE slack_parent_message_ts = $2;',
-      [needsAttention, slackParentMessageTs]
+      'UPDATE threads SET needs_attention = $1 WHERE slack_parent_message_ts = $2 AND slack_channel_id = $3;',
+      [needsAttention, slackParentMessageTs, slackChannelId]
     );
     logger.info(
       `DBAPIUTIL.setThreadNeedsAttentionToDb: Set thread ${slackParentMessageTs} needs_attention=${needsAttention}`
@@ -579,13 +580,14 @@ export async function setThreadNeedsAttentionToDb(
 
 export async function setThreadHistoryTs(
   slackParentMessageTs: string,
+  slackChannelId: string,
   historyTs: string
 ): Promise<void> {
   const client = await pool.connect();
   try {
     await client.query(
-      'UPDATE threads SET history_ts = $1 WHERE slack_parent_message_ts = $2;',
-      [historyTs, slackParentMessageTs]
+      'UPDATE threads SET history_ts = $1 WHERE slack_parent_message_ts = $2 AND slack_channel_id = $3;',
+      [historyTs, slackParentMessageTs, slackChannelId]
     );
   } catch (error) {
     logger.info('Failed to update threads; ignoring for now!');
@@ -595,7 +597,8 @@ export async function setThreadHistoryTs(
 }
 
 export async function getThreadLatestMessage(
-  slackParentMessageTs: string
+  slackParentMessageTs: string,
+  slackChannelId: string
 ): Promise<string | null> {
   const client = await pool.connect();
   try {
@@ -606,12 +609,14 @@ export async function getThreadLatestMessage(
       FROM threads t
       LEFT JOIN messages m ON (
         t.slack_parent_message_ts=m.slack_parent_message_ts
+        AND t.slack_channel_id=m.slack_channel
         AND m.slack_message_ts IS NOT NULL
       )
       WHERE
         t.slack_parent_message_ts=$1
+        AND t.slack_channel_id=$2
       ORDER BY COALESCE(m.slack_send_timestamp, m.slack_receive_timestamp) DESC LIMIT 1`,
-      [slackParentMessageTs]
+      [slackParentMessageTs, slackChannelId]
     );
     if (result.rows.length > 0) {
       return result.rows[0]['slack_message_ts'] || result.rows[0]['history_ts'];
@@ -693,7 +698,8 @@ export async function getThreadsNeedingAttentionFor(
 }
 
 export async function getThreadNeedsAttentionFor(
-  slackParentMessageTs: string
+  slackParentMessageTs: string,
+  slackChannelId: string
 ): Promise<boolean> {
   logger.info(`ENTERING DBAPIUTIL.getThreadNeedsAttentionFor`);
   logger.info(
@@ -703,8 +709,8 @@ export async function getThreadNeedsAttentionFor(
   const client = await pool.connect();
   try {
     const result = await client.query(
-      'SELECT needs_attention FROM threads WHERE slack_parent_message_ts = $1',
-      [slackParentMessageTs]
+      'SELECT needs_attention FROM threads WHERE slack_parent_message_ts = $1 AND slack_channel_id = $2',
+      [slackParentMessageTs, slackChannelId]
     );
     logger.info(
       `DBAPIUTIL.getMessageHistoryFor: Successfully looked up message history in PostgreSQL.`
