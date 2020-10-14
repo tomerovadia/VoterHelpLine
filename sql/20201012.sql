@@ -9,6 +9,11 @@ CREATE TABLE threads (
     updated_at timestamp without time zone,
     PRIMARY KEY (slack_parent_message_ts)
 );
+CREATE INDEX ON threads (channel_id);
+CREATE INDEX ON threads (user_id);
+CREATE INDEX ON threads (needs_attention);
+CREATE INDEX ON threads (updated_at);
+
 
 INSERT INTO threads
 WITH foo AS (
@@ -20,6 +25,7 @@ WITH foo AS (
         , COALESCE(slack_send_timestamp, slack_receive_timestamp) as updated_at
         , direction
         , automated
+        , archived
         , row_number() OVER (PARTITION BY slack_parent_message_ts ORDER BY COALESCE(slack_send_timestamp, slack_receive_timestamp) DESC) as rn
     FROM messages
     WHERE slack_parent_message_ts IS NOT NULL AND slack_channel IS NOT NULL
