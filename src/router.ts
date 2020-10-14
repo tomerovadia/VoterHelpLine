@@ -131,7 +131,7 @@ const introduceNewVoterToSlackChannel = async (
   slackChannelName: string,
   twilioCallbackURL: string,
   // This is only used by VOTE_AMERICA
-  includeWelcome?: boolean,
+  includeWelcome?: boolean
 ) => {
   logger.debug('ENTERING ROUTER.introduceNewVoterToSlackChannel');
   logger.debug(
@@ -302,7 +302,7 @@ export async function handleNewVoter(
   inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry,
   entryPoint: EntryPoint,
   twilioCallbackURL: string,
-  includeWelcome?: boolean,
+  includeWelcome?: boolean
 ): Promise<void> {
   logger.debug('ENTERING ROUTER.handleNewVoter');
   const userMessage = userOptions.userMessage;

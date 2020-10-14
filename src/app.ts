@@ -426,26 +426,26 @@ const handleIncomingTwilioMessage = async (
     }
 
     if (process.env.CLIENT_ORGANIZATION === 'VOTE_AMERICA') {
-        if (KeywordParser.isHelplineKeyword(userMessage)) {
-          await Router.handleNewVoter(
-            { userPhoneNumber, userMessage, userId },
-            redisClient,
-            twilioPhoneNumber,
-            inboundDbMessageEntry,
-            entryPoint,
-            twilioCallbackURL,
-            true /* includeWelcome */
-          );
-        } else {
-          await Router.welcomePotentialVoter(
-            { userPhoneNumber, userMessage, userId },
-            redisClient,
-            twilioPhoneNumber,
-            inboundDbMessageEntry,
-            entryPoint,
-            twilioCallbackURL
-          );
-        }
+      if (KeywordParser.isHelplineKeyword(userMessage)) {
+        await Router.handleNewVoter(
+          { userPhoneNumber, userMessage, userId },
+          redisClient,
+          twilioPhoneNumber,
+          inboundDbMessageEntry,
+          entryPoint,
+          twilioCallbackURL,
+          true /* includeWelcome */
+        );
+      } else {
+        await Router.welcomePotentialVoter(
+          { userPhoneNumber, userMessage, userId },
+          redisClient,
+          twilioPhoneNumber,
+          inboundDbMessageEntry,
+          entryPoint,
+          twilioCallbackURL
+        );
+      }
     } else {
       await Router.handleNewVoter(
         { userPhoneNumber, userMessage, userId },
