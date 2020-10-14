@@ -381,6 +381,7 @@ export function prettyTimeInterval(seconds: number): string {
 }
 
 export async function handleCommandUnclaimed(
+  teamId: string,
   channelId: string,
   channelName: string,
   userId: string,
@@ -438,7 +439,9 @@ export async function handleCommandUnclaimed(
       lines.push(
         `:bust_in_silhouette: ${x.userId} - age ${prettyTimeInterval(
           x.lastUpdateAge || 0
-        )} - ${channelName} - <${url}|Open>`
+        )} - <slack://channel?team=${teamId}&id=${
+          x.channelId
+        }|${channelName}> - <${url}|Open>`
       );
     } else {
       lines.push(
@@ -488,6 +491,7 @@ async function getNeedsAttentionList(userId: string): Promise<string[]> {
 }
 
 export async function handleCommandNeedsAttention(
+  teamId: string,
   channelId: string,
   channelName: string,
   userId: string,

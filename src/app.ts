@@ -588,6 +588,7 @@ app.post(
 
     await enqueueBackgroundTask(
       'slackCommandHandler',
+      req.body.team_id,
       req.body.channel_id,
       req.body.channel_name,
       req.body.user_id,
