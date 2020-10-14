@@ -541,8 +541,13 @@ export async function handleCommandNeedsAttention(
       );
     }
   } else if (arg && arg[0] == '@') {
+    const slackUserIds = await SlackApiUtil.fetchSlackUserNamesAndIds();
     showUserName = arg.substr(1);
-    showUserId = arg.substr(1); // FIXME
+    if (slackUserIds && showUserName in slackUserIds) {
+      showUserId = slackUserIds[showUserName];
+    } else {
+      lines.push(`Unrecognized user @${showUserName}`);
+    }
   } else if (arg && arg[0] == '#') {
     const slackChannelIds = await RedisApiUtil.getHash(
       redisClient,
@@ -592,7 +597,7 @@ export async function handleCommandNeedsAttention(
     // For a single user
     const ulines = await getNeedsAttentionList(showUserId);
     lines.push(
-      `*${ulines.length}* voters need attention from *${showUserName}*`
+      `*${ulines.length}* voters need attention from @${showUserName}`
     );
     lines = lines.concat(ulines);
   }

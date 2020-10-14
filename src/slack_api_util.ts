@@ -36,6 +36,10 @@ type SlackChannelNamesAndIds = {
   [channelId: string]: string; // mapping of channel ID to channel name
 };
 
+type SlackUserNamesAndIds = {
+  [userId: string]: string; // mapping of user ID to user name
+};
+
 export async function getThreadPermalink(
   channel: string,
   message_ts: string
@@ -351,6 +355,82 @@ export async function updateSlackChannelNamesAndIdsInRedis(
       redisClient,
       'slackPodChannelIds',
       slackChannelNamesAndIds
+    );
+  }
+}
+
+export async function fetchSlackUserNamesAndIds(): Promise<SlackUserNamesAndIds | null> {
+  logger.info(`ENTERING SLACKAPIUTIL.fetchSlackUserNamesAndIds`);
+  const firstPageResponse = await slackAPI.get('users.list', {
+    params: {
+      token: process.env.SLACK_BOT_ACCESS_TOKEN,
+      limit: 200,
+    },
+  });
+
+  if (!firstPageResponse.data.ok) {
+    logger.error(
+      `SLACKAPIUTIL.fetchSlackUserNamesAndIds: ERROR fetching initial page of Slack user names and IDs. Error: response.data: ${JSON.stringify(
+        firstPageResponse.data
+      )}`
+    );
+    return null;
+  }
+  logger.info(
+    `SLACKAPIUTIL.fetchSlackUserNamesAndIds: Successfully fetched first page of Slack user names and IDs.`
+  );
+
+  let users = firstPageResponse.data.members;
+  let cursor = firstPageResponse.data.response_metadata.next_cursor;
+  // Slack will return a (falsy) empty string when there is no next page.
+  // See 'Pagination' on this reference: https://api.slack.com/methods/conversations.list
+  while (cursor) {
+    logger.info(
+      `SLACKAPIUTIL.fetchSlackUserNamesAndIds: Fetching subsequent page of Slack user names and IDs (cursor: ${cursor}).`
+    );
+    const subsequentPageResponse = await slackAPI.get('users.list', {
+      params: {
+        token: process.env.SLACK_BOT_ACCESS_TOKEN,
+        limit: 200,
+        cursor,
+      },
+    });
+
+    if (subsequentPageResponse.data.ok) {
+      logger.info(
+        `SLACKAPIUTIL.fetchSlackUserNamesAndIds: Successfully fetched subsequent page of Slack user names and IDs (cursor: ${cursor}).`
+      );
+      cursor = subsequentPageResponse.data.response_metadata.next_cursor;
+      users = users.concat(subsequentPageResponse.data.members);
+    } else {
+      logger.error(
+        `SLACKAPIUTIL.fetchSlackUserNamesAndIds: ERROR fetching subsequent page of Slack user names and IDs. Error: response.data: ${JSON.stringify(
+          firstPageResponse.data
+        )}`
+      );
+      break;
+    }
+  }
+
+  const slackUserNamesAndIds = {} as SlackUserNamesAndIds;
+  for (const idx in users) {
+    const user = users[idx];
+    slackUserNamesAndIds[user.name] = user.id;
+  }
+  return slackUserNamesAndIds;
+}
+
+export async function updateSlackUserNamesAndIdsInRedis(
+  redisClient: PromisifiedRedisClient
+): Promise<void> {
+  logger.info(`ENTERING SLACKAPIUTIL.updateSlackUserNamesAndIdsInRedis`);
+  const slackUserNamesAndIds = await fetchSlackUserNamesAndIds();
+
+  if (slackUserNamesAndIds) {
+    await RedisApiUtil.setHash(
+      redisClient,
+      'slackUserIds',
+      slackUserNamesAndIds
     );
   }
 }
