@@ -528,16 +528,18 @@ export async function handleCommandNeedsAttention(
       )
     );
 
-    const vstats = await DbApiUtil.getThreadsNeedingAttentionByVolunteer();
     lines.push('Voters needing attention by volunteer');
-    lines = lines.concat(
-      vstats.map(
-        (x) =>
-          `${x.count} for @${
-            x.volunteerSlackUser
-          } - oldest ${prettyTimeInterval(x.maxLastUpdateAge)}`
-      )
-    );
+    const vstats = await DbApiUtil.getThreadsNeedingAttentionByVolunteer();
+    for (const x of vstats) {
+      const userName = await SlackApiUtil.getSlackUserName(
+        x.volunteerSlackUser
+      );
+      lines.push(
+        `${x.count} for @${userName} - oldest ${prettyTimeInterval(
+          x.maxLastUpdateAge
+        )}`
+      );
+    }
   } else if (arg && arg[0] == '@') {
     showUserName = arg.substr(1);
     showUserId = arg.substr(1); // FIXME
@@ -546,7 +548,6 @@ export async function handleCommandNeedsAttention(
       redisClient,
       'slackPodChannelIds'
     );
-    logger.info(JSON.stringify(slackChannelIds));
     const channelName = arg.substr(1);
     if (!(channelName in slackChannelIds)) {
       lines.push(`Unrecognized channel ${arg}`);
@@ -569,9 +570,8 @@ export async function handleCommandNeedsAttention(
           x.channelId,
           messageTs
         );
-        // FIXME: resolve user id into user name
         const owner = x.volunteerSlackUser
-          ? `@${x.volunteerSlackUser}`
+          ? `@${await SlackApiUtil.getSlackUserName(x.volunteerSlackUser)}`
           : 'unassigned';
         lines.push(
           `:bust_in_silhouette: ${

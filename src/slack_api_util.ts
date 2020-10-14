@@ -355,6 +355,24 @@ export async function updateSlackChannelNamesAndIdsInRedis(
   }
 }
 
+export async function getSlackUserName(userId: string): Promise<string | null> {
+  const response = await slackAPI.get('users.info', {
+    params: {
+      token: process.env.SLACK_BOT_ACCESS_TOKEN,
+      user: userId,
+    },
+  });
+  if (!response.data.ok) {
+    logger.error(
+      `SLACKAPIUTIL.fetchSlackUserName: ERROR fetching user.info for ${userId}. Error: response.data: ${JSON.stringify(
+        response.data
+      )}`
+    );
+    return null;
+  }
+  return response.data.user.name;
+}
+
 export async function addSlackMessageReaction(
   messageChannel: string,
   messageTs: string,
