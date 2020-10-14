@@ -108,7 +108,7 @@ export async function newThreadToDb(
   const client = await pool.connect();
   try {
     await client.query(
-      'INSERT INTO threads (slack_parent_message_ts, channel_id, user_id, user_phone_number, needs_attention, updated_at) VALUES ($1, $2, $3, $4, $5, NOW())',
+      'INSERT INTO threads (slack_parent_message_ts, slack_channel_id, user_id, user_phone_number, needs_attention, updated_at) VALUES ($1, $2, $3, $4, $5, NOW())',
       [
         databaseThreadEntry.slackParentMessageTs,
         databaseThreadEntry.channelId,
@@ -199,9 +199,9 @@ export async function getUnclaimedVoters(
     if (channelId) {
       result = await client.query(
         `SELECT
-         t.slack_parent_message_ts as id, t.channel_id, t.user_phone_number, t.user_id, EXTRACT(EPOCH FROM now() - t.updated_at) as age
+         t.slack_parent_message_ts, t.slack_channel_id, t.user_phone_number, t.user_id, EXTRACT(EPOCH FROM now() - t.updated_at) as age
         FROM threads t
-        WHERE t.needs_attention AND t.channel_id = $1
+        WHERE t.needs_attention AND t.slack_channel_id = $1
           AND NOT EXISTS (SELECT FROM volunteer_voter_claims c WHERE t.user_id=c.user_id
           AND t.user_phone_number=c.user_phone_number)`,
         [channelId]
@@ -209,15 +209,15 @@ export async function getUnclaimedVoters(
     } else {
       result = await client.query(
         `SELECT
-         t.slack_parent_message_ts as id, t.channel_id, t.user_phone_number, t.user_id, EXTRACT(EPOCH FROM now() - t.updated_at) as age
+         t.slack_parent_message_ts, t.slack_channel_id, t.user_phone_number, t.user_id, EXTRACT(EPOCH FROM now() - t.updated_at) as age
         FROM threads t
         WHERE t.needs_attention AND NOT EXISTS (SELECT FROM volunteer_voter_claims c WHERE t.user_id=c.user_id
           AND t.user_phone_number=c.user_phone_number)`
       );
     }
     return result.rows.map((x) => ({
-      slackParentMessageTs: x['id'],
-      channelId: x['channel_id'],
+      slackParentMessageTs: x['slack_parent_message_ts'],
+      channelId: x['slack_channel_id'],
       userPhoneNumber: x['user_phone_number'],
       userId: x['user_id'],
       age: x['age'],
@@ -237,7 +237,7 @@ export async function getThreadsNeedingAttentionFor(
   try {
     const result = await client.query(
       `SELECT
-         slack_parent_message_ts as id, channel_id, user_phone_number, user_id, EXTRACT(EPOCH FROM now() - updated_at) as age
+         slack_parent_message_ts, slack_channel_id, user_phone_number, user_id, EXTRACT(EPOCH FROM now() - updated_at) as age
         FROM threads t
         WHERE needs_attention AND EXISTS (
           SELECT FROM volunteer_voter_claims c
@@ -246,8 +246,8 @@ export async function getThreadsNeedingAttentionFor(
       [slackUserId]
     );
     return result.rows.map((x) => ({
-      slackParentMessageTs: x['id'],
-      channelId: x['channel_id'],
+      slackParentMessageTs: x['slack_parent_message_ts'],
+      channelId: x['slack_channel_id'],
       userPhoneNumber: x['user_phone_number'],
       userId: x['user_id'],
       age: x['age'],

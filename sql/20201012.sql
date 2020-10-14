@@ -2,7 +2,7 @@
 
 CREATE TABLE threads (
     slack_parent_message_ts text,
-    channel_id text,
+    slack_channel_id text,
     user_id text,
 	user_phone_number text,
     needs_attention bool,
@@ -10,7 +10,7 @@ CREATE TABLE threads (
     history_ts text,
     PRIMARY KEY (slack_parent_message_ts)
 );
-CREATE INDEX ON threads (channel_id);
+CREATE INDEX ON threads (slack_channel_id);
 CREATE INDEX ON threads (user_id);
 CREATE INDEX ON threads (needs_attention);
 CREATE INDEX ON threads (updated_at);
@@ -20,7 +20,7 @@ INSERT INTO threads
 WITH foo AS (
     SELECT
         m.slack_parent_message_ts
-        , slack_channel as channel_id
+        , slack_channel as slack_channel_id
         , m.user_id
         , CASE WHEN direction='INBOUND' THEN from_phone_number ELSE to_phone_number END as user_phone_number
         , COALESCE(slack_send_timestamp, slack_receive_timestamp) as updated_at
@@ -37,7 +37,7 @@ WITH foo AS (
 )
 SELECT
     slack_parent_message_ts
-    , channel_id
+    , slack_channel_id
     , user_id
     , user_phone_number
     , CASE WHEN direction='INBOUND' OR volunteer_slack_user_id IS NULL THEN true ELSE false END as needs_attention
