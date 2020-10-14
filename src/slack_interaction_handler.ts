@@ -537,14 +537,21 @@ export async function handleCommandNeedsAttention(
         } - oldest ${prettyTimeInterval(x.maxLastUpdateAge)}`
       );
     }
-  } else if (arg && arg[0] == '@') {
-    const slackUserIds = await SlackApiUtil.fetchSlackUserNamesAndIds();
-    showUserName = arg.substr(1);
-    if (slackUserIds && showUserName in slackUserIds) {
-      showUserId = slackUserIds[showUserName];
+  } else if (
+    arg &&
+    arg[0] == '<' &&
+    arg[arg.length - 1] == '>' &&
+    arg[1] == '@'
+  ) {
+    const s = arg.substr(2, arg.length - 3).split('|');
+    if (s.length != 2) {
+      lines.push(`Unrecognized user ${arg}`);
     } else {
-      lines.push(`Unrecognized user @${showUserName}`);
+      showUserId = s[0];
+      showUserName = s[1];
     }
+  } else if (arg && arg[0] == '@') {
+    lines.push(`Unrecognized user ${arg}`);
   } else if (arg && arg[0] == '#') {
     const slackChannelIds = await RedisApiUtil.getHash(
       redisClient,

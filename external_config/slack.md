@@ -87,7 +87,7 @@ Important: The Slack bot must be given access to each of these channels.
 - *Request URL:* base URL + /slack-command
 - *Short Description:* List voters needing your attention
 - *Usage Hint:*
-
+- *Escape channels, users, and links sent to your app:* CHECKED
 
 #### Shortcuts
 
