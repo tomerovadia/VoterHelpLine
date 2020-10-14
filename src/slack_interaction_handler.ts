@@ -412,10 +412,10 @@ export async function handleCommandUnclaimed(
   const threads = await DbApiUtil.getUnclaimedVoters(
     text === '*' ? null : channelId
   );
-  const topline =
+  const lines: string[] = [
     `${threads.length} unclaimed voters in ` +
-    (text === '*' ? 'all channels' : `#${channelName}`);
-  const lines: string[] = [];
+      (text === '*' ? 'all channels' : `#${channelName}`),
+  ];
   for (const x of threads) {
     const url = await SlackApiUtil.getThreadPermalink(
       x.channelId,
@@ -439,7 +439,7 @@ export async function handleCommandUnclaimed(
       );
     }
   }
-  await SlackApiUtil.sendMessage(topline, {
+  await SlackApiUtil.sendMessage('Unclaimed voters', {
     channel: outputChannelId,
     unfurl_links: false,
     unfurl_media: false,
