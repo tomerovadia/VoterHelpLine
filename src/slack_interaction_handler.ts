@@ -11,7 +11,6 @@ import { VoterStatus } from './types';
 import { PromisifiedRedisClient } from './redis_client';
 import { UserInfo, SlackThreadInfo } from './types';
 import redisClient from './redis_client';
-import { SlackBlock, SlackView } from './slack_block_util';
 
 export type VoterStatusUpdate = VoterStatus | 'UNDO';
 
@@ -389,7 +388,7 @@ export async function handleCommandUnclaimed(
 ): Promise<void> {
   const outputChannelId = channelId;
 
-  var arg = text;
+  let arg = text;
   if (text && !SlackApiUtil.isMemberOfAdminChannel(userId)) {
     arg = '';
   }
@@ -397,7 +396,7 @@ export async function handleCommandUnclaimed(
   const slackChannelIds = arg
     ? await RedisApiUtil.getHash(redisClient, 'slackPodChannelIds')
     : {};
-  let slackChannelNames: Record<string, string> = {};
+  const slackChannelNames: Record<string, string> = {};
   for (const name in slackChannelIds) {
     slackChannelNames[slackChannelIds[name]] = name;
   }
@@ -495,8 +494,7 @@ export async function handleCommandNeedsAttention(
   channelId: string,
   channelName: string,
   userId: string,
-  userName: string,
-  text: string
+  userName: string
 ): Promise<void> {
   const lines = await getNeedsAttentionList(userId);
   await SlackApiUtil.sendMessage(`Needs attention`, {
@@ -524,7 +522,6 @@ export async function handleShowNeedsAttention({
   payload: SlackInteractionEventPayload;
   viewId: string;
 }): Promise<void> {
-  const userName = await SlackApiUtil.fetchSlackUserName(payload.user.id);
   const lines = await getNeedsAttentionList(payload.user.id);
   const slackView: SlackBlockUtil.SlackView = {
     title: {

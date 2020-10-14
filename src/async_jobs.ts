@@ -17,7 +17,6 @@ import logger from './logger';
 import redisClient from './redis_client';
 import Hashes from 'jshashes';
 import * as DbApiUtil from './db_api_util';
-import * as SlackBlockUtil from './slack_block_util';
 
 import {
   SlackInteractionEventPayload,
@@ -57,8 +56,7 @@ async function slackCommandHandler(
         channelId,
         channelName,
         userId,
-        userName,
-        text
+        userName
       );
       return;
     }
