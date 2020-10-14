@@ -98,7 +98,7 @@ export type ThreadInfo = {
   slackParentMessageTs: string;
   channelId: string;
   userId: string | null;
-  age: number | null;
+  lastUpdateAge: number | null;
 };
 
 export async function logMessageToDb(
@@ -639,7 +639,7 @@ export async function getUnclaimedVoters(
           t.slack_parent_message_ts
           , t.slack_channel_id
           , t.user_id
-          , EXTRACT(EPOCH FROM now() - t.updated_at) as age
+          , EXTRACT(EPOCH FROM now() - t.updated_at) as last_update_age
         FROM threads t
         WHERE
           t.needs_attention
@@ -656,7 +656,7 @@ export async function getUnclaimedVoters(
           t.slack_parent_message_ts
           , t.slack_channel_id
           , t.user_id
-          , EXTRACT(EPOCH FROM now() - t.updated_at) as age
+          , EXTRACT(EPOCH FROM now() - t.updated_at) as last_update_age
         FROM threads t
         WHERE
           t.needs_attention
@@ -670,7 +670,7 @@ export async function getUnclaimedVoters(
       slackParentMessageTs: x['slack_parent_message_ts'],
       channelId: x['slack_channel_id'],
       userId: x['user_id'],
-      age: x['age'],
+      lastUpdateAge: x['last_update_age'],
     }));
   } catch (error) {
     logger.info('Failed to query unclaimed threads; ignoring for now!');
@@ -706,7 +706,7 @@ export async function getThreadsNeedingAttentionFor(
       channelId: x['slack_channel_id'],
       userPhoneNumber: x['user_phone_number'],
       userId: x['user_id'],
-      age: x['age'],
+      lastUpdateAge: x['last_update_age'],
     }));
   } catch (error) {
     logger.info('Failed to query threads; ignoring for now!');

@@ -423,12 +423,12 @@ export async function handleCommandUnclaimed(
       }
       lines.push(
         `:bust_in_silhouette: ${x.userId} - age ${prettyTimeInterval(
-          x.age || 0
+          x.lastUpdateAge || 0
         )} - ${channelName} - <${url}|Open>`
       );
     } else {
       lines.push(
-        `:bust_in_silhouette: ${x.userId} - age ${prettyTimeInterval(x.age || 0)} - <${url}|Open>`
+        `:bust_in_silhouette: ${x.userId} - age ${prettyTimeInterval(x.lastUpdateAge || 0)} - <${url}|Open>`
       );
     }
   }
@@ -476,7 +476,7 @@ export async function receiveShowNeedsAttention({
       text: {
         type: 'mrkdwn',
         text: `${x.userId} - age ${prettyTimeInterval(
-          x.age || 0
+          x.lastUpdateAge || 0
         )} - <${urls.pop()}|Open>`,
       },
     })),
