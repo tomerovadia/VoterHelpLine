@@ -43,6 +43,7 @@ async function slackCommandHandler(
       await SlackInteractionHandler.handleCommandUnclaimed(
         channelId,
         channelName,
+        userId,
         text
       );
       return;

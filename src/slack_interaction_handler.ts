@@ -383,11 +383,17 @@ export function prettyTimeInterval(seconds: number): string {
 export async function handleCommandUnclaimed(
   channelId: string,
   channelName: string,
+  userId: string,
   text: string
 ): Promise<void> {
   const outputChannelId = channelId;
 
-  const slackChannelIds = text
+  var arg = text;
+  if (text && !SlackApiUtil.isMemberOfAdminChannel(userId)) {
+    arg = '';
+  }
+
+  const slackChannelIds = arg
     ? await RedisApiUtil.getHash(redisClient, 'slackPodChannelIds')
     : {};
   let slackChannelNames: Record<string, string> = {};
@@ -396,26 +402,26 @@ export async function handleCommandUnclaimed(
   }
 
   logger.info(JSON.stringify(slackChannelIds));
-  if (text && text != '*') {
-    if (text[0] == '#') {
-      text = text.substr(1);
+  if (arg && arg != '*') {
+    if (arg[0] == '#') {
+      arg = arg.substr(1);
     }
-    if (!(text in slackChannelIds)) {
+    if (!(arg in slackChannelIds)) {
       await SlackApiUtil.sendMessage(`Channel #${channelName} not found`, {
         channel: outputChannelId,
       });
       return;
     }
-    channelName = text;
+    channelName = arg;
     channelId = slackChannelIds[channelName];
   }
 
   const threads = await DbApiUtil.getUnclaimedVoters(
-    text === '*' ? null : channelId
+    arg === '*' ? null : channelId
   );
   const lines: string[] = [
     `${threads.length} unclaimed voters in ` +
-      (text === '*' ? 'all channels' : `#${channelName}`),
+      (arg === '*' ? 'all channels' : `#${channelName}`),
   ];
   for (const x of threads) {
     const messageTs =
@@ -424,7 +430,7 @@ export async function handleCommandUnclaimed(
         x.channelId
       )) || x.slackParentMessageTs;
     const url = await SlackApiUtil.getThreadPermalink(x.channelId, messageTs);
-    if (text === '*') {
+    if (arg === '*') {
       let channelName = x.channelId;
       if (slackChannelNames && x.channelId in slackChannelNames) {
         channelName = `#${slackChannelNames[x.channelId]}`;
