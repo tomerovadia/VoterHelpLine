@@ -4,7 +4,7 @@ CREATE TABLE threads (
     slack_parent_message_ts text,
     slack_channel_id text,
     user_id text,
-	user_phone_number text,
+    user_phone_number text,
     needs_attention bool,
     updated_at timestamp without time zone,
     history_ts text,
