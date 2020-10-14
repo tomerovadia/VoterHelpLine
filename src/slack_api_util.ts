@@ -60,7 +60,6 @@ export async function getThreadPermalink(
         )}`
       );
     }
-    logger.info(response.data.permalink);
     return response.data.permalink;
   } catch (error) {
     logger.error(`SLACKAPIUTIL.getThreadPermalink: ERROR in getting permalink message,
