@@ -502,7 +502,6 @@ export async function handleCommandNeedsAttention(
     arg = '';
   }
 
-  let prefix = '';
   let lines = [] as string[];
   let showUserId = userId;
   let showUserName = userName;
@@ -518,14 +517,27 @@ export async function handleCommandNeedsAttention(
       slackChannelNames[slackChannelIds[name]] = name;
     }
 
+    lines.push('Voters needing attention by channel');
     const stats = await DbApiUtil.getThreadsNeedingAttentionByChannel();
-    lines = stats.map(
-      (x) =>
-        `${x.count} in <slack://channel?team=${teamId}&id=${x.channelId}|#${
-          slackChannelNames[x.channelId]
-        }> - oldest ${prettyTimeInterval(x.maxLastUpdateAge)}`
+    lines = lines.concat(
+      stats.map(
+        (x) =>
+          `${x.count} in <slack://channel?team=${teamId}&id=${x.channelId}|#${
+            slackChannelNames[x.channelId]
+          }> - oldest ${prettyTimeInterval(x.maxLastUpdateAge)}`
+      )
     );
-    prefix = 'Voters needing attention by channel';
+
+    const vstats = await DbApiUtil.getThreadsNeedingAttentionByVolunteer();
+    lines.push('Voters needing attention by volunteer');
+    lines = lines.concat(
+      vstats.map(
+        (x) =>
+          `${x.count} for @${
+            x.volunteerSlackUser
+          } - oldest ${prettyTimeInterval(x.maxLastUpdateAge)}`
+      )
+    );
   } else if (arg && arg[0] == '@') {
     showUserName = arg.substr(1);
     showUserId = arg.substr(1); // FIXME
@@ -537,10 +549,12 @@ export async function handleCommandNeedsAttention(
     logger.info(JSON.stringify(slackChannelIds));
     const channelName = arg.substr(1);
     if (!(channelName in slackChannelIds)) {
-      prefix = `Unrecognized channel ${arg}`;
+      lines.push(`Unrecognized channel ${arg}`);
     } else {
       const channelId = slackChannelIds[channelName];
-      prefix = `Voters needing attention for <slack://channel?team=${teamId}&id=${channelId}|#${channelName}>`;
+      lines.push(
+        `Voters needing attention for <slack://channel?team=${teamId}&id=${channelId}|#${channelName}>`
+      );
       const threads = await DbApiUtil.getThreadsNeedingAttentionForChannel(
         channelId
       );
@@ -569,13 +583,18 @@ export async function handleCommandNeedsAttention(
       }
     }
   } else if (arg) {
-    prefix = `Unrecognized argument _${arg}_: pass * for summary by channel, a channel (_#foo_), or a user (_@bar_)`;
+    lines.push(
+      `Unrecognized argument _${arg}_: pass * for summary by channel, a channel (_#foo_), or a user (_@bar_)`
+    );
   }
 
-  if (!prefix) {
+  if (lines.length == 0) {
     // For a single user
-    lines = await getNeedsAttentionList(showUserId);
-    prefix = `*${lines.length}* voters need attention from *${showUserName}*`;
+    const ulines = await getNeedsAttentionList(showUserId);
+    lines.push(
+      `*${ulines.length}* voters need attention from *${showUserName}*`
+    );
+    lines = lines.concat(ulines);
   }
 
   await SlackApiUtil.sendMessage(`Needs attention`, {
@@ -587,7 +606,7 @@ export async function handleCommandNeedsAttention(
         type: 'section',
         text: {
           type: 'mrkdwn',
-          text: prefix + '\n' + lines.join('\n'),
+          text: lines.join('\n'),
         },
       },
     ],

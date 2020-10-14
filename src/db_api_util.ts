@@ -108,6 +108,12 @@ export type ChannelStat = {
   maxLastUpdateAge: number;
 };
 
+export type VolunteerStat = {
+  volunteerSlackUser: string;
+  count: number;
+  maxLastUpdateAge: number;
+};
+
 export async function logMessageToDb(
   databaseMessageEntry: DatabaseMessageEntry
 ): Promise<void> {
@@ -722,6 +728,48 @@ export async function getThreadsNeedingAttentionByChannel(): Promise<
           count: x['count'],
           maxLastUpdateAge: x['max_last_update_age'],
         } as ChannelStat)
+    );
+  } catch (error) {
+    logger.info('Failed to query all threads for channel; ignoring for now!');
+    return [];
+  } finally {
+    client.release();
+  }
+}
+
+// Return a list of VolunteerStat's for all threads needing attention
+export async function getThreadsNeedingAttentionByVolunteer(): Promise<
+  VolunteerStat[]
+> {
+  const client = await pool.connect();
+  try {
+    const result = await client.query(
+      `WITH claims AS (
+        SELECT
+          user_id
+          , volunteer_slack_user_id
+          , row_number () OVER (PARTITION BY user_id ORDER BY created_at DESC) AS rn
+        FROM volunteer_voter_claims
+      )
+      SELECT
+        count(*)
+        , volunteer_slack_user_id
+        , MAX(EXTRACT(EPOCH FROM now() - updated_at)) as max_last_update_age
+        FROM threads t, claims c
+        WHERE
+          needs_attention
+          AND t.user_id=c.user_id
+          AND c.rn=1
+        GROUP BY volunteer_slack_user_id
+        ORDER BY max_last_update_age DESC`
+    );
+    return result.rows.map(
+      (x) =>
+        ({
+          volunteerSlackUser: x['volunteer_slack_user_id'],
+          count: x['count'],
+          maxLastUpdateAge: x['max_last_update_age'],
+        } as VolunteerStat)
     );
   } catch (error) {
     logger.info('Failed to query all threads for channel; ignoring for now!');
