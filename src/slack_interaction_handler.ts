@@ -531,13 +531,10 @@ export async function handleCommandNeedsAttention(
     lines.push('Voters needing attention by volunteer');
     const vstats = await DbApiUtil.getThreadsNeedingAttentionByVolunteer();
     for (const x of vstats) {
-      const userName = await SlackApiUtil.getSlackUserName(
-        x.volunteerSlackUser
-      );
       lines.push(
-        `${x.count} for @${userName} - oldest ${prettyTimeInterval(
-          x.maxLastUpdateAge
-        )}`
+        `${x.count} for @${
+          x.volunteerSlackUserName
+        } - oldest ${prettyTimeInterval(x.maxLastUpdateAge)}`
       );
     }
   } else if (arg && arg[0] == '@') {
@@ -575,8 +572,8 @@ export async function handleCommandNeedsAttention(
           x.channelId,
           messageTs
         );
-        const owner = x.volunteerSlackUser
-          ? `@${await SlackApiUtil.getSlackUserName(x.volunteerSlackUser)}`
+        const owner = x.volunteerSlackUserName
+          ? `@${x.volunteerSlackUserName}`
           : 'unassigned';
         lines.push(
           `:bust_in_silhouette: ${

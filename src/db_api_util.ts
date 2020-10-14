@@ -99,7 +99,8 @@ export type ThreadInfo = {
   channelId: string;
   userId: string | null;
   lastUpdateAge: number | null;
-  volunteerSlackUser: string | null;
+  volunteerSlackUserId: string | null;
+  volunteerSlackUserName: string | null;
 };
 
 export type ChannelStat = {
@@ -109,7 +110,8 @@ export type ChannelStat = {
 };
 
 export type VolunteerStat = {
-  volunteerSlackUser: string;
+  volunteerSlackUserId: string;
+  volunteerSlackUserName: string;
   count: number;
   maxLastUpdateAge: number;
 };
@@ -694,7 +696,8 @@ export async function getUnclaimedVoters(
       channelId: x['slack_channel_id'],
       userId: x['user_id'],
       lastUpdateAge: x['last_update_age'],
-      volunteerSlackUser: null,
+      volunteerSlackUserId: null,
+      volunteerSlackUserName: null,
     }));
   } catch (error) {
     logger.info('Failed to query unclaimed threads; ignoring for now!');
@@ -748,25 +751,28 @@ export async function getThreadsNeedingAttentionByVolunteer(): Promise<
         SELECT
           user_id
           , volunteer_slack_user_id
+          , volunteer_slack_user_name
           , row_number () OVER (PARTITION BY user_id ORDER BY created_at DESC) AS rn
         FROM volunteer_voter_claims
       )
       SELECT
         count(*)
         , volunteer_slack_user_id
+        , volunteer_slack_user_name
         , MAX(EXTRACT(EPOCH FROM now() - updated_at)) as max_last_update_age
         FROM threads t, claims c
         WHERE
           needs_attention
           AND t.user_id=c.user_id
           AND c.rn=1
-        GROUP BY volunteer_slack_user_id
+        GROUP BY volunteer_slack_user_id, volunteer_slack_user_name
         ORDER BY max_last_update_age DESC`
     );
     return result.rows.map(
       (x) =>
         ({
-          volunteerSlackUser: x['volunteer_slack_user_id'],
+          volunteerSlackUserId: x['volunteer_slack_user_id'],
+          volunteerSlackUserName: x['volunteer_slack_user_name'],
           count: x['count'],
           maxLastUpdateAge: x['max_last_update_age'],
         } as VolunteerStat)
@@ -790,6 +796,7 @@ export async function getThreadsNeedingAttentionForChannel(
         SELECT
           user_id
           , volunteer_slack_user_id
+          , volunteer_slack_user_name
           , row_number () OVER (PARTITION BY user_id ORDER BY created_at DESC) AS rn
         FROM volunteer_voter_claims
       )
@@ -799,6 +806,7 @@ export async function getThreadsNeedingAttentionForChannel(
         , t.user_id
         , EXTRACT(EPOCH FROM now() - updated_at) as last_update_age
         , c.volunteer_slack_user_id
+        , c.volunteer_slack_user_name
         FROM threads t, claims c
         WHERE
           needs_attention
@@ -813,7 +821,8 @@ export async function getThreadsNeedingAttentionForChannel(
       channelId: x['slack_channel_id'],
       userId: x['user_id'],
       lastUpdateAge: x['last_update_age'],
-      volunteerSlackUser: x['volunteer_slack_user_id'],
+      volunteerSlackUserId: x['volunteer_slack_user_id'],
+      volunteerSlackUserName: x['volunteer_slack_user_name'],
     }));
   } catch (error) {
     logger.info('Failed to query threads; ignoring for now!');
@@ -835,6 +844,7 @@ export async function getThreadsNeedingAttentionFor(
         SELECT
           user_id
           , volunteer_slack_user_id
+          , volunteer_slack_user_name
           , row_number () OVER (PARTITION BY user_id ORDER BY created_at DESC) AS rn
         FROM volunteer_voter_claims
       )
@@ -843,6 +853,7 @@ export async function getThreadsNeedingAttentionFor(
         , slack_channel_id
         , t.user_id
         , EXTRACT(EPOCH FROM now() - updated_at) as last_update_age
+        , c.volunteer_slack_user_name
         FROM threads t, claims c
         WHERE
           needs_attention
@@ -857,7 +868,8 @@ export async function getThreadsNeedingAttentionFor(
       channelId: x['slack_channel_id'],
       userId: x['user_id'],
       lastUpdateAge: x['last_update_age'],
-      volunteerSlackUser: slackUserId,
+      volunteerSlackUserId: slackUserId,
+      volunteerSlackUserName: x['volunteer_slack_user_name'],
     }));
   } catch (error) {
     logger.info('Failed to query threads; ignoring for now!');
