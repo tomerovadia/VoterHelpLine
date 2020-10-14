@@ -384,7 +384,6 @@ export async function handleCommandUnclaimed(
   text: string
 ): Promise<void> {
   const outputChannelId = channelId;
-  const MD5 = new Hashes.MD5();
 
   let channelFw: Record<string, string> = {};
   let channelBw: Record<string, string> = {};
@@ -423,17 +422,13 @@ export async function handleCommandUnclaimed(
         channelName = `#${channelBw[x.channelId]}`;
       }
       lines.push(
-        `:bust_in_silhouette: ${MD5.hex(
-          x.userPhoneNumber || ''
-        )} - age ${prettyTimeInterval(
+        `:bust_in_silhouette: ${x.userId} - age ${prettyTimeInterval(
           x.age || 0
         )} - ${channelName} - <${url}|Open>`
       );
     } else {
       lines.push(
-        `:bust_in_silhouette: ${MD5.hex(
-          x.userPhoneNumber || ''
-        )} - age ${prettyTimeInterval(x.age || 0)} - <${url}|Open>`
+        `:bust_in_silhouette: ${x.userId} - age ${prettyTimeInterval(x.age || 0)} - <${url}|Open>`
       );
     }
   }
@@ -461,7 +456,6 @@ export async function receiveShowNeedsAttention({
   viewId: string;
 }): Promise<void> {
   logger.info(`Entering SLACKINTERACTIONHANDLER.receiveShowNeedsAttention`);
-  const MD5 = new Hashes.MD5();
   const threads =
     (await DbApiUtil.getThreadsNeedingAttentionFor(payload.user.id)) || [];
 
@@ -481,7 +475,7 @@ export async function receiveShowNeedsAttention({
       type: 'section',
       text: {
         type: 'mrkdwn',
-        text: `${MD5.hex(x.userPhoneNumber || '')} - age ${prettyTimeInterval(
+        text: `${x.userId} - age ${prettyTimeInterval(
           x.age || 0
         )} - <${urls.pop()}|Open>`,
       },

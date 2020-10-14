@@ -98,7 +98,6 @@ export type ThreadInfo = {
   slackParentMessageTs: string;
   channelId: string;
   userId: string | null;
-  userPhoneNumber: string | null;
   age: number | null;
 };
 
@@ -639,7 +638,6 @@ export async function getUnclaimedVoters(
         `SELECT
           t.slack_parent_message_ts
           , t.slack_channel_id
-          , t.user_phone_number
           , t.user_id
           , EXTRACT(EPOCH FROM now() - t.updated_at) as age
         FROM threads t
@@ -649,7 +647,6 @@ export async function getUnclaimedVoters(
           AND NOT EXISTS (
             SELECT FROM volunteer_voter_claims c
             WHERE t.user_id=c.user_id
-              AND t.user_phone_number=c.user_phone_number
           )`,
         [channelId]
       );
@@ -658,7 +655,6 @@ export async function getUnclaimedVoters(
         `SELECT
           t.slack_parent_message_ts
           , t.slack_channel_id
-          , t.user_phone_number
           , t.user_id
           , EXTRACT(EPOCH FROM now() - t.updated_at) as age
         FROM threads t
@@ -667,14 +663,12 @@ export async function getUnclaimedVoters(
           AND NOT EXISTS (
             SELECT FROM volunteer_voter_claims c
             WHERE t.user_id=c.user_id
-              AND t.user_phone_number=c.user_phone_number
           )`
       );
     }
     return result.rows.map((x) => ({
       slackParentMessageTs: x['slack_parent_message_ts'],
       channelId: x['slack_channel_id'],
-      userPhoneNumber: x['user_phone_number'],
       userId: x['user_id'],
       age: x['age'],
     }));
