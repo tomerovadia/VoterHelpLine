@@ -71,7 +71,7 @@ async function slackInteractivityHandler(
     }
     switch (payload.callback_id) {
       case 'show_needs_attention': {
-        await SlackInteractionHandler.receiveShowNeedsAttention({
+        await SlackInteractionHandler.handleShowNeedsAttention({
           payload,
           viewId,
         });

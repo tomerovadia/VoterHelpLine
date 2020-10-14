@@ -458,14 +458,14 @@ export async function handleCommandUnclaimed(
   });
 }
 
-export async function receiveShowNeedsAttention({
+export async function handleShowNeedsAttention({
   payload,
   viewId,
 }: {
   payload: SlackInteractionEventPayload;
   viewId: string;
 }): Promise<void> {
-  logger.info(`Entering SLACKINTERACTIONHANDLER.receiveShowNeedsAttention`);
+  logger.info(`Entering SLACKINTERACTIONHANDLER.handleShowNeedsAttention`);
   const threads =
     (await DbApiUtil.getThreadsNeedingAttentionFor(payload.user.id)) || [];
 
