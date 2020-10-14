@@ -212,12 +212,12 @@ export async function getThreadsNeedingAttentionFor(
   try {
     const result = await client.query(
       `SELECT
-         t.slack_parent_message_ts as id, t.channel_id, t.user_phone_number, t.user_id, EXTRACT(EPOCH FROM now() - t.updated_at) as age
-        FROM threads t, volunteer_voter_claims c
-        WHERE t.needs_attention
-          AND t.user_id=c.user_id
-          AND t.user_phone_number=c.user_phone_number
-          AND c.volunteer_slack_user_id=$1`,
+         slack_parent_message_ts as id, channel_id, user_phone_number, user_id, EXTRACT(EPOCH FROM now() - updated_at) as age
+        FROM threads t
+        WHERE needs_attention AND EXISTS (
+          SELECT FROM volunteer_voter_claims c
+          WHERE t.user_id=c.user_id AND t.user_phone_number=c.user_phone_number AND c.volunteer_slack_user_id=$1
+        )`,
       [slackUserId]
     );
     return result.rows.map((x) => ({
