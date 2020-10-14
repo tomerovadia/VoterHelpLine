@@ -32,6 +32,8 @@ export type InteractivityHandlerMetadata = { viewId?: string };
 async function slackCommandHandler(
   channelId: string,
   channelName: string,
+  userId: string,
+  userName: string,
   command: string,
   text: string
 ) {
@@ -41,6 +43,17 @@ async function slackCommandHandler(
       await SlackInteractionHandler.handleCommandUnclaimed(
         channelId,
         channelName,
+        text
+      );
+      return;
+    }
+    case '/todo':
+    case '/needs-attention': {
+      await SlackInteractionHandler.handleCommandNeedsAttention(
+        channelId,
+        channelName,
+        userId,
+        userName,
         text
       );
       return;

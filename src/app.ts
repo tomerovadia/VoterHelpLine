@@ -590,6 +590,8 @@ app.post(
       'slackCommandHandler',
       req.body.channel_id,
       req.body.channel_name,
+      req.body.user_id,
+      req.body.user_name,
       req.body.command,
       req.body.text
     );

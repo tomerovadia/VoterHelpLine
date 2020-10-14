@@ -11,6 +11,7 @@ import { VoterStatus } from './types';
 import { PromisifiedRedisClient } from './redis_client';
 import { UserInfo, SlackThreadInfo } from './types';
 import redisClient from './redis_client';
+import { SlackBlock, SlackView } from './slack_block_util';
 
 export type VoterStatusUpdate = VoterStatus | 'UNDO';
 
@@ -457,16 +458,8 @@ export async function handleCommandUnclaimed(
   });
 }
 
-export async function handleShowNeedsAttention({
-  payload,
-  viewId,
-}: {
-  payload: SlackInteractionEventPayload;
-  viewId: string;
-}): Promise<void> {
-  logger.info(`Entering SLACKINTERACTIONHANDLER.handleShowNeedsAttention`);
-  const threads =
-    (await DbApiUtil.getThreadsNeedingAttentionFor(payload.user.id)) || [];
+async function getNeedsAttentionList(userId: string): Promise<string[]> {
+  const threads = (await DbApiUtil.getThreadsNeedingAttentionFor(userId)) || [];
 
   const urls: string[] = [];
   for (const x of threads) {
@@ -479,20 +472,64 @@ export async function handleShowNeedsAttention({
     urls.push(url);
   }
 
+  const lines = threads.map(
+    (x) =>
+      `:bust_in_silhouette: ${x.userId} - age ${prettyTimeInterval(
+        x.lastUpdateAge || 0
+      )} - <${urls.pop()}|Open>`
+  );
+  return lines;
+}
+
+export async function handleCommandNeedsAttention(
+  channelId: string,
+  channelName: string,
+  userId: string,
+  userName: string,
+  text: string
+): Promise<void> {
+  const lines = await getNeedsAttentionList(userId);
+  await SlackApiUtil.sendMessage(`Needs attention`, {
+    channel: channelId,
+    unfurl_links: false,
+    unfurl_media: false,
+    blocks: [
+      {
+        type: 'section',
+        text: {
+          type: 'mrkdwn',
+          text:
+            `*${lines.length}* voters need attention from *${userName}*\n` +
+            lines.join('\n'),
+        },
+      },
+    ],
+  });
+}
+
+export async function handleShowNeedsAttention({
+  payload,
+  viewId,
+}: {
+  payload: SlackInteractionEventPayload;
+  viewId: string;
+}): Promise<void> {
+  const userName = await SlackApiUtil.fetchSlackUserName(payload.user.id);
+  const lines = await getNeedsAttentionList(payload.user.id);
   const slackView: SlackBlockUtil.SlackView = {
     title: {
       type: 'plain_text',
-      text: 'Voters needing attention',
+      text: `${lines.length} voters need attention`,
     },
-    blocks: threads.map((x) => ({
-      type: 'section',
-      text: {
-        type: 'mrkdwn',
-        text: `${x.userId} - age ${prettyTimeInterval(
-          x.lastUpdateAge || 0
-        )} - <${urls.pop()}|Open>`,
+    blocks: [
+      {
+        type: 'section',
+        text: {
+          type: 'mrkdwn',
+          text: lines.join('\n') || 'No voters need attention right now',
+        },
       },
-    })),
+    ],
     type: 'modal',
   };
   await SlackApiUtil.updateModal(viewId, slackView);

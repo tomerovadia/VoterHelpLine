@@ -81,6 +81,13 @@ Important: The Slack bot must be given access to each of these channels.
 - *Short Description:* List unclaimed voters in a channel
 - *Usage Hint:* optional: pass channel name, or * for all channels
 
+##### Needs attention
+
+- *Command:* /needs-attention
+- *Request URL:* base URL + /slack-command
+- *Short Description:* List voters needing your attention
+- *Usage Hint:*
+
 
 #### Shortcuts
 
@@ -108,7 +115,7 @@ This should be added as a **messages** shortcut.
 - **Short Description**: Remove this thread from your Needs Attention list
 - **Callback ID**: clear_needs_attention
 
-##### ToDo
+##### Needs Attention
 
 This should be added as a **Global** shortcut.
 
