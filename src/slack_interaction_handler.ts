@@ -418,12 +418,11 @@ export async function handleCommandUnclaimed(
   ];
   for (const x of threads) {
     const messageTs =
-      (await DbApiUtil.getThreadLatestMessageTs(x.slackParentMessageTs, x.channelId)) ||
-      x.slackParentMessageTs;
-    const url = await SlackApiUtil.getThreadPermalink(
-      x.channelId,
-      messageTs
-    );
+      (await DbApiUtil.getThreadLatestMessageTs(
+        x.slackParentMessageTs,
+        x.channelId
+      )) || x.slackParentMessageTs;
+    const url = await SlackApiUtil.getThreadPermalink(x.channelId, messageTs);
     if (text === '*') {
       let channelName = x.channelId;
       if (slackChannelNames && x.channelId in slackChannelNames) {
@@ -472,12 +471,11 @@ export async function handleShowNeedsAttention({
   const urls: string[] = [];
   for (const x of threads) {
     const messageTs =
-      (await DbApiUtil.getThreadLatestMessageTs(x.slackParentMessageTs, x.channelId)) ||
-      x.slackParentMessageTs;
-    const url = await SlackApiUtil.getThreadPermalink(
-      x.channelId,
-      messageTs
-    );
+      (await DbApiUtil.getThreadLatestMessageTs(
+        x.slackParentMessageTs,
+        x.channelId
+      )) || x.slackParentMessageTs;
+    const url = await SlackApiUtil.getThreadPermalink(x.channelId, messageTs);
     urls.push(url);
   }
 

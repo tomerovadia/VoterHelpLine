@@ -208,7 +208,7 @@ async function slackInteractivityHandler(
     }
     return;
   }
-  
+
   // Modal confirmation
   if (payload.type === 'view_submission') {
     // Get the data associated with the modal used for execution of the
@@ -227,7 +227,9 @@ async function slackInteractivityHandler(
     // exit and continue down to throw an error.
   }
 
-  throw new Error(`Received an unexpected Slack interaction: ${JSON.stringify(payload)}`);
+  throw new Error(
+    `Received an unexpected Slack interaction: ${JSON.stringify(payload)}`
+  );
 }
 
 async function slackMessageEventHandler(
