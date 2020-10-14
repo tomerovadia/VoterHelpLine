@@ -141,34 +141,6 @@ export async function logMessageToDb(
     logger.info(
       `DBAPIUTIL.logMessageToDb: Successfully inserted message into PostgreSQL database.`
     );
-
-    // Update thread status
-    if (databaseMessageEntry.direction === 'INBOUND') {
-      await client.query(
-        'UPDATE threads SET needs_attention = true, updated_at=NOW() WHERE slack_parent_message_ts = $1;',
-        [databaseMessageEntry.slackParentMessageTs]
-      );
-    } else if (
-      !databaseMessageEntry.automated &&
-      databaseMessageEntry.userId &&
-      databaseMessageEntry.toPhoneNumber &&
-      (await getVoterHasVolunteer(
-        databaseMessageEntry.userId,
-        databaseMessageEntry.toPhoneNumber
-      ))
-    ) {
-      await client.query(
-        'UPDATE threads SET needs_attention = false, updated_at=NOW() WHERE slack_parent_message_ts = $1;',
-        [databaseMessageEntry.slackParentMessageTs]
-      );
-    } else {
-      await client.query(
-        'UPDATE threads SET updated_at=NOW() WHERE slack_parent_message_ts = $1;',
-        [databaseMessageEntry.slackParentMessageTs]
-      );
-    }
-  } catch (error) {
-    logger.info('Failed to update threads; ignoring for now!');
   } finally {
     // Make sure to release the client before any error handling,
     // just in case the error handling itself throws an error.
@@ -552,6 +524,45 @@ export async function logThreadToDb(
   } catch (error) {
     logger.info('Failed to update threads; ignoring for now!');
   } finally {
+    client.release();
+  }
+}
+
+export async function updateThreadStatusFromMessage(
+  databaseMessageEntry: DatabaseMessageEntry
+): Promise<void> {
+  const client = await pool.connect();
+  try {
+    // Update thread status
+    if (databaseMessageEntry.direction === 'INBOUND') {
+      await client.query(
+        'UPDATE threads SET needs_attention = true, updated_at=NOW() WHERE slack_parent_message_ts = $1;',
+        [databaseMessageEntry.slackParentMessageTs]
+      );
+    } else if (
+      !databaseMessageEntry.automated &&
+      databaseMessageEntry.userId &&
+      databaseMessageEntry.toPhoneNumber &&
+      (await getVoterHasVolunteer(
+        databaseMessageEntry.userId,
+        databaseMessageEntry.toPhoneNumber
+      ))
+    ) {
+      await client.query(
+        'UPDATE threads SET needs_attention = false, updated_at=NOW() WHERE slack_parent_message_ts = $1;',
+        [databaseMessageEntry.slackParentMessageTs]
+      );
+    } else {
+      await client.query(
+        'UPDATE threads SET updated_at=NOW() WHERE slack_parent_message_ts = $1;',
+        [databaseMessageEntry.slackParentMessageTs]
+      );
+    }
+  } catch (error) {
+    logger.info('Failed to update threads; ignoring for now!');
+  } finally {
+    // Make sure to release the client before any error handling,
+    // just in case the error handling itself throws an error.
     client.release();
   }
 }
