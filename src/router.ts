@@ -659,7 +659,7 @@ const routeVoterToSlackChannel = async (
     // Remember the voter's thread in this channel.
     userInfo[response.data.channel] = response.data.ts;
 
-    // Create the thread
+    // Create the thread with the origin thread's need_attention status
     await DbApiUtil.logThreadToDb({
       slackParentMessageTs: response.data.ts,
       channelId: response.data.channel,
@@ -740,6 +740,7 @@ const routeVoterToSlackChannel = async (
     `timestampOfLastMessageInThread: ${timestampOfLastMessageInThread}`
   );
 
+  // Set destination thread to have same needs_attention status as origin thread
   await DbApiUtil.setThreadNeedsAttentionToDb(
     userInfo[destinationSlackChannelId],
     destinationSlackChannelId,
