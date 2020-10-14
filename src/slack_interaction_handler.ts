@@ -494,9 +494,91 @@ export async function handleCommandNeedsAttention(
   channelId: string,
   channelName: string,
   userId: string,
-  userName: string
+  userName: string,
+  text: string
 ): Promise<void> {
-  const lines = await getNeedsAttentionList(userId);
+  var arg = text;
+  if (arg && !SlackApiUtil.isMemberOfAdminChannel(userId)) {
+    arg = '';
+  }
+
+  let prefix = '';
+  let lines = [] as string[];
+  let showUserId = userId;
+  let showUserName = userName;
+
+  if (arg === '*') {
+    // Summary across all channels
+    const slackChannelIds = await RedisApiUtil.getHash(
+      redisClient,
+      'slackPodChannelIds'
+    );
+    const slackChannelNames: Record<string, string> = {};
+    for (const name in slackChannelIds) {
+      slackChannelNames[slackChannelIds[name]] = name;
+    }
+
+    const stats = await DbApiUtil.getThreadsNeedingAttentionByChannel();
+    lines = stats.map(
+      (x) =>
+        `${x.count} in <slack://channel?team=${teamId}&id=${x.channelId}|#${
+          slackChannelNames[x.channelId]
+        }> - oldest ${prettyTimeInterval(x.maxLastUpdateAge)}`
+    );
+    prefix = 'Voters needing attention by channel';
+  } else if (arg && arg[0] == '@') {
+    showUserName = arg.substr(1);
+    showUserId = arg.substr(1); // FIXME
+  } else if (arg && arg[0] == '#') {
+    const slackChannelIds = await RedisApiUtil.getHash(
+      redisClient,
+      'slackPodChannelIds'
+    );
+    logger.info(JSON.stringify(slackChannelIds));
+    const channelName = arg.substr(1);
+    if (!(channelName in slackChannelIds)) {
+      prefix = `Unrecognized channel ${arg}`;
+    } else {
+      const channelId = slackChannelIds[channelName];
+      prefix = `Voters needing attention for <slack://channel?team=${teamId}&id=${channelId}|#${channelName}>`;
+      const threads = await DbApiUtil.getThreadsNeedingAttentionForChannel(
+        channelId
+      );
+
+      const urls: string[] = [];
+      for (const x of threads) {
+        const messageTs =
+          (await DbApiUtil.getThreadLatestMessageTs(
+            x.slackParentMessageTs,
+            x.channelId
+          )) || x.slackParentMessageTs;
+        const url = await SlackApiUtil.getThreadPermalink(
+          x.channelId,
+          messageTs
+        );
+        // FIXME: resolve user id into user name
+        const owner = x.volunteerSlackUser
+          ? `@${x.volunteerSlackUser}`
+          : 'unassigned';
+        lines.push(
+          `:bust_in_silhouette: ${
+            x.userId
+          } - ${owner} - age ${prettyTimeInterval(
+            x.lastUpdateAge || 0
+          )} - <${url}|Open>`
+        );
+      }
+    }
+  } else if (arg) {
+    prefix = `Unrecognized argument _${arg}_: pass * for summary by channel, a channel (_#foo_), or a user (_@bar_)`;
+  }
+
+  if (!prefix) {
+    // For a single user
+    lines = await getNeedsAttentionList(showUserId);
+    prefix = `*${lines.length}* voters need attention from *${showUserName}*`;
+  }
+
   await SlackApiUtil.sendMessage(`Needs attention`, {
     channel: channelId,
     unfurl_links: false,
@@ -506,13 +588,12 @@ export async function handleCommandNeedsAttention(
         type: 'section',
         text: {
           type: 'mrkdwn',
-          text:
-            `*${lines.length}* voters need attention from *${userName}*\n` +
-            lines.join('\n'),
+          text: prefix + '\n' + lines.join('\n'),
         },
       },
     ],
   });
+  return;
 }
 
 export async function handleShowNeedsAttention({

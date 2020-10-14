@@ -56,7 +56,8 @@ async function slackCommandHandler(
         channelId,
         channelName,
         userId,
-        userName
+        userName,
+        text
       );
       return;
     }
