@@ -417,9 +417,12 @@ export async function handleCommandUnclaimed(
       (text === '*' ? 'all channels' : `#${channelName}`),
   ];
   for (const x of threads) {
+    const messageTs =
+      (await DbApiUtil.getThreadLatestMessageTs(x.slackParentMessageTs, x.channelId)) ||
+      x.slackParentMessageTs;
     const url = await SlackApiUtil.getThreadPermalink(
       x.channelId,
-      x.slackParentMessageTs
+      messageTs
     );
     if (text === '*') {
       let channelName = x.channelId;
@@ -468,9 +471,14 @@ export async function receiveShowNeedsAttention({
 
   const urls: string[] = [];
   for (const x of threads) {
-    urls.push(
-      await SlackApiUtil.getThreadPermalink(x.channelId, x.slackParentMessageTs)
+    const messageTs =
+      (await DbApiUtil.getThreadLatestMessageTs(x.slackParentMessageTs, x.channelId)) ||
+      x.slackParentMessageTs;
+    const url = await SlackApiUtil.getThreadPermalink(
+      x.channelId,
+      messageTs
     );
+    urls.push(url);
   }
 
   const slackView: SlackBlockUtil.SlackView = {

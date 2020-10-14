@@ -38,14 +38,10 @@ type SlackChannelNamesAndIds = {
 
 export async function getThreadPermalink(
   channel: string,
-  thread_ts: string
+  message_ts: string
 ): Promise<string> {
   try {
     // Pick the newest message in the thread
-    const message_ts =
-      (await DbApiUtil.getThreadLatestMessageTs(thread_ts, channel)) ||
-      thread_ts;
-
     const response = await slackAPI.get('chat.getPermalink', {
       params: {
         channel: channel,
@@ -65,7 +61,7 @@ export async function getThreadPermalink(
   } catch (error) {
     logger.error(`SLACKAPIUTIL.getThreadPermalink: ERROR in getting permalink message,
                   channel: ${channel},
-                  message_ts: ${thread_ts}`);
+                  message_ts: ${message_ts}`);
     throw error;
   }
 }
