@@ -196,7 +196,7 @@ const introduceNewVoterToSlackChannel = async (
   userInfo[response.data.channel] = response.data.ts;
 
   // Create the thread
-  await DbApiUtil.newThreadToDb({
+  await DbApiUtil.logThreadToDb({
     slackParentMessageTs: response.data.ts,
     channelId: response.data.channel,
     userId: userInfo.userId,
@@ -657,7 +657,7 @@ const routeVoterToSlackChannel = async (
     userInfo[response.data.channel] = response.data.ts;
 
     // Create the thread
-    await DbApiUtil.newThreadToDb({
+    await DbApiUtil.logThreadToDb({
       slackParentMessageTs: response.data.ts,
       channelId: response.data.channel,
       userId: userInfo.userId,

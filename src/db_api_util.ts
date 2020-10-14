@@ -102,7 +102,7 @@ export type ThreadInfo = {
   age: number | null;
 };
 
-export async function newThreadToDb(
+export async function logThreadToDb(
   databaseThreadEntry: DatabaseThreadEntry
 ): Promise<void> {
   const client = await pool.connect();
@@ -117,7 +117,7 @@ export async function newThreadToDb(
         databaseThreadEntry.needsAttention,
       ]
     );
-    logger.info('DBAPIUTIL.newThreadToDb: Successfully created thread');
+    logger.info('DBAPIUTIL.logThreadToDb: Successfully created thread');
   } catch (error) {
     logger.info('Failed to update threads; ignoring for now!');
   } finally {
