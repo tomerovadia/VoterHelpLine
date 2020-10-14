@@ -43,7 +43,8 @@ export async function getThreadPermalink(
   try {
     // Pick the newest message in the thread
     const message_ts =
-      (await DbApiUtil.getThreadLatestMessageTs(thread_ts, channel)) || thread_ts;
+      (await DbApiUtil.getThreadLatestMessageTs(thread_ts, channel)) ||
+      thread_ts;
 
     const response = await slackAPI.get('chat.getPermalink', {
       params: {

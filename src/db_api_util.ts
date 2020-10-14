@@ -854,9 +854,7 @@ export async function logVolunteerVoterClaimToDb(
   }
 }
 
-export async function getVoterHasVolunteer(
-  userId: string,
-): Promise<boolean> {
+export async function getVoterHasVolunteer(userId: string): Promise<boolean> {
   const client = await pool.connect();
   try {
     const result = await client.query(
