@@ -549,8 +549,9 @@ export async function updateThreadStatusFromMessage(
   const client = await pool.connect();
   try {
     // Update thread status
+    let result;
     if (databaseMessageEntry.direction === 'INBOUND') {
-      await client.query(
+      result = await client.query(
         'UPDATE threads SET needs_attention = true, updated_at=NOW() WHERE slack_parent_message_ts = $1;',
         [databaseMessageEntry.slackParentMessageTs]
       );
@@ -560,14 +561,24 @@ export async function updateThreadStatusFromMessage(
       databaseMessageEntry.toPhoneNumber &&
       (await getVoterHasVolunteer(databaseMessageEntry.userId))
     ) {
-      await client.query(
+      result = await client.query(
         'UPDATE threads SET needs_attention = false, updated_at=NOW() WHERE slack_parent_message_ts = $1;',
         [databaseMessageEntry.slackParentMessageTs]
       );
     } else {
-      await client.query(
+      result = await client.query(
         'UPDATE threads SET updated_at=NOW() WHERE slack_parent_message_ts = $1;',
         [databaseMessageEntry.slackParentMessageTs]
+      );
+    }
+    if (result.rowCount == 0) {
+      await logThreadToDb({
+          slackParentMessageTs: databaseMessageEntry.slackParentMessageTs,
+          channelId: databaseMessageEntry.slackChannel,
+          userId: databaseMessageEntry.userId,
+          userPhoneNumber: databaseMessageEntry.direction === 'INBOUND' ? databaseMessageEntry.fromPhoneNumber : databaseMessageEntry.toPhoneNumber,
+          needsAttention: databaseMessageEntry.direction === 'INBOUND',
+        } as DatabaseThreadEntry
       );
     }
   } catch (error) {
