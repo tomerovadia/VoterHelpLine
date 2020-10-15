@@ -421,7 +421,8 @@ export async function handleCommandUnclaimed(
     arg === '*' ? null : showChannelId
   );
   const lines: string[] = [
-    `${threads.length} unclaimed voters` + (arg === '*' ? ' in all channels' : ''),
+    `${threads.length} unclaimed voters` +
+      (arg === '*' ? ' in all channels' : ''),
   ];
 
   for (const thread of threads) {
