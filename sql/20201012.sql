@@ -21,8 +21,20 @@ CREATE INDEX ON threads (updated_at);
 
 INSERT INTO threads
 
+---- We need to identify the *latest* claim
+with claims AS (
+        SELECT
+          user_id
+          , slack_parent_message_ts
+          , slack_channel_id
+          , volunteer_slack_user_id
+          , volunteer_slack_user_name
+          , row_number () OVER (PARTITION BY slack_parent_message_ts, slack_channel_id ORDER BY created_at DESC) AS rn
+        FROM volunteer_voter_claims
+      )
+
 --- first, identify the most recent mapping of user_id to a (thread, channel)
-WITH messages_user_window AS (
+, messages_user_window AS (
     SELECT
         slack_parent_message_ts
         , slack_channel
@@ -56,8 +68,9 @@ WITH messages_user_window AS (
                 AND n.slack_parent_message_ts = m.slack_parent_message_ts
         ) as is_newest_thread
     FROM messages m
-    LEFT JOIN volunteer_voter_claims c ON (
+    LEFT JOIN claims c ON (
         m.slack_parent_message_ts = c.slack_parent_message_ts
+        AND c.rn = 1
     )
     WHERE m.slack_parent_message_ts IS NOT NULL AND m.slack_channel IS NOT NULL
 )
