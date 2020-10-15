@@ -36,10 +36,6 @@ type SlackChannelNamesAndIds = {
   [channelId: string]: string; // mapping of channel ID to channel name
 };
 
-type SlackUserNamesAndIds = {
-  [userId: string]: string; // mapping of user ID to user name
-};
-
 export async function getThreadPermalink(
   channel: string,
   message_ts: string
