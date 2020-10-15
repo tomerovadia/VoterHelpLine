@@ -25,6 +25,8 @@ import {
 } from './async_jobs';
 import { handleTwilioStatusCallback } from './twilio_status_callback_handler';
 import { SlackInteractionEventPayload } from './slack_interaction_handler';
+import { TwilioRequestBody } from './twilio_util';
+import * as KeywordParser from './keyword_parser';
 
 const app = express();
 
@@ -217,7 +219,8 @@ const handleIncomingTwilioMessage = async (
 ) => {
   logger.info('Entering SERVER.handleIncomingTwilioMessage');
 
-  const userPhoneNumber = req.body.From;
+  const reqBody = req.body as TwilioRequestBody;
+  const userPhoneNumber = reqBody.From;
 
   const inboundTextsBlocked = await RedisApiUtil.getHashField(
     redisClient,
@@ -232,8 +235,8 @@ const handleIncomingTwilioMessage = async (
     return;
   }
 
-  const twilioPhoneNumber = req.body.To;
-  const userMessage = req.body.Body;
+  const twilioPhoneNumber = reqBody.To;
+  const userMessage = TwilioUtil.formatAttachments(reqBody);
   const MD5 = new Hashes.MD5();
   const userId = MD5.hex(userPhoneNumber);
   logger.info(`SERVER.handleIncomingTwilioMessage: Receiving Twilio message from ${entryPoint} entry point voter,
@@ -246,7 +249,7 @@ const handleIncomingTwilioMessage = async (
     userMessage,
     userPhoneNumber,
     twilioPhoneNumber,
-    twilioMessageSid: req.body.SmsMessageSid,
+    twilioMessageSid: reqBody.SmsMessageSid,
     entryPoint: LoadBalancer.PUSH_ENTRY_POINT,
   });
 
@@ -302,7 +305,8 @@ const handleIncomingTwilioMessage = async (
             twilioPhoneNumber,
             inboundDbMessageEntry,
             entryPoint,
-            twilioCallbackURL
+            twilioCallbackURL,
+            false /* includeWelcome */
           );
           return;
         } else {
@@ -403,7 +407,7 @@ const handleIncomingTwilioMessage = async (
       `SERVER.handleIncomingTwilioMessage (${userId}): Voter is new to us (Redis returned no userInfo for redisHashKey ${redisHashKey})`
     );
 
-    if (userMessage.toLowerCase().trim() === 'stop') {
+    if (KeywordParser.isStopKeyword(userMessage)) {
       logger.info(
         `SERVER.handleIncomingTwilioMessage: Received STOP text from phone number: ${userPhoneNumber}.`
       );
@@ -422,14 +426,26 @@ const handleIncomingTwilioMessage = async (
     }
 
     if (process.env.CLIENT_ORGANIZATION === 'VOTE_AMERICA') {
-      await Router.welcomePotentialVoter(
-        { userPhoneNumber, userMessage, userId },
-        redisClient,
-        twilioPhoneNumber,
-        inboundDbMessageEntry,
-        entryPoint,
-        twilioCallbackURL
-      );
+      if (KeywordParser.isHelplineKeyword(userMessage)) {
+        await Router.handleNewVoter(
+          { userPhoneNumber, userMessage, userId },
+          redisClient,
+          twilioPhoneNumber,
+          inboundDbMessageEntry,
+          entryPoint,
+          twilioCallbackURL,
+          true /* includeWelcome */
+        );
+      } else {
+        await Router.welcomePotentialVoter(
+          { userPhoneNumber, userMessage, userId },
+          redisClient,
+          twilioPhoneNumber,
+          inboundDbMessageEntry,
+          entryPoint,
+          twilioCallbackURL
+        );
+      }
     } else {
       await Router.handleNewVoter(
         { userPhoneNumber, userMessage, userId },

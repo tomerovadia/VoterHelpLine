@@ -129,7 +129,9 @@ const introduceNewVoterToSlackChannel = async (
   inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry,
   entryPoint: EntryPoint,
   slackChannelName: string,
-  twilioCallbackURL: string
+  twilioCallbackURL: string,
+  // This is only used by VOTE_AMERICA
+  includeWelcome?: boolean
 ) => {
   logger.debug('ENTERING ROUTER.introduceNewVoterToSlackChannel');
   logger.debug(
@@ -140,7 +142,7 @@ const introduceNewVoterToSlackChannel = async (
     `ROUTER.introduceNewVoterToSlackChannel: Announcing new voter via new thread in ${slackChannelName}.`
   );
   // In Slack, create entry channel message, followed by voter's message and intro text.
-  const operatorMessage = `<!channel> New voter!\n*User ID:* ${userInfo.userId}\n*Connected via:* ${twilioPhoneNumber} (${entryPoint})`;
+  const operatorMessage = `New voter!\n*User ID:* ${userInfo.userId}\n*Connected via:* ${twilioPhoneNumber} (${entryPoint})`;
 
   const slackBlocks = SlackBlockUtil.getVoterStatusBlocks(operatorMessage);
 
@@ -151,7 +153,13 @@ const introduceNewVoterToSlackChannel = async (
 
   let messageToVoter;
   if (process.env.CLIENT_ORGANIZATION === 'VOTE_AMERICA') {
-    messageToVoter = MessageConstants.STATE_QUESTION();
+    if (includeWelcome) {
+      // Voter initiated conversation with "HELPLINE".
+      messageToVoter = MessageConstants.WELCOME_AND_STATE_QUESTION();
+    } else {
+      // Voter has already received automated welcome and is just now responding with "HELPLINE".
+      messageToVoter = MessageConstants.STATE_QUESTION();
+    }
   } else {
     messageToVoter = MessageConstants.WELCOME_VOTER();
   }
@@ -252,7 +260,7 @@ const introduceNewVoterToSlackChannel = async (
     );
   } else if (entryPoint === LoadBalancer.PULL_ENTRY_POINT) {
     // Pass the voter's message along to the initial Slack channel thread,
-    // and show in the Slack  thread the welcome message the voter received
+    // and show in the Slack thread the welcome message the voter received
     // in response.
     logger.debug(
       `ROUTER.introduceNewVoterToSlackChannel: Passing voter message to Slack, slackChannelName: ${slackChannelName}, parentMessageTs: ${response.data.ts}.`
@@ -302,7 +310,8 @@ export async function handleNewVoter(
   twilioPhoneNumber: string,
   inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry,
   entryPoint: EntryPoint,
-  twilioCallbackURL: string
+  twilioCallbackURL: string,
+  includeWelcome?: boolean
 ): Promise<void> {
   logger.debug('ENTERING ROUTER.handleNewVoter');
   const userMessage = userOptions.userMessage;
@@ -364,7 +373,8 @@ export async function handleNewVoter(
     inboundDbMessageEntry,
     entryPoint,
     slackChannelName,
-    twilioCallbackURL
+    twilioCallbackURL,
+    includeWelcome
   );
 }
 
