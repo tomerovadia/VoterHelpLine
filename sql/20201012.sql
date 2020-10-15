@@ -23,15 +23,23 @@ INSERT INTO threads
 
 ---- We need to identify the *latest* claim
 with claims AS (
-        SELECT
-          user_id
-          , slack_parent_message_ts
-          , slack_channel_id
-          , volunteer_slack_user_id
-          , volunteer_slack_user_name
-          , row_number () OVER (PARTITION BY slack_parent_message_ts, slack_channel_id ORDER BY created_at DESC) AS rn
-        FROM volunteer_voter_claims
-      )
+    SELECT
+        user_id
+        , slack_parent_message_ts
+        , slack_channel_id
+        , volunteer_slack_user_id
+        , volunteer_slack_user_name
+        , row_number () OVER (PARTITION BY slack_parent_message_ts, slack_channel_id ORDER BY created_at DESC) AS rn
+    FROM volunteer_voter_claims
+)
+
+--- and latest status
+, statuses AS (
+    SELECT
+        *
+        , row_number () OVER (PARTITION BY user_id ORDER BY created_at DESC) AS rn
+    FROM voter_status_updates
+)
 
 --- first, identify the most recent mapping of user_id to a (thread, channel)
 , messages_user_window AS (
@@ -67,6 +75,13 @@ with claims AS (
                 AND n.slack_channel = m.slack_channel
                 AND n.slack_parent_message_ts = m.slack_parent_message_ts
         ) as is_newest_thread
+        , EXISTS (
+            SELECT FROM statuses s WHERE
+                s.user_id = m.user_id
+                AND s.is_demo = m.is_demo
+                AND rn = 1
+                AND voter_status IN ('REFUSED', 'SPAM')
+        ) as is_refused_spam
     FROM messages m
     LEFT JOIN claims c ON (
         m.slack_parent_message_ts = c.slack_parent_message_ts
@@ -80,7 +95,7 @@ SELECT
     , user_id
     , user_phone_number
     --- needs_attention if this the user's newest thread AND (they texted last OR no volunteer)
-    , CASE WHEN is_newest_thread AND (direction='INBOUND' OR volunteer_slack_user_id IS NULL) THEN true
+    , CASE WHEN is_newest_thread AND NOT is_refused_spam AND (direction='INBOUND' OR volunteer_slack_user_id IS NULL) THEN true
             ELSE false END AS needs_attention
     , updated_at
     , NULL as history_ts
