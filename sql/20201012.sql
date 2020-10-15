@@ -66,7 +66,7 @@ with claims AS (
         , COALESCE(slack_send_timestamp, slack_receive_timestamp) as updated_at
         , direction
         , automated
-        , row_number() OVER (PARTITION BY m.slack_parent_message_ts ORDER BY COALESCE(slack_send_timestamp, slack_receive_timestamp) DESC) as rn
+        , row_number() OVER (PARTITION BY m.slack_parent_message_ts, m.slack_channel ORDER BY COALESCE(slack_send_timestamp, slack_receive_timestamp) DESC) as rn
         , c.volunteer_slack_user_id
         , EXISTS (
             SELECT FROM newest_messages n WHERE
