@@ -516,7 +516,6 @@ export async function handleCommandNeedsAttention(
   // Which user we'll show voters for (if the command arg doesn't have us show * or a channel)
   // Empty arg means current user.
   let showUserId = userId;
-  let showUserName = userName;
 
   if (arg === '*') {
     // Summary across all channels
@@ -544,9 +543,9 @@ export async function handleCommandNeedsAttention(
     const vstats = await DbApiUtil.getThreadsNeedingAttentionByVolunteer();
     for (const v of vstats) {
       lines.push(
-        `${v.count} for @${
-          v.volunteerSlackUserName
-        } - oldest ${prettyTimeInterval(v.maxLastUpdateAge)}`
+        `${v.count} for <@${
+          v.volunteerSlackUserId
+        }> - oldest ${prettyTimeInterval(v.maxLastUpdateAge)}`
       );
     }
   } else if (
@@ -555,9 +554,8 @@ export async function handleCommandNeedsAttention(
     arg[arg.length - 1] === '>' &&
     arg[1] === '@'
   ) {
-    const s = arg.substr(2, arg.length - 3).split('|');
-    showUserId = s[0];
-    showUserName = s.length == 2 ? s[1] : s[0]; // username portion is optional; slack is phasing them out
+    // the |username portion is optional and being phased out by slack
+    showUserId  = arg.substr(2, arg.length - 3).split('|')[0];
   } else if (arg && arg[0] === '@') {
     lines.push(`Unrecognized user ${arg}`);
   } else if (arg && arg[0] === '#') {
@@ -587,8 +585,8 @@ export async function handleCommandNeedsAttention(
           thread.channelId,
           messageTs
         );
-        const owner = thread.volunteerSlackUserName
-          ? `@${thread.volunteerSlackUserName}`
+        const owner = thread.volunteerSlackUserId
+          ? `<@${thread.volunteerSlackUserId}>`
           : 'unassigned';
         lines.push(
           `:bust_in_silhouette: ${
@@ -609,7 +607,7 @@ export async function handleCommandNeedsAttention(
     // For a single user
     const ulines = await getNeedsAttentionList(showUserId);
     lines.push(
-      `*${ulines.length}* voters need attention from @${showUserName}`
+      `*${ulines.length}* voters need attention from <@${showUserId}>`
     );
     lines = lines.concat(ulines);
   }
