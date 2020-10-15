@@ -17,6 +17,7 @@ import logger from './logger';
 import redisClient from './redis_client';
 import Hashes from 'jshashes';
 import * as DbApiUtil from './db_api_util';
+import * as SlackBlockUtil from './slack_block_util';
 
 import {
   SlackInteractionEventPayload,
@@ -157,11 +158,26 @@ async function slackInteractivityHandler(
           "actionTs": payload.action_ts
         } as SlackModalPrivateMetadata;
 
+        if (!originatingSlackChannelName || !redisData) {
+          modalPrivateMetadata.success = false;
+          modalPrivateMetadata.failureReason = 'invalid_shortcut_use';
+          await DbApiUtil.logCommandToDb(modalPrivateMetadata);
+          const slackView = SlackBlockUtil.getErrorSlackView(
+            'not_active_voter_parent_thread',
+            'This shortcut is not valid on this message.'
+          );
+          await SlackApiUtil.updateModal(viewId, slackView);
+          logger.info(
+            `SLACKINTERACTIONHANDLER.receiveResetDemo: Volunteer used a shortcut on an invalid message.`
+          );
+          return;
+        }
+
         await SlackInteractionHandler.receiveResetDemo({
           payload,
           redisClient,
           modalPrivateMetadata,
-          twilioPhoneNumber: redisData ? redisData.twilioPhoneNumber : null,
+          twilioPhoneNumber: redisData.twilioPhoneNumber,
           userId: MD5.hex(redisData.userPhoneNumber),
           viewId,
         });

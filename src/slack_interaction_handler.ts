@@ -557,7 +557,7 @@ export async function handleCommandNeedsAttention(
   ) {
     const s = arg.substr(2, arg.length - 3).split('|');
     showUserId = s[0];
-    showUserName = s.length == 2 ? s[1] : s[0];   // username portion is optional; slack is phasing them out
+    showUserName = s.length == 2 ? s[1] : s[0]; // username portion is optional; slack is phasing them out
   } else if (arg && arg[0] === '@') {
     lines.push(`Unrecognized user ${arg}`);
   } else if (arg && arg[0] === '#') {
