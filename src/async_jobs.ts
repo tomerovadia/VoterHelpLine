@@ -113,6 +113,7 @@ async function slackInteractivityHandler(
 
     switch (payload.callback_id) {
       case 'set_needs_attention': {
+        // Use thread if message is threaded; original channel msg if there is no thread yet
         await DbApiUtil.setThreadNeedsAttentionToDb(
           payload.message.thread_ts || payload.message.ts,
           payload.channel.id,
@@ -122,6 +123,7 @@ async function slackInteractivityHandler(
       }
 
       case 'clear_needs_attention': {
+        // Use thread if message is threaded; original channel msg if there is no thread yet
         await DbApiUtil.setThreadNeedsAttentionToDb(
           payload.message.thread_ts || payload.message.ts,
           payload.channel.id,
