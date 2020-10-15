@@ -16,6 +16,9 @@ CREATE INDEX ON threads (needs_attention);
 CREATE INDEX ON threads (updated_at);
 
 
+--- One caveat here: if a voter is routed but no additional messages have been sent, there is no
+--- state in messages that we can use to determine the new thread's id, so we mark the lobby thread
+--- as the one thta needs attention (because it is the newest thread for the voter).
 
 INSERT INTO threads
 
@@ -28,6 +31,7 @@ WITH all_threads AS (
         , is_demo
         , CASE WHEN row_number() OVER (PARTITION BY user_id, is_demo ORDER BY slack_send_timestamp DESC) = 1 THEN 1 ELSE 0 END as best
     FROM messages
+    WHERE slack_parent_message_ts IS NOT NULL
 )
 , newest_threads AS (
     SELECT * FROM all_threads WHERE best = 1
