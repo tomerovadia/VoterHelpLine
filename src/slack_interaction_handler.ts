@@ -422,29 +422,29 @@ export async function handleCommandUnclaimed(
     `${threads.length} unclaimed voters in ` +
       (arg === '*' ? 'all channels' : `#${channelName}`),
   ];
-  for (const x of threads) {
+  for (const thread of threads) {
     const messageTs =
       (await DbApiUtil.getThreadLatestMessageTs(
-        x.slackParentMessageTs,
-        x.channelId
-      )) || x.slackParentMessageTs;
-    const url = await SlackApiUtil.getThreadPermalink(x.channelId, messageTs);
+        thread.slackParentMessageTs,
+        thread.channelId
+      )) || thread.slackParentMessageTs;
+    const url = await SlackApiUtil.getThreadPermalink(thread.channelId, messageTs);
     if (arg === '*') {
-      let channelName = x.channelId;
-      if (slackChannelNames && x.channelId in slackChannelNames) {
-        channelName = `#${slackChannelNames[x.channelId]}`;
+      let channelName = thread.channelId;
+      if (slackChannelNames && thread.channelId in slackChannelNames) {
+        channelName = `#${slackChannelNames[thread.channelId]}`;
       }
       lines.push(
-        `:bust_in_silhouette: ${x.userId} - age ${prettyTimeInterval(
-          x.lastUpdateAge || 0
+        `:bust_in_silhouette: ${thread.userId} - age ${prettyTimeInterval(
+          thread.lastUpdateAge || 0
         )} - <slack://channel?team=${teamId}&id=${
-          x.channelId
+          thread.channelId
         }|${channelName}> - <${url}|Open>`
       );
     } else {
       lines.push(
-        `:bust_in_silhouette: ${x.userId} - age ${prettyTimeInterval(
-          x.lastUpdateAge || 0
+        `:bust_in_silhouette: ${thread.userId} - age ${prettyTimeInterval(
+          thread.lastUpdateAge || 0
         )} - <${url}|Open>`
       );
     }
@@ -469,13 +469,13 @@ async function getNeedsAttentionList(userId: string): Promise<string[]> {
   const threads = (await DbApiUtil.getThreadsNeedingAttentionFor(userId)) || [];
 
   const urls: string[] = [];
-  for (const x of threads) {
+  for (const thread of threads) {
     const messageTs =
       (await DbApiUtil.getThreadLatestMessageTs(
-        x.slackParentMessageTs,
-        x.channelId
-      )) || x.slackParentMessageTs;
-    const url = await SlackApiUtil.getThreadPermalink(x.channelId, messageTs);
+        thread.slackParentMessageTs,
+        thread.channelId
+      )) || thread.slackParentMessageTs;
+    const url = await SlackApiUtil.getThreadPermalink(thread.channelId, messageTs);
     urls.push(url);
   }
 
@@ -529,11 +529,11 @@ export async function handleCommandNeedsAttention(
 
     lines.push('Voters needing attention by volunteer');
     const vstats = await DbApiUtil.getThreadsNeedingAttentionByVolunteer();
-    for (const x of vstats) {
+    for (const v of vstats) {
       lines.push(
-        `${x.count} for @${
-          x.volunteerSlackUserName
-        } - oldest ${prettyTimeInterval(x.maxLastUpdateAge)}`
+        `${v.count} for @${
+          v.volunteerSlackUserName
+        } - oldest ${prettyTimeInterval(v.maxLastUpdateAge)}`
       );
     }
   } else if (
@@ -568,24 +568,24 @@ export async function handleCommandNeedsAttention(
         channelId
       );
 
-      for (const x of threads) {
+      for (const thread of threads) {
         const messageTs =
           (await DbApiUtil.getThreadLatestMessageTs(
-            x.slackParentMessageTs,
-            x.channelId
-          )) || x.slackParentMessageTs;
+            thread.slackParentMessageTs,
+            thread.channelId
+          )) || thread.slackParentMessageTs;
         const url = await SlackApiUtil.getThreadPermalink(
-          x.channelId,
+          thread.channelId,
           messageTs
         );
-        const owner = x.volunteerSlackUserName
-          ? `@${x.volunteerSlackUserName}`
+        const owner = thread.volunteerSlackUserName
+          ? `@${thread.volunteerSlackUserName}`
           : 'unassigned';
         lines.push(
           `:bust_in_silhouette: ${
-            x.userId
+            thread.userId
           } - ${owner} - age ${prettyTimeInterval(
-            x.lastUpdateAge || 0
+            thread.lastUpdateAge || 0
           )} - <${url}|Open>`
         );
       }
