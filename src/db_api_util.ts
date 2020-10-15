@@ -87,6 +87,36 @@ export type DatabaseCommandEntry = {
   failureReason?: string | null;
 };
 
+export type DatabaseThreadEntry = {
+  slackParentMessageTs: string | null;
+  channelId: string | null;
+  userId: string | null;
+  userPhoneNumber: string | null;
+  needsAttention: boolean | null;
+};
+
+export type ThreadInfo = {
+  slackParentMessageTs: string;
+  channelId: string;
+  userId: string | null;
+  lastUpdateAge: number | null;
+  volunteerSlackUserId: string | null;
+  volunteerSlackUserName: string | null;
+};
+
+export type ChannelStat = {
+  channelId: string;
+  count: number;
+  maxLastUpdateAge: number;
+};
+
+export type VolunteerStat = {
+  volunteerSlackUserId: string;
+  volunteerSlackUserName: string;
+  count: number;
+  maxLastUpdateAge: number;
+};
+
 export async function logMessageToDb(
   databaseMessageEntry: DatabaseMessageEntry
 ): Promise<void> {
@@ -125,7 +155,6 @@ export async function logMessageToDb(
         databaseMessageEntry.stateName,
       ]
     );
-
     logger.info(
       `DBAPIUTIL.logMessageToDb: Successfully inserted message into PostgreSQL database.`
     );
@@ -502,6 +531,412 @@ export async function archiveMessagesForDemoVoter(
   }
 }
 
+export async function logThreadToDb(
+  databaseThreadEntry: DatabaseThreadEntry
+): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query(
+      'INSERT INTO threads (slack_parent_message_ts, slack_channel_id, user_id, user_phone_number, needs_attention, updated_at) VALUES ($1, $2, $3, $4, $5, NOW())',
+      [
+        databaseThreadEntry.slackParentMessageTs,
+        databaseThreadEntry.channelId,
+        databaseThreadEntry.userId,
+        databaseThreadEntry.userPhoneNumber,
+        databaseThreadEntry.needsAttention,
+      ]
+    );
+    logger.info('DBAPIUTIL.logThreadToDb: Successfully created thread');
+  } catch (error) {
+    logger.info('Failed to update threads; ignoring for now!');
+  } finally {
+    client.release();
+  }
+}
+
+export async function updateThreadStatusFromMessage(
+  databaseMessageEntry: DatabaseMessageEntry
+): Promise<void> {
+  const client = await pool.connect();
+  try {
+    // Update thread status
+    let result;
+    if (databaseMessageEntry.direction === 'INBOUND') {
+      result = await client.query(
+        'UPDATE threads SET needs_attention = true, updated_at=NOW() WHERE slack_parent_message_ts = $1;',
+        [databaseMessageEntry.slackParentMessageTs]
+      );
+    } else if (
+      !databaseMessageEntry.automated &&
+      databaseMessageEntry.userId &&
+      databaseMessageEntry.toPhoneNumber &&
+      (await getVoterHasVolunteer(databaseMessageEntry.userId))
+    ) {
+      result = await client.query(
+        'UPDATE threads SET needs_attention = false, updated_at=NOW() WHERE slack_parent_message_ts = $1;',
+        [databaseMessageEntry.slackParentMessageTs]
+      );
+    } else {
+      result = await client.query(
+        'UPDATE threads SET updated_at=NOW() WHERE slack_parent_message_ts = $1;',
+        [databaseMessageEntry.slackParentMessageTs]
+      );
+    }
+    if (result.rowCount == 0) {
+      await logThreadToDb({
+        slackParentMessageTs: databaseMessageEntry.slackParentMessageTs,
+        channelId: databaseMessageEntry.slackChannel,
+        userId: databaseMessageEntry.userId,
+        userPhoneNumber:
+          databaseMessageEntry.direction === 'INBOUND'
+            ? databaseMessageEntry.fromPhoneNumber
+            : databaseMessageEntry.toPhoneNumber,
+        needsAttention: databaseMessageEntry.direction === 'INBOUND',
+      } as DatabaseThreadEntry);
+    }
+  } catch (error) {
+    logger.info('Failed to update threads; ignoring for now!');
+  } finally {
+    // Make sure to release the client before any error handling,
+    // just in case the error handling itself throws an error.
+    client.release();
+  }
+}
+
+export async function setThreadNeedsAttentionToDb(
+  slackParentMessageTs: string,
+  slackChannelId: string,
+  needsAttention: boolean
+): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query(
+      'UPDATE threads SET needs_attention = $1 WHERE slack_parent_message_ts = $2 AND slack_channel_id = $3;',
+      [needsAttention, slackParentMessageTs, slackChannelId]
+    );
+    logger.info(
+      `DBAPIUTIL.setThreadNeedsAttentionToDb: Set thread ${slackParentMessageTs} needs_attention=${needsAttention}`
+    );
+  } catch (error) {
+    logger.info('Failed to update threads; ignoring for now!');
+  } finally {
+    client.release();
+  }
+}
+
+export async function setThreadHistoryTs(
+  slackParentMessageTs: string,
+  slackChannelId: string,
+  historyTs: string
+): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query(
+      'UPDATE threads SET history_ts = $1 WHERE slack_parent_message_ts = $2 AND slack_channel_id = $3;',
+      [historyTs, slackParentMessageTs, slackChannelId]
+    );
+  } catch (error) {
+    logger.info('Failed to update threads; ignoring for now!');
+  } finally {
+    client.release();
+  }
+}
+
+export async function getThreadLatestMessageTs(
+  slackParentMessageTs: string,
+  slackChannelId: string
+): Promise<string | null> {
+  const client = await pool.connect();
+  try {
+    const result = await client.query(
+      `SELECT
+        t.history_ts
+        , m.slack_message_ts
+      FROM threads t
+      LEFT JOIN messages m ON (
+        t.slack_parent_message_ts=m.slack_parent_message_ts
+        AND t.slack_channel_id=m.slack_channel
+        AND m.slack_message_ts IS NOT NULL
+      )
+      WHERE
+        t.slack_parent_message_ts=$1
+        AND t.slack_channel_id=$2
+      ORDER BY COALESCE(m.slack_send_timestamp, m.slack_receive_timestamp) DESC
+      LIMIT 1`,
+      [slackParentMessageTs, slackChannelId]
+    );
+    if (result.rows.length > 0) {
+      return result.rows[0]['slack_message_ts'] || result.rows[0]['history_ts'];
+    }
+    return null;
+  } catch (error) {
+    logger.info('Failed to query threads; ignoring for now!');
+    return null;
+  } finally {
+    client.release();
+  }
+}
+
+export async function getUnclaimedVoters(
+  channelId: string | null
+): Promise<ThreadInfo[]> {
+  const client = await pool.connect();
+  try {
+    let result = null;
+    if (channelId) {
+      result = await client.query(
+        `SELECT
+          t.slack_parent_message_ts
+          , t.slack_channel_id
+          , t.user_id
+          , EXTRACT(EPOCH FROM now() - t.updated_at) as last_update_age
+        FROM threads t
+        WHERE
+          t.needs_attention
+          AND t.slack_channel_id = $1
+          AND NOT EXISTS (
+            SELECT FROM volunteer_voter_claims c
+            WHERE t.user_id=c.user_id
+          )
+        ORDER BY t.updated_at`,
+        [channelId]
+      );
+    } else {
+      result = await client.query(
+        `SELECT
+          t.slack_parent_message_ts
+          , t.slack_channel_id
+          , t.user_id
+          , EXTRACT(EPOCH FROM now() - t.updated_at) as last_update_age
+        FROM threads t
+        WHERE
+          t.needs_attention
+          AND NOT EXISTS (
+            SELECT FROM volunteer_voter_claims c
+            WHERE t.user_id=c.user_id
+          )
+        ORDER BY t.updated_at`
+      );
+    }
+    return result.rows.map((x) => ({
+      slackParentMessageTs: x['slack_parent_message_ts'],
+      channelId: x['slack_channel_id'],
+      userId: x['user_id'],
+      lastUpdateAge: x['last_update_age'],
+      volunteerSlackUserId: null,
+      volunteerSlackUserName: null,
+    }));
+  } catch (error) {
+    logger.info('Failed to query unclaimed threads; ignoring for now!');
+    return [];
+  } finally {
+    client.release();
+  }
+}
+
+// Return a list of ChannelStat's for all threads needing attention
+export async function getThreadsNeedingAttentionByChannel(): Promise<
+  ChannelStat[]
+> {
+  const client = await pool.connect();
+  try {
+    const result = await client.query(
+      `SELECT
+        count(*)
+        , slack_channel_id
+        , MAX(EXTRACT(EPOCH FROM now() - updated_at)) as max_last_update_age
+        FROM threads t
+        WHERE
+          needs_attention
+        GROUP BY slack_channel_id
+        ORDER BY max_last_update_age DESC`
+    );
+    return result.rows.map(
+      (x) =>
+        ({
+          channelId: x['slack_channel_id'],
+          count: x['count'],
+          maxLastUpdateAge: x['max_last_update_age'],
+        } as ChannelStat)
+    );
+  } catch (error) {
+    logger.info('Failed to query all threads for channel; ignoring for now!');
+    return [];
+  } finally {
+    client.release();
+  }
+}
+
+// Return a list of VolunteerStat's for all threads needing attention
+export async function getThreadsNeedingAttentionByVolunteer(): Promise<
+  VolunteerStat[]
+> {
+  const client = await pool.connect();
+  try {
+    const result = await client.query(
+      `WITH claims AS (
+        SELECT
+          user_id
+          , volunteer_slack_user_id
+          , volunteer_slack_user_name
+          , row_number () OVER (PARTITION BY user_id ORDER BY created_at DESC) AS rn
+        FROM volunteer_voter_claims
+      )
+      SELECT
+        count(*)
+        , volunteer_slack_user_id
+        , volunteer_slack_user_name
+        , MAX(EXTRACT(EPOCH FROM now() - updated_at)) as max_last_update_age
+        FROM threads t, claims c
+        WHERE
+          needs_attention
+          AND t.user_id=c.user_id
+          AND c.rn=1
+        GROUP BY volunteer_slack_user_id, volunteer_slack_user_name
+        ORDER BY max_last_update_age DESC`
+    );
+    return result.rows.map(
+      (x) =>
+        ({
+          volunteerSlackUserId: x['volunteer_slack_user_id'],
+          volunteerSlackUserName: x['volunteer_slack_user_name'],
+          count: x['count'],
+          maxLastUpdateAge: x['max_last_update_age'],
+        } as VolunteerStat)
+    );
+  } catch (error) {
+    logger.info('Failed to query all threads for channel; ignoring for now!');
+    return [];
+  } finally {
+    client.release();
+  }
+}
+
+// Return a list of ThreadInfo's for all threads needing attention in a channel
+export async function getThreadsNeedingAttentionForChannel(
+  channelId: string
+): Promise<ThreadInfo[]> {
+  const client = await pool.connect();
+  try {
+    const result = await client.query(
+      `WITH claims AS (
+        SELECT
+          user_id
+          , volunteer_slack_user_id
+          , volunteer_slack_user_name
+          , row_number () OVER (PARTITION BY user_id ORDER BY created_at DESC) AS rn
+        FROM volunteer_voter_claims
+      )
+      SELECT
+        slack_parent_message_ts
+        , slack_channel_id
+        , t.user_id
+        , EXTRACT(EPOCH FROM now() - updated_at) as last_update_age
+        , c.volunteer_slack_user_id
+        , c.volunteer_slack_user_name
+        FROM threads t, claims c
+        WHERE
+          needs_attention
+          AND t.user_id=c.user_id
+          AND c.rn=1
+          AND slack_channel_id = $1
+        ORDER BY updated_at`,
+      [channelId]
+    );
+    return result.rows.map((x) => ({
+      slackParentMessageTs: x['slack_parent_message_ts'],
+      channelId: x['slack_channel_id'],
+      userId: x['user_id'],
+      lastUpdateAge: x['last_update_age'],
+      volunteerSlackUserId: x['volunteer_slack_user_id'],
+      volunteerSlackUserName: x['volunteer_slack_user_name'],
+    }));
+  } catch (error) {
+    logger.info('Failed to query threads; ignoring for now!');
+    throw error;
+    return [];
+  } finally {
+    client.release();
+  }
+}
+
+// Return a list of ThreadInfo's for all threads needing attention for a slack user
+export async function getThreadsNeedingAttentionFor(
+  slackUserId: string
+): Promise<ThreadInfo[]> {
+  const client = await pool.connect();
+  try {
+    const result = await client.query(
+      `WITH claims AS (
+        SELECT
+          user_id
+          , volunteer_slack_user_id
+          , volunteer_slack_user_name
+          , row_number () OVER (PARTITION BY user_id ORDER BY created_at DESC) AS rn
+        FROM volunteer_voter_claims
+      )
+      SELECT
+        slack_parent_message_ts
+        , slack_channel_id
+        , t.user_id
+        , EXTRACT(EPOCH FROM now() - updated_at) as last_update_age
+        , c.volunteer_slack_user_name
+        FROM threads t, claims c
+        WHERE
+          needs_attention
+          AND t.user_id=c.user_id
+          AND c.rn=1
+          AND c.volunteer_slack_user_id=$1
+        ORDER BY updated_at`,
+      [slackUserId]
+    );
+    return result.rows.map((x) => ({
+      slackParentMessageTs: x['slack_parent_message_ts'],
+      channelId: x['slack_channel_id'],
+      userId: x['user_id'],
+      lastUpdateAge: x['last_update_age'],
+      volunteerSlackUserId: slackUserId,
+      volunteerSlackUserName: x['volunteer_slack_user_name'],
+    }));
+  } catch (error) {
+    logger.info('Failed to query threads; ignoring for now!');
+    return [];
+  } finally {
+    client.release();
+  }
+}
+
+// Return the needs_attention status for a specific thread
+export async function getThreadNeedsAttentionFor(
+  slackParentMessageTs: string,
+  slackChannelId: string
+): Promise<boolean> {
+  logger.info(`ENTERING DBAPIUTIL.getThreadNeedsAttentionFor`);
+  logger.info(
+    `DBAPIUTIL.getThreadNeedsAttentionFor: Looking up thread:${slackParentMessageTs}`
+  );
+
+  const client = await pool.connect();
+  try {
+    const result = await client.query(
+      'SELECT needs_attention FROM threads WHERE slack_parent_message_ts = $1 AND slack_channel_id = $2',
+      [slackParentMessageTs, slackChannelId]
+    );
+    logger.info(
+      `DBAPIUTIL.getMessageHistoryFor: Successfully looked up message history in PostgreSQL.`
+    );
+    if (result.rows.length > 0) {
+      return result.rows[0].needs_attention;
+    }
+    return false;
+  } catch (error) {
+    logger.info('Failed to query threads; assuming needs_attention for now!');
+    return true;
+  } finally {
+    client.release();
+  }
+}
+
 export async function logVoterStatusToDb(
   databaseVoterStatusEntry: DatabaseVoterStatusEntry
 ): Promise<void> {
@@ -597,6 +1032,19 @@ export async function logVolunteerVoterClaimToDb(
     logger.info(
       `DBAPIUTIL.logVolunteerVoterClaimToDb: Successfully inserted volunteer voter claim into PostgreSQL database.`
     );
+  } finally {
+    client.release();
+  }
+}
+
+export async function getVoterHasVolunteer(userId: string): Promise<boolean> {
+  const client = await pool.connect();
+  try {
+    const result = await client.query(
+      'SELECT EXISTS(SELECT 1 FROM volunteer_voter_claims WHERE user_id = $1) AS exists',
+      [userId]
+    );
+    return result.rows.length > 0 && result.rows[0]['exists'];
   } finally {
     client.release();
   }

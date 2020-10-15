@@ -591,6 +591,37 @@ app.post(
 );
 
 app.post(
+  '/slack-command',
+  runAsyncWrapper(async (req, res) => {
+    if (!SlackUtil.passesAuth(req)) {
+      logger.error(
+        'SERVER POST /slack-command: ERROR in authenticating request is from Slack.'
+      );
+      res.sendStatus(401);
+      return;
+    }
+    logger.info('SERVER POST /slack-command: PASSES AUTH');
+
+    await enqueueBackgroundTask(
+      'slackCommandHandler',
+      req.body.team_id,
+      req.body.channel_id,
+      req.body.channel_name,
+      req.body.user_id,
+      req.body.user_name,
+      req.body.command,
+      req.body.text
+    );
+
+    // Use res.end instead of res.sendStatus because the latter sends the code as
+    // a string in the body, and modal responses require an empty body in some cases.
+    // See https://api.slack.com/surfaces/modals/using#close_current_view.
+    res.writeHead(200);
+    res.end();
+  })
+);
+
+app.post(
   '/slack-interactivity',
   runAsyncWrapper(async (req, res) => {
     logger.info(
@@ -623,8 +654,9 @@ app.post(
     const metadata: InteractivityHandlerMetadata = {};
 
     if (
-      payload.type === 'message_action' &&
-      payload.callback_id === 'reset_demo'
+      (payload.type === 'message_action' &&
+        payload.callback_id === 'reset_demo') ||
+      payload.type === 'shortcut'
     ) {
       // For message actions, we always show a confirmation modal. Because we
       // have to show this modal within 3 seconds, we immediately make the call

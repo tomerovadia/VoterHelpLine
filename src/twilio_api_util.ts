@@ -41,6 +41,7 @@ export async function sendMessage(
 
     try {
       await DbApiUtil.logMessageToDb(databaseMessageEntry);
+      await DbApiUtil.updateThreadStatusFromMessage(databaseMessageEntry);
     } catch (error) {
       logger.error(
         'TWILIOAPIUTIL.sendMessage: failed to log message send duplication failure to DB'
@@ -70,6 +71,7 @@ export async function sendMessage(
 
     try {
       await DbApiUtil.logMessageToDb(databaseMessageEntry);
+      await DbApiUtil.updateThreadStatusFromMessage(databaseMessageEntry);
     } catch (error) {
       logger.error(
         'TWILIOAPIUTIL.sendMessage: failed to log message send success to DB'
@@ -98,6 +100,7 @@ export async function sendMessage(
 
     try {
       await DbApiUtil.logMessageToDb(databaseMessageEntry);
+      await DbApiUtil.updateThreadStatusFromMessage(databaseMessageEntry);
     } catch (error) {
       logger.error(
         'TWILIOAPIUTIL.sendMessage: failed to log message send failure to DB'

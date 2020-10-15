@@ -26,12 +26,44 @@ type SlackSendMessageResponse = {
 type SlackSendMessageOptions = {
   channel: string;
   parentMessageTs?: string;
+  parse?: boolean;
+  unfurl_links?: boolean;
+  unfurl_media?: boolean;
   blocks?: SlackBlock[];
 };
 
 type SlackChannelNamesAndIds = {
   [channelId: string]: string; // mapping of channel ID to channel name
 };
+
+export async function getThreadPermalink(
+  channel: string,
+  message_ts: string
+): Promise<string> {
+  try {
+    // Pick the newest message in the thread
+    const response = await slackAPI.get('chat.getPermalink', {
+      params: {
+        channel: channel,
+        message_ts: message_ts,
+        token: process.env.SLACK_BOT_ACCESS_TOKEN,
+      },
+    });
+    if (!response.data.ok) {
+      logger.error(
+        `SLACKAPIUTIL.getThreadPermalink: ERROR: ${JSON.stringify(
+          response.data
+        )}`
+      );
+    }
+    return response.data.permalink;
+  } catch (error) {
+    logger.error(`SLACKAPIUTIL.getThreadPermalink: ERROR in getting permalink message,
+                  channel: ${channel},
+                  message_ts: ${message_ts}`);
+    throw error;
+  }
+}
 
 export async function sendMessage(
   message: string,
@@ -96,6 +128,7 @@ export async function sendMessage(
 
       try {
         await DbApiUtil.logMessageToDb(databaseMessageEntry);
+        await DbApiUtil.updateThreadStatusFromMessage(databaseMessageEntry);
       } catch (error) {
         logger.info(
           `SLACKAPIUTIL.sendMessage: failed to log message send success to DB`
@@ -337,6 +370,35 @@ export async function addSlackMessageReaction(
     throw new Error(
       `SLACKAPIUTIL.addSlackMessageReaction: ERROR in adding reaction: ${response.data.error}`
     );
+  }
+}
+
+export async function isMemberOfAdminChannel(
+  slackUserId: string
+): Promise<boolean> {
+  const channelId = process.env.ADMIN_CONTROL_ROOM_SLACK_CHANNEL_ID;
+
+  // TODO: Consider caching this data. For now, calling every time is the best
+  // way to maintain security though.
+  const response = await slackAPI.get('conversations.members', {
+    params: {
+      channel: channelId,
+      token: process.env.SLACK_BOT_ACCESS_TOKEN,
+    },
+  });
+
+  if (response.data.ok) {
+    logger.info(
+      `SLACKAPIUTIL.isMemberOfAdminChannel: Successfully called isMemberOfAdminChannel`
+    );
+    return response.data.members.includes(slackUserId);
+  } else {
+    logger.error(
+      `SLACKAPIUTIL.isMemberOfAdminChannel: Failed to call conversations.members for ${channelId}. Error: response.data: ${JSON.stringify(
+        response.data
+      )}`
+    );
+    return false;
   }
 }
 

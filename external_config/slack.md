@@ -119,3 +119,44 @@ This should be added as a **messages** shortcut.
 - **Name:** Reset Demo
 - **Short Description:** Closes this conversation, allowing the volunteer to message the demo line again as a new mock voter.
 - **Callback ID:** reset_demo
+
+##### Set Needs Attention
+
+This should be added as a **messages** shortcut.
+
+- **Name:** Set Needs Attention
+- **Short Description:** Add this thread to your Needs Attention list
+- **Callback ID:** set_needs_attention
+
+##### Clear Needs Attention
+
+This should be added as a **messages** shortcut.
+
+- **Name:** Clear Needs Attention
+- **Short Description**: Remove this thread from your Needs Attention list
+- **Callback ID**: clear_needs_attention
+
+##### Needs Attention
+
+This should be added as a **global** shortcut.
+
+- **Name:** Needs Attention
+- **Short Description:** Show voters needing attention
+- **Callback ID:** show_needs_attention
+
+### Slash commands
+
+#### Unclaimed
+
+- *Command:* /unclaimed
+- *Request URL:* base URL + /slack-command
+- *Short Description:* List unclaimed voters in a channel
+- *Usage Hint:* optional: pass channel name, or * for all channels
+
+#### Needs attention
+
+- *Command:* /needs-attention
+- *Request URL:* base URL + /slack-command
+- *Short Description:* List voters needing your attention
+- *Usage Hint:*
+- *Escape channels, users, and links sent to your app:* CHECKED

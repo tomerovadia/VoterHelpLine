@@ -203,6 +203,15 @@ const introduceNewVoterToSlackChannel = async (
   // using the ID version of the channel.
   userInfo[response.data.channel] = response.data.ts;
 
+  // Create the thread
+  await DbApiUtil.logThreadToDb({
+    slackParentMessageTs: response.data.ts,
+    channelId: response.data.channel,
+    userId: userInfo.userId,
+    userPhoneNumber: userInfo.userPhoneNumber,
+    needsAttention: true,
+  });
+
   // Set active channel to this first channel, since the voter is new.
   // Makes sure subsequent messages from the voter go to this channel, unless
   // this active channel is changed.
@@ -403,13 +412,20 @@ const postUserMessageHistoryToSlack = async (
     userId.substring(0, 5)
   );
 
-  await SlackApiUtil.sendMessage(
+  const msgInfo = await SlackApiUtil.sendMessage(
     `*Operator:* ${messageHistoryContextText}\n\n${formattedMessageHistory}`,
     {
       parentMessageTs: destinationSlackParentMessageTs,
       channel: destinationSlackChannelId,
     }
   );
+  if (msgInfo) {
+    await DbApiUtil.setThreadHistoryTs(
+      destinationSlackParentMessageTs,
+      destinationSlackChannelId,
+      msgInfo.data.ts
+    );
+  }
 };
 
 // This helper handles all tasks associated with routing a voter to a new
@@ -573,6 +589,17 @@ const routeVoterToSlackChannel = async (
     );
   }
 
+  // The old thread no longer needs attention
+  const needsAttention = await DbApiUtil.getThreadNeedsAttentionFor(
+    userInfo[userInfo.activeChannelId],
+    userInfo.activeChannelId
+  );
+  await DbApiUtil.setThreadNeedsAttentionToDb(
+    userInfo[userInfo.activeChannelId],
+    userInfo.activeChannelId,
+    false
+  );
+
   // Remove the voter status panel from the old thread, in which the voter is no longer active.
   // Note: First we need to fetch the old thread parent message blocks, for both 1. the
   // text to be preserved when changing the parent message, and for 2. the other
@@ -641,6 +668,15 @@ const routeVoterToSlackChannel = async (
 
     // Remember the voter's thread in this channel.
     userInfo[response.data.channel] = response.data.ts;
+
+    // Create the thread with the origin thread's need_attention status
+    await DbApiUtil.logThreadToDb({
+      slackParentMessageTs: response.data.ts,
+      channelId: response.data.channel,
+      userId: userInfo.userId,
+      userPhoneNumber: userInfo.userPhoneNumber,
+      needsAttention: needsAttention,
+    });
 
     // Be able to identify phone number using NEW Slack channel identifying info.
     await RedisApiUtil.setHash(
@@ -712,6 +748,13 @@ const routeVoterToSlackChannel = async (
 
   logger.debug(
     `timestampOfLastMessageInThread: ${timestampOfLastMessageInThread}`
+  );
+
+  // Set destination thread to have same needs_attention status as origin thread
+  await DbApiUtil.setThreadNeedsAttentionToDb(
+    userInfo[destinationSlackChannelId],
+    destinationSlackChannelId,
+    needsAttention
   );
 
   await SlackApiUtil.sendMessage(

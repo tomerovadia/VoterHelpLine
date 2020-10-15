@@ -29,6 +29,43 @@ import { UserInfo } from './types';
 
 export type InteractivityHandlerMetadata = { viewId?: string };
 
+async function slackCommandHandler(
+  teamId: string,
+  channelId: string,
+  channelName: string,
+  userId: string,
+  userName: string,
+  command: string,
+  text: string
+) {
+  logger.info(`channel ${channelId} command ${command} text ${text}`);
+  switch (command) {
+    case '/unclaimed': {
+      await SlackInteractionHandler.handleCommandUnclaimed(
+        teamId,
+        channelId,
+        channelName,
+        userId,
+        text
+      );
+      return;
+    }
+    case '/todo':
+    case '/needs-attention': {
+      await SlackInteractionHandler.handleCommandNeedsAttention(
+        teamId,
+        channelId,
+        channelName,
+        userId,
+        userName,
+        text
+      );
+      return;
+    }
+  }
+  throw new Error(`Unrecognized command ${command}`);
+}
+
 async function slackInteractivityHandler(
   payload: SlackInteractionEventPayload,
   interactivityMetadata: InteractivityHandlerMetadata
@@ -42,7 +79,28 @@ async function slackInteractivityHandler(
     );
   }
 
-  if (payload.type === 'block_actions' || payload.type === 'message_action') {
+  // Global shortcut
+  if (payload.type === 'shortcut') {
+    const { viewId } = interactivityMetadata;
+    if (!viewId) {
+      throw new Error(
+        'slackInteractivityHandler called for message_action without viewId'
+      );
+    }
+    switch (payload.callback_id) {
+      case 'show_needs_attention': {
+        await SlackInteractionHandler.handleShortcutShowNeedsAttention({
+          payload,
+          viewId,
+        });
+        return;
+      }
+    }
+    throw new Error(`Unrecognized shortcut ${payload.callback_id}`);
+  }
+
+  // Message shortcut
+  if (payload.type === 'message_action') {
     const originatingSlackChannelName = await SlackApiUtil.fetchSlackChannelName(
       payload.channel.id
     );
@@ -50,58 +108,32 @@ async function slackInteractivityHandler(
     const redisHashKey = `${payload.channel.id}:${payload.message.ts}`;
     const redisData = await RedisApiUtil.getHash(redisClient, redisHashKey);
 
-    // Exempt message_action, which will be handled later by updating the Slack user's modal.
-    if (!(payload.type === 'message_action')) {
-      if (!originatingSlackChannelName) {
-        throw new Error(
-          `Could not get slack channel name for Slack channel ${payload.channel.id}`
-        );
-      }
-      if (!redisData) {
-        logger.debug(
-          `SERVER POST /slack-interactivity: Received an interaction for a voter who no longer exists in Redis.`
+    logger.info(
+      `SERVER POST /slack-interactivity: Determined user interaction is a message shortcut.`
+    );
+
+    switch (payload.callback_id) {
+      case 'set_needs_attention': {
+        // Use thread if message is threaded; original channel msg if there is no thread yet
+        await DbApiUtil.setThreadNeedsAttentionToDb(
+          payload.message.thread_ts || payload.message.ts,
+          payload.channel.id,
+          true
         );
         return;
       }
-    }
 
-    switch (payload.type) {
-      case 'block_actions': {
-        const selectedVoterStatus = payload.actions[0].selected_option
-          ? payload.actions[0].selected_option.value
-          : payload.actions[0].value;
-        if (selectedVoterStatus) {
-          logger.info(
-            `SERVER POST /slack-interactivity: Determined user interaction is a voter status update or undo.`
-          );
-          await SlackInteractionHandler.handleVoterStatusUpdate({
-            payload,
-            selectedVoterStatus,
-            originatingSlackUserName,
-            slackChannelName: originatingSlackChannelName,
-            userPhoneNumber: redisData ? redisData.userPhoneNumber : null,
-            twilioPhoneNumber: redisData ? redisData.twilioPhoneNumber : null,
-            redisClient,
-          });
-        } else if (payload.actions[0].selected_user) {
-          logger.info(
-            `SERVER POST /slack-interactivity: Determined user interaction is a volunteer update.`
-          );
-          await SlackInteractionHandler.handleVolunteerUpdate({
-            payload,
-            originatingSlackUserName,
-            slackChannelName: originatingSlackChannelName,
-            userPhoneNumber: redisData ? redisData.userPhoneNumber : null,
-            twilioPhoneNumber: redisData ? redisData.twilioPhoneNumber : null,
-          });
-        }
+      case 'clear_needs_attention': {
+        // Use thread if message is threaded; original channel msg if there is no thread yet
+        await DbApiUtil.setThreadNeedsAttentionToDb(
+          payload.message.thread_ts || payload.message.ts,
+          payload.channel.id,
+          false
+        );
         return;
       }
-      case 'message_action': {
-        logger.info(
-          `SERVER POST /slack-interactivity: Determined user interaction is a message shortcut.`
-        );
 
+      case 'reset_demo': {
         const { viewId } = interactivityMetadata;
         if (!viewId) {
           throw new Error(
@@ -141,23 +173,77 @@ async function slackInteractivityHandler(
           return;
         }
 
-        if (payload.callback_id === 'reset_demo') {
-          await SlackInteractionHandler.receiveResetDemo({
-            payload,
-            redisClient,
-            modalPrivateMetadata,
-            twilioPhoneNumber: redisData ? redisData.twilioPhoneNumber : null,
-            userId: MD5.hex(redisData.userPhoneNumber),
-            viewId,
-          });
-          return;
-        }
-        break;
+        await SlackInteractionHandler.receiveResetDemo({
+          payload,
+          redisClient,
+          modalPrivateMetadata,
+          twilioPhoneNumber: redisData.twilioPhoneNumber,
+          userId: MD5.hex(redisData.userPhoneNumber),
+          viewId,
+        });
+        return;
+      }
+
+      default: {
+        throw new Error(
+          `slackInteractivityHandler unrecognized callback_id ${payload.callback_id}`
+        );
       }
     }
   }
 
-  // If the interaction is confirmation of a modal.
+  // Block action
+  if (payload.type === 'block_actions') {
+    const originatingSlackChannelName = await SlackApiUtil.fetchSlackChannelName(
+      payload.channel.id
+    );
+    if (!originatingSlackChannelName) {
+      throw new Error(
+        `Could not get slack channel name for Slack channel ${payload.channel.id}`
+      );
+    }
+
+    const redisHashKey = `${payload.channel.id}:${payload.message.ts}`;
+    const redisData = await RedisApiUtil.getHash(redisClient, redisHashKey);
+    if (!redisData) {
+      logger.debug(
+        `SERVER POST /slack-interactivity: Received an interaction for a voter who no longer exists in Redis.`
+      );
+      return;
+    }
+
+    const selectedVoterStatus = payload.actions[0].selected_option
+      ? payload.actions[0].selected_option.value
+      : payload.actions[0].value;
+    if (selectedVoterStatus) {
+      logger.info(
+        `SERVER POST /slack-interactivity: Determined user interaction is a voter status update or undo.`
+      );
+      await SlackInteractionHandler.handleVoterStatusUpdate({
+        payload,
+        selectedVoterStatus,
+        originatingSlackUserName,
+        slackChannelName: originatingSlackChannelName,
+        userPhoneNumber: redisData ? redisData.userPhoneNumber : null,
+        twilioPhoneNumber: redisData ? redisData.twilioPhoneNumber : null,
+        redisClient,
+      });
+    } else if (payload.actions[0].selected_user) {
+      logger.info(
+        `SERVER POST /slack-interactivity: Determined user interaction is a volunteer update.`
+      );
+      await SlackInteractionHandler.handleVolunteerUpdate({
+        payload,
+        originatingSlackUserName,
+        slackChannelName: originatingSlackChannelName,
+        userPhoneNumber: redisData ? redisData.userPhoneNumber : null,
+        twilioPhoneNumber: redisData ? redisData.twilioPhoneNumber : null,
+      });
+    }
+    return;
+  }
+
+  // Modal confirmation
   if (payload.type === 'view_submission') {
     // Get the data associated with the modal used for execution of the
     // action it confirmed.
@@ -175,7 +261,9 @@ async function slackInteractivityHandler(
     // exit and continue down to throw an error.
   }
 
-  throw new Error(`Received an unexpected Slack interaction.`);
+  throw new Error(
+    `Received an unexpected Slack interaction: ${JSON.stringify(payload)}`
+  );
 }
 
 async function slackMessageEventHandler(
@@ -282,6 +370,7 @@ const BACKGROUND_TASKS = {
   slackInteractivityHandler,
   slackMessageEventHandler,
   slackAppMentionEventHandler,
+  slackCommandHandler,
 };
 
 export async function enqueueBackgroundTask(
