@@ -622,7 +622,7 @@ export async function handleCommandNeedsAttention(
   return;
 }
 
-export async function handleShowNeedsAttention({
+export async function handleShortcutShowNeedsAttention({
   payload,
   viewId,
 }: {
