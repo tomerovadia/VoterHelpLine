@@ -37,6 +37,12 @@ Important: The Slack bot must be given access to each of these channels.
 - demo-new-york-0
 - arizona-0
 - demo-arizona-0
+- wisconsin-0
+- demo-wisconsin-0
+- illinois-0
+- demo-illinois-0
+- minnesota-0
+- demo-minnesota-0
 
 #### Redis
 
@@ -67,6 +73,12 @@ Important: The Slack bot must be given access to each of these channels.
 - RPUSH openPodsPullDemoNewYork demo-new-york-0
 - RPUSH openPodsPullArizona arizona-0
 - RPUSH openPodsPullDemoArizona demo-arizona-0
+- RPUSH openPodsPullWisconsin wisconsin-0
+- RPUSH openPodsPullDemoWisconsin demo-wisconsin-0
+- RPUSH openPodsPullIllinois illinois-0
+- RPUSH openPodsPullDemoIllinois demo-illinois-0
+- RPUSH openPodsPullMinnesota minnesota-0
+- RPUSH openPodsPullDemoMinnesota demo-minnesota-0
 
 ## Slack App
 
