@@ -8,9 +8,8 @@ CREATE TABLE threads (
     needs_attention bool,
     updated_at timestamp without time zone,
     history_ts text,
-    PRIMARY KEY (slack_parent_message_ts)
+    PRIMARY KEY (slack_parent_message_ts, slack_channel_id)
 );
-CREATE INDEX ON threads (slack_channel_id);
 CREATE INDEX ON threads (user_id);
 CREATE INDEX ON threads (needs_attention);
 CREATE INDEX ON threads (updated_at);
