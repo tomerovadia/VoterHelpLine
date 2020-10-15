@@ -807,7 +807,7 @@ export async function determineVoterState(
     }
   }
 
-  // This is used for display as well as to know later that the voter's
+  // This is used for display, DB logging, as well as to know later that the voter's
   // U.S. state has been determined.
   userInfo.stateName = stateName;
   logger.debug(

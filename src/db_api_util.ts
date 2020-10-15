@@ -40,6 +40,7 @@ export type DatabaseMessageEntry = {
   originatingSlackUserName?: string | null;
   entryPoint: EntryPoint | null;
   archived?: boolean | null;
+  stateName?: string | null;
 };
 
 export type DatabaseVoterStatusEntry = {
@@ -92,7 +93,7 @@ export async function logMessageToDb(
   const client = await pool.connect();
   try {
     await client.query(
-      'INSERT INTO messages (message, direction, automated, successfully_sent, from_phone_number, user_id, to_phone_number, originating_slack_user_id, slack_channel, slack_parent_message_ts, twilio_message_sid, slack_message_ts, slack_error, twilio_error, twilio_send_timestamp, twilio_receive_timestamp, slack_send_timestamp, slack_receive_timestamp, confirmed_disclaimer, is_demo, last_voter_message_secs_from_epoch, unprocessed_message, slack_retry_num, slack_retry_reason, originating_slack_user_name, entry_point, archived) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27);',
+      'INSERT INTO messages (message, direction, automated, successfully_sent, from_phone_number, user_id, to_phone_number, originating_slack_user_id, slack_channel, slack_parent_message_ts, twilio_message_sid, slack_message_ts, slack_error, twilio_error, twilio_send_timestamp, twilio_receive_timestamp, slack_send_timestamp, slack_receive_timestamp, confirmed_disclaimer, is_demo, last_voter_message_secs_from_epoch, unprocessed_message, slack_retry_num, slack_retry_reason, originating_slack_user_name, entry_point, archived, state_name) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28);',
       [
         databaseMessageEntry.message,
         databaseMessageEntry.direction,
@@ -121,6 +122,7 @@ export async function logMessageToDb(
         databaseMessageEntry.originatingSlackUserName,
         databaseMessageEntry.entryPoint,
         databaseMessageEntry.archived,
+        databaseMessageEntry.stateName,
       ]
     );
 
@@ -197,6 +199,9 @@ export function populateIncomingDbMessageTwilioEntry({
     lastVoterMessageSecsFromEpoch: null,
 
     archived: false,
+
+    // To be filled later
+    stateName: null,
   };
 }
 
@@ -264,6 +269,9 @@ export function populateIncomingDbMessageSlackEntry({
     lastVoterMessageSecsFromEpoch: null,
 
     archived: false,
+
+    // To be filled later
+    stateName: null,
   };
 }
 
@@ -278,6 +286,7 @@ export function updateDbMessageEntryWithUserInfo(
   dbMessageEntry.lastVoterMessageSecsFromEpoch =
     userInfo.lastVoterMessageSecsFromEpoch;
   dbMessageEntry.entryPoint = userInfo.entryPoint;
+  dbMessageEntry.stateName = userInfo.stateName;
 }
 
 // Populates a DB entry with available info right before it is passed to TwilioApiUtil for additional info and writing to DB.
@@ -330,6 +339,8 @@ export function populateAutomatedDbMessageEntry(
     lastVoterMessageSecsFromEpoch: userInfo.lastVoterMessageSecsFromEpoch,
 
     archived: false,
+
+    stateName: userInfo.stateName,
   };
 }
 
