@@ -386,12 +386,14 @@ export async function handleCommandUnclaimed(
   userId: string,
   text: string
 ): Promise<void> {
-  const outputChannelId = channelId;
-
+  // command argument
   let arg = text;
   if (text && !SlackApiUtil.isMemberOfAdminChannel(userId)) {
     arg = '';
   }
+
+  let showChannelName = channelName;
+  let showChannelId = channelId;
 
   const slackChannelIds = arg
     ? await RedisApiUtil.getHash(redisClient, 'slackPodChannelIds')
@@ -401,34 +403,39 @@ export async function handleCommandUnclaimed(
     slackChannelNames[slackChannelIds[name]] = name;
   }
 
+  // Is arg a channel (either #foo or foo)?
   if (arg && arg != '*') {
     if (arg[0] == '#') {
-      arg = arg.substr(1);
+      arg = arg.substr(1); // strip off the # prefix
     }
     if (!(arg in slackChannelIds)) {
-      await SlackApiUtil.sendMessage(`Channel #${channelName} not found`, {
-        channel: outputChannelId,
+      await SlackApiUtil.sendMessage(`Channel #${arg} not found`, {
+        channel: channelId,
       });
       return;
     }
-    channelName = arg;
-    channelId = slackChannelIds[channelName];
+    showChannelName = arg;
+    showChannelId = slackChannelIds[showChannelName];
   }
 
   const threads = await DbApiUtil.getUnclaimedVoters(
-    arg === '*' ? null : channelId
+    arg === '*' ? null : showChannelId
   );
   const lines: string[] = [
     `${threads.length} unclaimed voters in ` +
-      (arg === '*' ? 'all channels' : `#${channelName}`),
+      (arg === '*' ? 'all channels' : `#${showChannelName}`),
   ];
+
   for (const thread of threads) {
     const messageTs =
       (await DbApiUtil.getThreadLatestMessageTs(
         thread.slackParentMessageTs,
         thread.channelId
       )) || thread.slackParentMessageTs;
-    const url = await SlackApiUtil.getThreadPermalink(thread.channelId, messageTs);
+    const url = await SlackApiUtil.getThreadPermalink(
+      thread.channelId,
+      messageTs
+    );
     if (arg === '*') {
       let channelName = thread.channelId;
       if (slackChannelNames && thread.channelId in slackChannelNames) {
@@ -450,7 +457,7 @@ export async function handleCommandUnclaimed(
     }
   }
   await SlackApiUtil.sendMessage('Unclaimed voters', {
-    channel: outputChannelId,
+    channel: channelId,
     unfurl_links: false,
     unfurl_media: false,
     blocks: [
@@ -475,7 +482,10 @@ async function getNeedsAttentionList(userId: string): Promise<string[]> {
         thread.slackParentMessageTs,
         thread.channelId
       )) || thread.slackParentMessageTs;
-    const url = await SlackApiUtil.getThreadPermalink(thread.channelId, messageTs);
+    const url = await SlackApiUtil.getThreadPermalink(
+      thread.channelId,
+      messageTs
+    );
     urls.push(url);
   }
 
@@ -496,12 +506,15 @@ export async function handleCommandNeedsAttention(
   userName: string,
   text: string
 ): Promise<void> {
+  // command argument
   let arg = text;
   if (arg && !SlackApiUtil.isMemberOfAdminChannel(userId)) {
     arg = '';
   }
 
   let lines = [] as string[];
+
+  // Which user we'll show voters for (if the command arg doesn't have us show * or a channel)
   let showUserId = userId;
   let showUserName = userName;
 
@@ -538,9 +551,9 @@ export async function handleCommandNeedsAttention(
     }
   } else if (
     arg &&
-    arg[0] == '<' &&
-    arg[arg.length - 1] == '>' &&
-    arg[1] == '@'
+    arg[0] === '<' &&
+    arg[arg.length - 1] === '>' &&
+    arg[1] === '@'
   ) {
     const s = arg.substr(2, arg.length - 3).split('|');
     if (s.length != 2) {
@@ -549,9 +562,9 @@ export async function handleCommandNeedsAttention(
       showUserId = s[0];
       showUserName = s[1];
     }
-  } else if (arg && arg[0] == '@') {
+  } else if (arg && arg[0] === '@') {
     lines.push(`Unrecognized user ${arg}`);
-  } else if (arg && arg[0] == '#') {
+  } else if (arg && arg[0] === '#') {
     const slackChannelIds = await RedisApiUtil.getHash(
       redisClient,
       'slackPodChannelIds'
