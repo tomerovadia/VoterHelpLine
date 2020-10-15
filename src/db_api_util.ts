@@ -573,13 +573,15 @@ export async function updateThreadStatusFromMessage(
     }
     if (result.rowCount == 0) {
       await logThreadToDb({
-          slackParentMessageTs: databaseMessageEntry.slackParentMessageTs,
-          channelId: databaseMessageEntry.slackChannel,
-          userId: databaseMessageEntry.userId,
-          userPhoneNumber: databaseMessageEntry.direction === 'INBOUND' ? databaseMessageEntry.fromPhoneNumber : databaseMessageEntry.toPhoneNumber,
-          needsAttention: databaseMessageEntry.direction === 'INBOUND',
-        } as DatabaseThreadEntry
-      );
+        slackParentMessageTs: databaseMessageEntry.slackParentMessageTs,
+        channelId: databaseMessageEntry.slackChannel,
+        userId: databaseMessageEntry.userId,
+        userPhoneNumber:
+          databaseMessageEntry.direction === 'INBOUND'
+            ? databaseMessageEntry.fromPhoneNumber
+            : databaseMessageEntry.toPhoneNumber,
+        needsAttention: databaseMessageEntry.direction === 'INBOUND',
+      } as DatabaseThreadEntry);
     }
   } catch (error) {
     logger.info('Failed to update threads; ignoring for now!');
