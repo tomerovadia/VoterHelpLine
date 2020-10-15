@@ -392,9 +392,6 @@ export async function handleCommandUnclaimed(
     arg = '';
   }
 
-  let showChannelName = channelName;
-  let showChannelId = channelId;
-
   const slackChannelIds = arg
     ? await RedisApiUtil.getHash(redisClient, 'slackPodChannelIds')
     : {};
@@ -403,7 +400,9 @@ export async function handleCommandUnclaimed(
     slackChannelNames[slackChannelIds[name]] = name;
   }
 
-  // Is arg a channel (either #foo or foo)?
+  // Is arg a channel (either #foo or foo)?  Empty arg means use current channel.
+  let showChannelName = channelName;
+  let showChannelId = channelId;
   if (arg && arg != '*') {
     if (arg[0] == '#') {
       arg = arg.substr(1); // strip off the # prefix
@@ -515,6 +514,7 @@ export async function handleCommandNeedsAttention(
   let lines = [] as string[];
 
   // Which user we'll show voters for (if the command arg doesn't have us show * or a channel)
+  // Empty arg means current user.
   let showUserId = userId;
   let showUserName = userName;
 
