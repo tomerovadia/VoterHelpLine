@@ -645,6 +645,9 @@ export async function getThreadLatestMessageTs(
       return result.rows[0]['slack_message_ts'] || result.rows[0]['history_ts'];
     }
     return null;
+  } catch (error) {
+    logger.info('Failed to query threads; ignoring for now!');
+    return null;
   } finally {
     client.release();
   }
