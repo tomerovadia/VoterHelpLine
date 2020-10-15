@@ -72,23 +72,6 @@ Important: The Slack bot must be given access to each of these channels.
 
 ### Interactivity & Shortcuts
 
-#### Slash commands
-
-##### Unclaimed
-
-- *Command:* /unclaimed
-- *Request URL:* base URL + /slack-command
-- *Short Description:* List unclaimed voters in a channel
-- *Usage Hint:* optional: pass channel name, or * for all channels
-
-##### Needs attention
-
-- *Command:* /needs-attention
-- *Request URL:* base URL + /slack-command
-- *Short Description:* List voters needing your attention
-- *Usage Hint:*
-- *Escape channels, users, and links sent to your app:* CHECKED
-
 #### Shortcuts
 
 ##### Reset Demo
@@ -122,3 +105,20 @@ This should be added as a **global** shortcut.
 - **Name:** Needs Attention
 - **Short Description:** Show voters needing attention
 - **Callback ID:** show_needs_attention
+
+### Slash commands
+
+#### Unclaimed
+
+- *Command:* /unclaimed
+- *Request URL:* base URL + /slack-command
+- *Short Description:* List unclaimed voters in a channel
+- *Usage Hint:* optional: pass channel name, or * for all channels
+
+#### Needs attention
+
+- *Command:* /needs-attention
+- *Request URL:* base URL + /slack-command
+- *Short Description:* List voters needing your attention
+- *Usage Hint:*
+- *Escape channels, users, and links sent to your app:* CHECKED
