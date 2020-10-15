@@ -117,7 +117,7 @@ This should be added as a **messages** shortcut.
 
 ##### Needs Attention
 
-This should be added as a **Global** shortcut.
+This should be added as a **global** shortcut.
 
 - **Name:** Needs Attention
 - **Short Description:** Show voters needing attention

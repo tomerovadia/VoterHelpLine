@@ -401,7 +401,6 @@ export async function handleCommandUnclaimed(
     slackChannelNames[slackChannelIds[name]] = name;
   }
 
-  logger.info(JSON.stringify(slackChannelIds));
   if (arg && arg != '*') {
     if (arg[0] == '#') {
       arg = arg.substr(1);
