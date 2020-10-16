@@ -615,7 +615,7 @@ const routeVoterToSlackChannel = async (
 
   // return SlackBlockUtil.populateDropdownWithLatestVoterStatus(previousParentMessageBlocks, userId).then(() => {
   // make deep copy of previousParentMessageBlocks
-  const closedVoterPanelMessage = `Voter has been routed to *${destinationSlackChannelName}*.`;
+  const closedVoterPanelMessage = `Voter has been routed to <slack://channel?team=${process.env.TEAM_ID}&id=${destinationSlackChannelId}|#${destinationSlackChannelName}>.`;
   const closedVoterPanelBlocks = SlackBlockUtil.makeClosedVoterPanelBlocks(
     closedVoterPanelMessage,
     false /* include undo button */
