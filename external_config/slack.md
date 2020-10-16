@@ -160,15 +160,14 @@ This should be added as a **global** shortcut.
 
 #### Unclaimed
 
-- _Command:_ /unclaimed
-- _Request URL:_ base URL + /slack-command
-- _Short Description:_ List unclaimed voters in a channel
-- _Usage Hint:_ optional: pass channel name, or \* for all channels
+- **Command:** /unclaimed
+- **Request URL:** base URL + /slack-command
+- **Short Description:** List unclaimed voters in a channel
+- **Usage Hint:** none
 
 #### Needs attention
 
-- _Command:_ /needs-attention
-- _Request URL:_ base URL + /slack-command
-- _Short Description:_ List voters needing your attention
-- _Usage Hint:_
-- _Escape channels, users, and links sent to your app:_ CHECKED
+- **Command:** /needs-attention
+- **Request URL:** base URL + /slack-command
+- **Short Description:** List voters needing your attention
+- **Usage Hint:** None
