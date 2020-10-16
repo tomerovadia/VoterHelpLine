@@ -163,11 +163,11 @@ This should be added as a **global** shortcut.
 - **Command:** /unclaimed
 - **Request URL:** base URL + /slack-command
 - **Short Description:** List unclaimed voters in a channel
-- **Usage Hint:** none
+- **Usage Hint:** (None)
 
 #### Needs attention
 
 - **Command:** /needs-attention
 - **Request URL:** base URL + /slack-command
 - **Short Description:** List voters needing your attention
-- **Usage Hint:** None
+- **Usage Hint:** (None)
