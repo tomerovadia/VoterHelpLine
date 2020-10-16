@@ -440,7 +440,7 @@ export async function handleCommandUnclaimed(
     if (arg === '*') {
       let channelName = thread.channelId;
       if (slackChannelNames && thread.channelId in slackChannelNames) {
-        channelName = `#${slackChannelNames[thread.channelId]}`;
+        channelName = slackChannelNames[thread.channelId];
       }
       lines.push(
         `:bust_in_silhouette: ${thread.userId} - age ${prettyTimeInterval(
