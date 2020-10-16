@@ -123,6 +123,13 @@ async function slackInteractivityHandler(
           payload.channel.id,
           true
         );
+        await SlackApiUtil.sendMessage(
+          '*Operator:* Marked thread as *Needs Attention*',
+          {
+            parentMessageTs: payload.message.thread_ts || payload.message.ts,
+            channel: payload.channel.id,
+          }
+        );
         return;
       }
 
@@ -132,6 +139,13 @@ async function slackInteractivityHandler(
           payload.message.thread_ts || payload.message.ts,
           payload.channel.id,
           false
+        );
+        await SlackApiUtil.sendMessage(
+          '*Operator:* Cleared *Needs Attention*',
+          {
+            parentMessageTs: payload.message.thread_ts || payload.message.ts,
+            channel: payload.channel.id,
+          }
         );
         return;
       }
