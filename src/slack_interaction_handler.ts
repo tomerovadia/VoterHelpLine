@@ -847,6 +847,12 @@ export async function handleResetDemo(
     modalPrivateMetadata.twilioPhoneNumber
   );
 
+  await DbApiUtil.setThreadNeedsAttentionToDb(
+    modalPrivateMetadata.slackParentMessageTs,
+    modalPrivateMetadata.slackChannelId,
+    false
+  );
+
   modalPrivateMetadata.success = true;
   await DbApiUtil.logCommandToDb(modalPrivateMetadata);
 
