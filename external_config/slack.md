@@ -43,6 +43,12 @@ Important: The Slack bot must be given access to each of these channels.
 - demo-illinois-0
 - minnesota-0
 - demo-minnesota-0
+- colorado-0
+- demo-colorado-0
+- california-0
+- demo-california-0
+- north-carolina-0
+- demo-north-carolina-0
 
 #### Redis
 
@@ -79,6 +85,12 @@ Important: The Slack bot must be given access to each of these channels.
 - RPUSH openPodsPullDemoIllinois demo-illinois-0
 - RPUSH openPodsPullMinnesota minnesota-0
 - RPUSH openPodsPullDemoMinnesota demo-minnesota-0
+- RPUSH openPodsPullColorado colorado-0
+- RPUSH openPodsPullDemoColorado demo-colorado-0
+- RPUSH openPodsPullCalifornia california-0
+- RPUSH openPodsPullDemoCalifornia demo-california-0
+- RPUSH openPodsPullNorthCarolina north-carolina-0
+- RPUSH openPodsPullDemoNorthCarolina demo-north-carolina-0
 
 ## Slack App
 
@@ -148,15 +160,14 @@ This should be added as a **global** shortcut.
 
 #### Unclaimed
 
-- *Command:* /unclaimed
-- *Request URL:* base URL + /slack-command
-- *Short Description:* List unclaimed voters in a channel
-- *Usage Hint:* optional: pass channel name, or * for all channels
+- **Command:** /unclaimed
+- **Request URL:** base URL + /slack-command
+- **Short Description:** List unclaimed voters in a channel
+- **Usage Hint:** (None)
 
 #### Needs attention
 
-- *Command:* /needs-attention
-- *Request URL:* base URL + /slack-command
-- *Short Description:* List voters needing your attention
-- *Usage Hint:*
-- *Escape channels, users, and links sent to your app:* CHECKED
+- **Command:** /needs-attention
+- **Request URL:** base URL + /slack-command
+- **Short Description:** List voters needing your attention
+- **Usage Hint:** (None)
