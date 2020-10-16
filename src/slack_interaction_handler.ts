@@ -12,6 +12,8 @@ import { PromisifiedRedisClient } from './redis_client';
 import { UserInfo, SlackThreadInfo } from './types';
 import redisClient from './redis_client';
 
+const maxCommandLines = 100; // this is about half of slacks message size limit
+
 export type VoterStatusUpdate = VoterStatus | 'UNDO';
 
 export type SlackInteractionEventPayload = {
@@ -455,6 +457,10 @@ export async function handleCommandUnclaimed(
         )} - <${url}|Open>`
       );
     }
+    if (lines.length >= maxCommandLines) {
+      lines.push('... (truncated for brevity) ...');
+      break;
+    }
   }
   await SlackApiUtil.sendEphemeralResponse(responseUrl, lines.join('\n'));
 }
@@ -462,7 +468,7 @@ export async function handleCommandUnclaimed(
 async function getNeedsAttentionList(userId: string): Promise<string[]> {
   const threads = (await DbApiUtil.getThreadsNeedingAttentionFor(userId)) || [];
 
-  const urls: string[] = [];
+  const lines: string[] = [];
   for (const thread of threads) {
     const messageTs =
       (await DbApiUtil.getThreadLatestMessageTs(
@@ -473,15 +479,16 @@ async function getNeedsAttentionList(userId: string): Promise<string[]> {
       thread.channelId,
       messageTs
     );
-    urls.push(url);
+    lines.push(
+      `:bust_in_silhouette: ${thread.userId} - age ${prettyTimeInterval(
+        thread.lastUpdateAge || 0
+      )} - <${url}|Open>`
+    );
+    if (lines.length >= maxCommandLines) {
+      lines.push('... (truncated for brevity) ...');
+      break;
+    }
   }
-
-  const lines = threads.map(
-    (x) =>
-      `:bust_in_silhouette: ${x.userId} - age ${prettyTimeInterval(
-        x.lastUpdateAge || 0
-      )} - <${urls.pop()}|Open>`
-  );
   return lines;
 }
 
@@ -596,6 +603,10 @@ export async function handleCommandNeedsAttention(
             thread.lastUpdateAge || 0
           )} - <${url}|Open>`
         );
+        if (lines.length >= maxCommandLines) {
+          lines.push('... (truncated for brevity) ...');
+          break;
+        }
       }
     }
   } else if (arg) {
@@ -612,7 +623,6 @@ export async function handleCommandNeedsAttention(
     );
     lines = lines.concat(ulines);
   }
-
   await SlackApiUtil.sendEphemeralResponse(responseUrl, lines.join('\n'));
 }
 
