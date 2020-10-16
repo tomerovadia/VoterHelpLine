@@ -610,7 +610,8 @@ app.post(
       req.body.user_id,
       req.body.user_name,
       req.body.command,
-      req.body.text
+      req.body.text,
+      req.body.response_url
     );
 
     // Use res.end instead of res.sendStatus because the latter sends the code as

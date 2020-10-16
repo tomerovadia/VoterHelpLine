@@ -65,6 +65,35 @@ export async function getThreadPermalink(
   }
 }
 
+export async function sendEphemeralResponse(
+  url: string,
+  message: string
+): Promise<void> {
+  try {
+    const response = await axios.post(url, {
+      text: message,
+      token: process.env.SLACK_BOT_ACCESS_TOKEN,
+      unfurl_media: false,
+      response_type: 'ephemeral',
+    });
+
+    if (!response.data.ok) {
+      throw new Error(
+        `SLACKAPIUTIL.sendEphemeralResponse: ERROR in sending Slack message: ${JSON.stringify(
+          response.data
+        )}`
+      );
+    }
+  } catch (error) {
+    logger.error(
+      `SLACKAPIUTIL.sendEphemeralResponse: ERROR in sending Slack response. Error data from Slack: ${JSON.stringify(
+        error
+      )}`
+    );
+    Sentry.captureException(error);
+  }
+}
+
 export async function sendMessage(
   message: string,
   options: SlackSendMessageOptions

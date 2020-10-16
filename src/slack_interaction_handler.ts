@@ -384,7 +384,8 @@ export async function handleCommandUnclaimed(
   channelId: string,
   channelName: string,
   userId: string,
-  text: string
+  text: string,
+  responseUrl: string
 ): Promise<void> {
   // command argument
   let arg = text;
@@ -455,20 +456,7 @@ export async function handleCommandUnclaimed(
       );
     }
   }
-  await SlackApiUtil.sendMessage('Unclaimed voters', {
-    channel: channelId,
-    unfurl_links: false,
-    unfurl_media: false,
-    blocks: [
-      {
-        type: 'section',
-        text: {
-          type: 'mrkdwn',
-          text: lines.join('\n'),
-        },
-      },
-    ],
-  });
+  await SlackApiUtil.sendEphemeralResponse(responseUrl, lines.join('\n'));
 }
 
 async function getNeedsAttentionList(userId: string): Promise<string[]> {
@@ -503,7 +491,8 @@ export async function handleCommandNeedsAttention(
   channelName: string,
   userId: string,
   userName: string,
-  text: string
+  text: string,
+  responseUrl: string
 ): Promise<void> {
   // command argument
   let arg = text;
@@ -624,21 +613,7 @@ export async function handleCommandNeedsAttention(
     lines = lines.concat(ulines);
   }
 
-  await SlackApiUtil.sendMessage(`Needs attention`, {
-    channel: channelId,
-    unfurl_links: false,
-    unfurl_media: false,
-    blocks: [
-      {
-        type: 'section',
-        text: {
-          type: 'mrkdwn',
-          text: lines.join('\n'),
-        },
-      },
-    ],
-  });
-  return;
+  await SlackApiUtil.sendEphemeralResponse(responseUrl, lines.join('\n'));
 }
 
 export async function handleShortcutShowNeedsAttention({
