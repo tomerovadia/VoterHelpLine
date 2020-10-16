@@ -445,9 +445,10 @@ export async function handleCommandUnclaimed(
       lines.push(
         `:bust_in_silhouette: ${thread.userId} - age ${prettyTimeInterval(
           thread.lastUpdateAge || 0
-        )} - <slack://channel?team=${process.env.TEAM_ID}&id=${
-          thread.channelId
-        }|${channelName}> - <${url}|Open>`
+        )} - ${SlackApiUtil.linkToSlackChannel(
+          thread.channelId,
+          channelName
+        )} - <${url}|Open>`
       );
     } else {
       lines.push(
@@ -527,11 +528,10 @@ export async function handleCommandNeedsAttention(
     lines = lines.concat(
       stats.map(
         (x) =>
-          `${x.count} in <slack://channel?team=${process.env.TEAM_ID}&id=${
-            x.channelId
-          }|#${slackChannelNames[x.channelId]}> - oldest ${prettyTimeInterval(
-            x.maxLastUpdateAge
-          )}`
+          `${x.count} in ${SlackApiUtil.linkToSlackChannel(
+            x.channelId,
+            slackChannelNames[x.channelId]
+          )} - oldest ${prettyTimeInterval(x.maxLastUpdateAge)}`
       )
     );
 
@@ -577,7 +577,10 @@ export async function handleCommandNeedsAttention(
       lines.push(`Unrecognized channel ${arg}`);
     } else {
       lines.push(
-        `Voters needing attention for <slack://channel?team=${process.env.TEAM_ID}&id=${channelId}|#${channelName}>`
+        `Voters needing attention for ${SlackApiUtil.linkToSlackChannel(
+          channelId,
+          channelName
+        )}`
       );
       const threads = await DbApiUtil.getThreadsNeedingAttentionForChannel(
         channelId
