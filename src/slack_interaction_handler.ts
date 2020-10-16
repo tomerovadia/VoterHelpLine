@@ -527,9 +527,11 @@ export async function handleCommandNeedsAttention(
     lines = lines.concat(
       stats.map(
         (x) =>
-          `${x.count} in <slack://channel?team=${process.env.TEAM_ID}&id=${x.channelId}|#${
-            slackChannelNames[x.channelId]
-          }> - oldest ${prettyTimeInterval(x.maxLastUpdateAge)}`
+          `${x.count} in <slack://channel?team=${process.env.TEAM_ID}&id=${
+            x.channelId
+          }|#${slackChannelNames[x.channelId]}> - oldest ${prettyTimeInterval(
+            x.maxLastUpdateAge
+          )}`
       )
     );
 
