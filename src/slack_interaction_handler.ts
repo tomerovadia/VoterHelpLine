@@ -559,45 +559,56 @@ export async function handleCommandNeedsAttention(
   } else if (arg && arg[0] === '@') {
     lines.push(`Unrecognized user ${arg}`);
   } else if (
-    arg &&
-    arg[0] === '<' &&
-    arg[arg.length - 1] === '>' &&
-    arg[1] === '#'
+    (arg && arg[0] === '<' && arg[arg.length - 1] === '>' && arg[1] === '#') ||
+    (arg && arg[0] === '#')
   ) {
-    const parts = arg.substr(2, arg.length - 3).split('|');
-    const channelId = parts[0];
-    const channelName = parts[1];
-
-    lines.push(
-      `Voters needing attention for <slack://channel?team=${teamId}&id=${channelId}|#${channelName}>`
-    );
-    const threads = await DbApiUtil.getThreadsNeedingAttentionForChannel(
-      channelId
-    );
-
-    for (const thread of threads) {
-      const messageTs =
-        (await DbApiUtil.getThreadLatestMessageTs(
-          thread.slackParentMessageTs,
-          thread.channelId
-        )) || thread.slackParentMessageTs;
-      const url = await SlackApiUtil.getThreadPermalink(
-        thread.channelId,
-        messageTs
+    if (arg[0] === '#') {
+      // Slack did not escape it :(
+      const slackChannelIds = await RedisApiUtil.getHash(
+        redisClient,
+        'slackPodChannelIds'
       );
-      const owner = thread.volunteerSlackUserId
-        ? `<@${thread.volunteerSlackUserId}>`
-        : 'unassigned';
-      lines.push(
-        `:bust_in_silhouette: ${
-          thread.userId
-        } - ${owner} - age ${prettyTimeInterval(
-          thread.lastUpdateAge || 0
-        )} - <${url}|Open>`
-      );
+      channelName = arg.substr(1);
+      channelId = slackChannelIds[channelName];
+    } else {
+      // Slack escaped it for us
+      const parts = arg.substr(2, arg.length - 3).split('|');
+      channelId = parts[0];
+      channelName = parts[1];
     }
-  } else if (arg && arg[0] === '#') {
-    lines.push(`Unrecognized channel ${arg}`);
+
+    if (!channelId) {
+      lines.push(`Unrecognized channel ${arg}`);
+    } else {
+      lines.push(
+        `Voters needing attention for <slack://channel?team=${teamId}&id=${channelId}|#${channelName}>`
+      );
+      const threads = await DbApiUtil.getThreadsNeedingAttentionForChannel(
+        channelId
+      );
+
+      for (const thread of threads) {
+        const messageTs =
+          (await DbApiUtil.getThreadLatestMessageTs(
+            thread.slackParentMessageTs,
+            thread.channelId
+          )) || thread.slackParentMessageTs;
+        const url = await SlackApiUtil.getThreadPermalink(
+          thread.channelId,
+          messageTs
+        );
+        const owner = thread.volunteerSlackUserId
+          ? `<@${thread.volunteerSlackUserId}>`
+          : 'unassigned';
+        lines.push(
+          `:bust_in_silhouette: ${
+            thread.userId
+          } - ${owner} - age ${prettyTimeInterval(
+            thread.lastUpdateAge || 0
+          )} - <${url}|Open>`
+        );
+      }
+    }
   } else if (arg) {
     lines.push(
       `Unrecognized argument _${arg}_: pass * for summary by channel, a channel (_#foo_), or a user (_@bar_)`
