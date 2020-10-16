@@ -12,6 +12,8 @@ import { PromisifiedRedisClient } from './redis_client';
 import { UserInfo, SlackThreadInfo } from './types';
 import redisClient from './redis_client';
 
+const maxCommandLines = 100; // this is about half of slacks message size limit
+
 export type VoterStatusUpdate = VoterStatus | 'UNDO';
 
 export type SlackInteractionEventPayload = {
@@ -384,7 +386,8 @@ export async function handleCommandUnclaimed(
   channelId: string,
   channelName: string,
   userId: string,
-  text: string
+  text: string,
+  responseUrl: string
 ): Promise<void> {
   // command argument
   let arg = text;
@@ -454,27 +457,18 @@ export async function handleCommandUnclaimed(
         )} - <${url}|Open>`
       );
     }
+    if (lines.length >= maxCommandLines) {
+      lines.push('... (truncated for brevity) ...');
+      break;
+    }
   }
-  await SlackApiUtil.sendMessage('Unclaimed voters', {
-    channel: channelId,
-    unfurl_links: false,
-    unfurl_media: false,
-    blocks: [
-      {
-        type: 'section',
-        text: {
-          type: 'mrkdwn',
-          text: lines.join('\n'),
-        },
-      },
-    ],
-  });
+  await SlackApiUtil.sendEphemeralResponse(responseUrl, lines.join('\n'));
 }
 
 async function getNeedsAttentionList(userId: string): Promise<string[]> {
   const threads = (await DbApiUtil.getThreadsNeedingAttentionFor(userId)) || [];
 
-  const urls: string[] = [];
+  const lines: string[] = [];
   for (const thread of threads) {
     const messageTs =
       (await DbApiUtil.getThreadLatestMessageTs(
@@ -485,15 +479,16 @@ async function getNeedsAttentionList(userId: string): Promise<string[]> {
       thread.channelId,
       messageTs
     );
-    urls.push(url);
+    lines.push(
+      `:bust_in_silhouette: ${thread.userId} - age ${prettyTimeInterval(
+        thread.lastUpdateAge || 0
+      )} - <${url}|Open>`
+    );
+    if (lines.length >= maxCommandLines) {
+      lines.push('... (truncated for brevity) ...');
+      break;
+    }
   }
-
-  const lines = threads.map(
-    (x) =>
-      `:bust_in_silhouette: ${x.userId} - age ${prettyTimeInterval(
-        x.lastUpdateAge || 0
-      )} - <${urls.pop()}|Open>`
-  );
   return lines;
 }
 
@@ -503,7 +498,8 @@ export async function handleCommandNeedsAttention(
   channelName: string,
   userId: string,
   userName: string,
-  text: string
+  text: string,
+  responseUrl: string
 ): Promise<void> {
   // command argument
   let arg = text;
@@ -607,6 +603,10 @@ export async function handleCommandNeedsAttention(
             thread.lastUpdateAge || 0
           )} - <${url}|Open>`
         );
+        if (lines.length >= maxCommandLines) {
+          lines.push('... (truncated for brevity) ...');
+          break;
+        }
       }
     }
   } else if (arg) {
@@ -623,22 +623,7 @@ export async function handleCommandNeedsAttention(
     );
     lines = lines.concat(ulines);
   }
-
-  await SlackApiUtil.sendMessage(`Needs attention`, {
-    channel: channelId,
-    unfurl_links: false,
-    unfurl_media: false,
-    blocks: [
-      {
-        type: 'section',
-        text: {
-          type: 'mrkdwn',
-          text: lines.join('\n'),
-        },
-      },
-    ],
-  });
-  return;
+  await SlackApiUtil.sendEphemeralResponse(responseUrl, lines.join('\n'));
 }
 
 export async function handleShortcutShowNeedsAttention({

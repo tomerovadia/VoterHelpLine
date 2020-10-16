@@ -36,7 +36,8 @@ async function slackCommandHandler(
   userId: string,
   userName: string,
   command: string,
-  text: string
+  text: string,
+  responseUrl: string
 ) {
   logger.info(`channel ${channelId} command ${command} text ${text}`);
   switch (command) {
@@ -46,7 +47,8 @@ async function slackCommandHandler(
         channelId,
         channelName,
         userId,
-        text
+        text,
+        responseUrl
       );
       return;
     }
@@ -58,7 +60,8 @@ async function slackCommandHandler(
         channelName,
         userId,
         userName,
-        text
+        text,
+        responseUrl
       );
       return;
     }
