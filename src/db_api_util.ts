@@ -563,8 +563,13 @@ export async function updateThreadStatusFromMessage(
     let result;
     if (databaseMessageEntry.direction === 'INBOUND') {
       result = await client.query(
-        'UPDATE threads SET needs_attention = true, updated_at=NOW() WHERE slack_parent_message_ts = $1;',
-        [databaseMessageEntry.slackParentMessageTs]
+        `UPDATE threads
+        SET needs_attention = true, updated_at=NOW()
+        WHERE slack_parent_message_ts = $1 AND slack_channel_id = $2`,
+        [
+          databaseMessageEntry.slackParentMessageTs,
+          databaseMessageEntry.slackChannel,
+        ]
       );
     } else if (
       !databaseMessageEntry.automated &&
@@ -573,16 +578,28 @@ export async function updateThreadStatusFromMessage(
       (await getVoterHasVolunteer(databaseMessageEntry.userId))
     ) {
       result = await client.query(
-        'UPDATE threads SET needs_attention = false, updated_at=NOW() WHERE slack_parent_message_ts = $1;',
-        [databaseMessageEntry.slackParentMessageTs]
+        `UPDATE threads
+        SET needs_attention = false, updated_at=NOW()
+        WHERE slack_parent_message_ts = $1 AND slack_channel_id = $2`,
+        [
+          databaseMessageEntry.slackParentMessageTs,
+          databaseMessageEntry.slackChannel,
+        ]
       );
     } else {
       result = await client.query(
-        'UPDATE threads SET updated_at=NOW() WHERE slack_parent_message_ts = $1;',
-        [databaseMessageEntry.slackParentMessageTs]
+        `UPDATE threads
+        SET updated_at=NOW()
+        WHERE slack_parent_message_ts = $1 AND slack_channel_id = $2`,
+        [
+          databaseMessageEntry.slackParentMessageTs,
+          databaseMessageEntry.slackChannel,
+        ]
       );
     }
     if (result.rowCount == 0) {
+      // If the thread doesn't already exist (because this thread predates the creation
+      // of the threads table), create it now.
       await logThreadToDb({
         slackParentMessageTs: databaseMessageEntry.slackParentMessageTs,
         channelId: databaseMessageEntry.slackChannel,
