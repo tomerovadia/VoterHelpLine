@@ -700,14 +700,24 @@ export async function getUnclaimedVoters(
   const client = await pool.connect();
   try {
     let result = null;
+    const withPreamble = `WITH all_status AS (
+      SELECT
+        user_id, voter_status
+        , row_number() OVER (PARTITION BY user_id ORDER BY created_at DESC) AS rn
+      FROM voter_status_updates
+    ), latest_status AS (
+      SELECT user_id, voter_status FROM all_status WHERE rn=1
+    )`;
     if (channelId) {
       result = await client.query(
-        `SELECT
+        withPreamble +
+          `SELECT
           t.slack_parent_message_ts
           , t.slack_channel_id
           , t.user_id
           , EXTRACT(EPOCH FROM now() - t.updated_at) as last_update_age
         FROM threads t
+        LEFT JOIN latest_status s ON (t.user_id = s.user_id)
         WHERE
           t.needs_attention
           AND t.slack_channel_id = $1
@@ -715,23 +725,27 @@ export async function getUnclaimedVoters(
             SELECT FROM volunteer_voter_claims c
             WHERE t.user_id=c.user_id
           )
+          AND s.voter_status NOT IN ('REFUSED', 'SPAM')
         ORDER BY t.updated_at`,
         [channelId]
       );
     } else {
       result = await client.query(
-        `SELECT
+        withPreamble +
+          `SELECT
           t.slack_parent_message_ts
           , t.slack_channel_id
           , t.user_id
           , EXTRACT(EPOCH FROM now() - t.updated_at) as last_update_age
         FROM threads t
+        LEFT JOIN latest_status s ON (t.user_id = s.user_id)
         WHERE
           t.needs_attention
           AND NOT EXISTS (
             SELECT FROM volunteer_voter_claims c
             WHERE t.user_id=c.user_id
           )
+          AND s.voter_status NOT IN ('REFUSED', 'SPAM')
         ORDER BY t.updated_at`
       );
     }
