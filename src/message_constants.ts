@@ -1,7 +1,7 @@
 export function STATE_CONFIRMATION(state: string): string {
   switch (process.env.CLIENT_ORGANIZATION) {
     case 'VOTE_AMERICA':
-      return `Great! We are finding a ${state} volunteer. We try to reply within minutes but may take 24 hours. Meanwhile, please share more about how we can help.`;
+      return `Thanks! We are finding a ${state} volunteer. We try to reply within minutes but may take 24 hours. Meanwhile, please share more about how we can help.`;
     case 'VOTE_FROM_HOME_2020':
       return `Great! We are finding a ${state} volunteer. We try to reply within minutes but may take 24 hours. Meanwhile, please share more about how we can help.`;
     case 'VOTER_HELP_LINE':
