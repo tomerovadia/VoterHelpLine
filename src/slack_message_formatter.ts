@@ -1,22 +1,12 @@
 import { HistoricalMessage } from './types';
 import logger from './logger';
 
-const getMessageSender = (messageObject: HistoricalMessage, userId: string) => {
-  switch (messageObject.direction) {
-    case 'INBOUND':
-      return `${userId}:`;
-    case 'OUTBOUND':
-      if (messageObject.automated) {
-        return 'Automated:';
-      }
-      return `${messageObject.originating_slack_user_name}:`;
-    default:
-      logger.error(
-        'SLACKMESSAGEFORMATTER.formatMessageHistory: Error getting message sender: message is either INBOUND nor OUTBOUND'
-      );
-  }
-
-  return 'unknown';
+const formatMessageBlock = (msg: string, formatchar: string) => {
+  return msg
+    .split('\n')
+    .map((x) => (x ? formatchar + x + formatchar : x))
+    .map((x) => '>' + x)
+    .join('\n');
 };
 
 export function formatMessageHistory(
@@ -27,12 +17,30 @@ export function formatMessageHistory(
   const formattedMessages = messageObjects.map((messageObject) => {
     const timeSinceEpochSecs = Date.parse(messageObject.timestamp) / 1000;
     // See https://api.slack.com/reference/surfaces/formatting#visual-styles
-    const specialSlackTimestamp = `*(<!date^${timeSinceEpochSecs}^{date_num} {time_secs}|${messageObject.timestamp}>)*`;
-    const messageSender = `*${getMessageSender(messageObject, userId)}*`;
-    return [specialSlackTimestamp, messageSender, messageObject.message].join(
-      ' '
-    );
+    const specialSlackTimestamp = `<!date^${timeSinceEpochSecs}^{time} {date_short}|${messageObject.timestamp}>`;
+    if (messageObject.direction == 'INBOUND') {
+      return (
+        `:bust_in_silhouette: *Voter ${userId}*  ` +
+        specialSlackTimestamp +
+        '\n' +
+        formatMessageBlock(messageObject.message, '*')
+      );
+    } else if (messageObject.automated) {
+      return (
+        ':gear: *Helpline*  ' +
+        specialSlackTimestamp +
+        '\n' +
+        formatMessageBlock(messageObject.message, '_')
+      );
+    } else {
+      return (
+        ':adult: *Helpline*  ' +
+        specialSlackTimestamp +
+        '\n' +
+        formatMessageBlock(messageObject.message, '')
+      );
+    }
   });
 
-  return formattedMessages.join('\n');
+  return formattedMessages.join('\n\n');
 }

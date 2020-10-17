@@ -35,6 +35,12 @@ const requireModules = () => {
   RedisApiUtil.setHash = jest.fn();
   DbApiUtil.getMessageHistoryFor = jest.fn();
   DbApiUtil.logVoterStatusToDb = jest.fn();
+  DbApiUtil.logThreadToDb = jest.fn();
+  DbApiUtil.setThreadNeedsAttentionToDb = jest.fn();
+  DbApiUtil.getThreadNeedsAttentionFor = jest.fn();
+  DbApiUtil.setThreadHistoryTs = jest.fn();
+  DbApiUtil.updateThreadStatusFromMessage = jest.fn();
+
   SlackBlockUtil.populateDropdownWithLatestVoterStatus = jest.fn();
 };
 
@@ -170,14 +176,6 @@ describe('handleNewVoter', () => {
     });
   });
 
-  test('Includes truncated user id in new voter announcement in Slack', () => {
-    const MD5 = new Hashes.MD5();
-    const userId = MD5.hex('+1234567890');
-    expect(SlackApiUtil.sendMessage.mock.calls[0][0]).toContain(
-      userId.substring(0, 5)
-    );
-  });
-
   test('Relays voter message in subsequent message to Slack', () => {
     expect(SlackApiUtil.sendMessage.mock.calls[1][0]).toEqual(
       expect.stringContaining('can you help me vote')
@@ -207,14 +205,6 @@ describe('handleNewVoter', () => {
       userInfo.lastVoterMessageSecsFromEpoch;
     expect(newLastVoterMessageSecsFromEpoch - secsFromEpochNow).toBeLessThan(
       10
-    );
-  });
-
-  test('Includes truncated user id in relay of voter message', () => {
-    const MD5 = new Hashes.MD5();
-    const userId = MD5.hex('+1234567890');
-    expect(SlackApiUtil.sendMessage.mock.calls[1][0]).toEqual(
-      expect.stringContaining(userId.substring(0, 5))
     );
   });
 
@@ -481,14 +471,6 @@ describe('determineVoterState', () => {
     test('Passes voter message to Slack', () => {
       expect(SlackApiUtil.sendMessage.mock.calls[0][0]).toContain(
         'nonsensical statement'
-      );
-    });
-
-    test('Includes truncated user id in passing voter message to Slack', () => {
-      const MD5 = new Hashes.MD5();
-      const userId = MD5.hex('+1234567890');
-      expect(SlackApiUtil.sendMessage.mock.calls[0][0]).toContain(
-        userId.substring(0, 5)
       );
     });
 
@@ -1569,11 +1551,11 @@ describe('handleClearedVoter', () => {
     });
   });
 
-  test("Sends voter a welcome back text if it's been longer than 1 hour", () => {
+  test("Sends voter a welcome back text if it's been longer than 24 hours", () => {
     expect.assertions(2);
-    const oneHourAndOneMinInSecs = 60 * 60 + 60;
+    const twentyFourHoursAndOneMinInSecs = 60 * 60 * 24 + 60;
     const mockLastVoterMessageSecsFromEpoch = Math.round(
-      Date.now() / 1000 - oneHourAndOneMinInSecs
+      Date.now() / 1000 - twentyFourHoursAndOneMinInSecs
     );
     const userInfo = {
       activeChannelId: 'CNORTHCAROLINACHANNELID',

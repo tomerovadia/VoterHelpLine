@@ -12,7 +12,6 @@ import * as Sentry from '@sentry/node';
 import * as SlackApiUtil from './slack_api_util';
 import * as RedisApiUtil from './redis_api_util';
 import * as SlackInteractionHandler from './slack_interaction_handler';
-import { SlackActionId, SlackCallbackId } from './slack_interaction_ids';
 import * as Router from './router';
 import logger from './logger';
 import redisClient from './redis_client';
@@ -27,6 +26,7 @@ import {
 import { wrapLambdaHandlerForSentry } from './sentry_wrapper';
 import { SlackEventRequestBody } from './router';
 import { UserInfo } from './types';
+import { SlackActionId, SlackCallbackId } from './slack_interaction_ids';
 
 export type InteractivityHandlerMetadata = { viewId?: string };
 
@@ -42,6 +42,46 @@ function getViewId(
   throw new Error('slackInteractivityHandler called without viewId');
 }
 
+async function slackCommandHandler(
+  teamId: string,
+  channelId: string,
+  channelName: string,
+  userId: string,
+  userName: string,
+  command: string,
+  text: string,
+  responseUrl: string
+) {
+  logger.info(`channel ${channelId} command ${command} text ${text}`);
+  switch (command) {
+    case '/unclaimed': {
+      await SlackInteractionHandler.handleCommandUnclaimed(
+        teamId,
+        channelId,
+        channelName,
+        userId,
+        text,
+        responseUrl
+      );
+      return;
+    }
+    case '/todo':
+    case '/needs-attention': {
+      await SlackInteractionHandler.handleCommandNeedsAttention(
+        teamId,
+        channelId,
+        channelName,
+        userId,
+        userName,
+        text,
+        responseUrl
+      );
+      return;
+    }
+  }
+  throw new Error(`Unrecognized command ${command}`);
+}
+
 async function slackInteractivityHandler(
   payload: SlackInteractionEventPayload,
   interactivityMetadata: InteractivityHandlerMetadata
@@ -55,162 +95,90 @@ async function slackInteractivityHandler(
     );
   }
 
-  if (
-    payload.type === 'shortcut' &&
-    payload.callback_id === SlackCallbackId.OPEN_CLOSE_CHANNELS
-  ) {
-    logger.info(
-      `SERVER POST /slack-interactivity: Determined user interaction is a OPEN_CLOSE_CHANNELS  shortcut.`
-    );
-
-    await SlackInteractionHandler.handleOpenCloseChannels({
-      payload,
-      redisClient,
-      originatingSlackUserName,
-      viewId: getViewId(payload, interactivityMetadata),
-    });
-    return;
-  }
-
-  // Handle open/close modal actions
-  if (
-    payload.type === 'block_actions' &&
-    payload.actions &&
-    [
-      SlackActionId.OPEN_CLOSE_CHANNELS_FILTER_STATE,
-      SlackActionId.OPEN_CLOSE_CHANNELS_FILTER_TYPE,
-    ].includes(payload.actions[0].action_id as SlackActionId)
-  ) {
-    logger.info(
-      `SERVER POST /slack-interactivity: Determined user interaction is in OPEN_CLOSE_CHANNELS modal`
-    );
-
-    const view = payload.view;
-    if (!view) {
-      throw new Error('OPEN_CLOSE_CHANNELS block_actions expected view');
+  // Global shortcut
+  if (payload.type === 'shortcut') {
+    const { viewId } = interactivityMetadata;
+    if (!viewId) {
+      throw new Error(
+        'slackInteractivityHandler called for message_action without viewId'
+      );
     }
+    switch (payload.callback_id) {
+      case SlackCallbackId.SHOW_NEEDS_ATTENTION: {
+        await SlackInteractionHandler.handleShortcutShowNeedsAttention({
+          payload,
+          viewId,
+        });
+        return;
+      }
 
-    await SlackInteractionHandler.handleOpenCloseChannels({
-      payload,
-      redisClient,
-      originatingSlackUserName,
-      viewId: getViewId(payload, interactivityMetadata),
-      values: payload?.view?.state?.values,
-      action: payload.actions[0],
-    });
-    return;
+      case SlackCallbackId.OPEN_CLOSE_CHANNELS: {
+        logger.info(
+          `SERVER POST /slack-interactivity: Determined user interaction is a OPEN_CLOSE_CHANNELS_MODAL submission.`
+        );
+        await SlackInteractionHandler.handleOpenCloseChannels({
+          payload,
+          redisClient,
+          originatingSlackUserName,
+          viewId: getViewId(payload, interactivityMetadata),
+          values: payload?.view?.state?.values,
+          isSubmission: true,
+        });
+        return;
+      }
+    }
+    throw new Error(`Unrecognized shortcut ${payload.callback_id}`);
   }
 
-  // Handle open/close modal submission
-  if (
-    payload.type === 'view_submission' &&
-    payload.view?.callback_id === SlackCallbackId.OPEN_CLOSE_CHANNELS_MODAL
-  ) {
-    logger.info(
-      `SERVER POST /slack-interactivity: Determined user interaction is a OPEN_CLOSE_CHANNELS_MODAL submission.`
+  // Message shortcut
+  if (payload.type === 'message_action') {
+    const originatingSlackChannelName = await SlackApiUtil.fetchSlackChannelName(
+      payload.channel.id
     );
-
-    await SlackInteractionHandler.handleOpenCloseChannels({
-      payload,
-      redisClient,
-      originatingSlackUserName,
-      viewId: getViewId(payload, interactivityMetadata),
-      values: payload?.view?.state?.values,
-      isSubmission: true,
-    });
-    return;
-  }
-
-  // Confirmation modal submission
-  if (
-    payload.type === 'view_submission' &&
-    payload.view?.callback_id ===
-      SlackCallbackId.OPEN_CLOSE_CHANNELS_CONFIRM_MODAL
-  ) {
-    logger.info(
-      `SERVER POST /slack-interactivity: Determined user interaction is a OPEN_CLOSE_CHANNELS_MODAL_CONFIRM submission.`
-    );
-
-    await SlackInteractionHandler.handleOpenCloseChannels({
-      payload,
-      redisClient,
-      originatingSlackUserName,
-      viewId: payload?.view?.root_view_id,
-      values: JSON.parse(payload?.view?.private_metadata),
-      isSubmission: true,
-    });
-    return;
-  }
-
-  if (
-    payload.type === 'block_actions' &&
-    payload.actions[0].action_id ===
-      SlackActionId.OPEN_CLOSE_CHANNELS_CHANNEL_STATE_DROPDOWN
-  ) {
-    // Noop -- this gets handled with submission
-    return;
-  }
-
-  if (payload.type === 'block_actions' || payload.type === 'message_action') {
-    const originatingSlackChannelName =
-      payload.channel &&
-      (await SlackApiUtil.fetchSlackChannelName(payload.channel.id));
 
     const redisHashKey = `${payload.channel.id}:${payload.message.ts}`;
     const redisData = await RedisApiUtil.getHash(redisClient, redisHashKey);
 
-    // Exempt message_action, which will be handled later by updating the Slack user's modal.
-    if (!(payload.type === 'message_action')) {
-      if (!originatingSlackChannelName) {
-        throw new Error(
-          `Could not get slack channel name for Slack channel ${payload.channel.id}`
+    logger.info(
+      `SERVER POST /slack-interactivity: Determined user interaction is a message shortcut.`
+    );
+
+    switch (payload.callback_id) {
+      case SlackCallbackId.SET_NEEDS_ATTENTION: {
+        // Use thread if message is threaded; original channel msg if there is no thread yet
+        await DbApiUtil.setThreadNeedsAttentionToDb(
+          payload.message.thread_ts || payload.message.ts,
+          payload.channel.id,
+          true
         );
-      }
-      if (!redisData) {
-        logger.debug(
-          `SERVER POST /slack-interactivity: Received an interaction for a voter who no longer exists in Redis.`
+        await SlackApiUtil.sendMessage(
+          '*Operator:* Marked thread as *Needs Attention*',
+          {
+            parentMessageTs: payload.message.thread_ts || payload.message.ts,
+            channel: payload.channel.id,
+          }
         );
         return;
       }
-    }
 
-    switch (payload.type) {
-      case 'block_actions': {
-        const selectedVoterStatus = payload.actions[0].selected_option
-          ? payload.actions[0].selected_option.value
-          : payload.actions[0].value;
-        if (selectedVoterStatus) {
-          logger.info(
-            `SERVER POST /slack-interactivity: Determined user interaction is a voter status update or undo.`
-          );
-          await SlackInteractionHandler.handleVoterStatusUpdate({
-            payload,
-            selectedVoterStatus: selectedVoterStatus as SlackInteractionHandler.VoterStatusUpdate,
-            originatingSlackUserName,
-            slackChannelName: originatingSlackChannelName,
-            userPhoneNumber: redisData ? redisData.userPhoneNumber : null,
-            twilioPhoneNumber: redisData ? redisData.twilioPhoneNumber : null,
-            redisClient,
-          });
-        } else if (payload.actions[0].selected_user) {
-          logger.info(
-            `SERVER POST /slack-interactivity: Determined user interaction is a volunteer update.`
-          );
-          await SlackInteractionHandler.handleVolunteerUpdate({
-            payload,
-            originatingSlackUserName,
-            slackChannelName: originatingSlackChannelName,
-            userPhoneNumber: redisData ? redisData.userPhoneNumber : null,
-            twilioPhoneNumber: redisData ? redisData.twilioPhoneNumber : null,
-          });
-        }
+      case SlackCallbackId.CLEAR_NEEDS_ATTENTION: {
+        // Use thread if message is threaded; original channel msg if there is no thread yet
+        await DbApiUtil.setThreadNeedsAttentionToDb(
+          payload.message.thread_ts || payload.message.ts,
+          payload.channel.id,
+          false
+        );
+        await SlackApiUtil.sendMessage(
+          '*Operator:* Cleared *Needs Attention*',
+          {
+            parentMessageTs: payload.message.thread_ts || payload.message.ts,
+            channel: payload.channel.id,
+          }
+        );
         return;
       }
-      case 'message_action': {
-        logger.info(
-          `SERVER POST /slack-interactivity: Determined user interaction is a message shortcut.`
-        );
 
+      case SlackCallbackId.RESET_DEMO: {
         const { viewId } = interactivityMetadata;
         if (!viewId) {
           throw new Error(
@@ -250,24 +218,144 @@ async function slackInteractivityHandler(
           return;
         }
 
-        if (payload.callback_id === SlackCallbackId.RESET_DEMO) {
-          await SlackInteractionHandler.receiveResetDemo({
-            payload,
-            redisClient,
-            modalPrivateMetadata,
-            twilioPhoneNumber: redisData ? redisData.twilioPhoneNumber : null,
-            userId: MD5.hex(redisData.userPhoneNumber),
-            viewId: getViewId(payload, interactivityMetadata),
-          });
-          return;
-        }
-        break;
+        await SlackInteractionHandler.receiveResetDemo({
+          payload,
+          redisClient,
+          modalPrivateMetadata,
+          twilioPhoneNumber: redisData.twilioPhoneNumber,
+          userId: MD5.hex(redisData.userPhoneNumber),
+          viewId,
+        });
+        return;
+      }
+
+      default: {
+        throw new Error(
+          `slackInteractivityHandler unrecognized callback_id ${payload.callback_id}`
+        );
       }
     }
   }
 
-  // If the interaction is confirmation of a modal.
+  // Block action
+  if (payload.type === 'block_actions') {
+    const actionId = payload.actions[0]?.action_id;
+    switch (actionId) {
+      case SlackActionId.OPEN_CLOSE_CHANNELS_FILTER_STATE:
+      case SlackActionId.OPEN_CLOSE_CHANNELS_FILTER_TYPE: {
+        logger.info(
+          `SERVER POST /slack-interactivity: Determined user interaction is in OPEN_CLOSE_CHANNELS modal`
+        );
+
+        const view = payload.view;
+        if (!view) {
+          throw new Error('OPEN_CLOSE_CHANNELS block_actions expected view');
+        }
+
+        await SlackInteractionHandler.handleOpenCloseChannels({
+          payload,
+          redisClient,
+          originatingSlackUserName,
+          viewId: getViewId(payload, interactivityMetadata),
+          values: payload?.view?.state?.values,
+          action: payload.actions[0],
+        });
+        return;
+      }
+
+      case SlackActionId.OPEN_CLOSE_CHANNELS_CHANNEL_STATE_DROPDOWN: {
+        // Noop -- this gets handled with submission
+        return;
+      }
+    }
+
+    // Fallback behavior for block actions introduced prior to use of action IDs
+    const originatingSlackChannelName = await SlackApiUtil.fetchSlackChannelName(
+      payload.channel.id
+    );
+    if (!originatingSlackChannelName) {
+      throw new Error(
+        `Could not get slack channel name for Slack channel ${payload.channel.id}`
+      );
+    }
+
+    const redisHashKey = `${payload.channel.id}:${payload.message.ts}`;
+    const redisData = await RedisApiUtil.getHash(redisClient, redisHashKey);
+    if (!redisData) {
+      logger.debug(
+        `SERVER POST /slack-interactivity: Received an interaction for a voter who no longer exists in Redis.`
+      );
+      return;
+    }
+
+    const selectedVoterStatus = payload.actions[0].selected_option
+      ? payload.actions[0].selected_option.value
+      : payload.actions[0].value;
+    if (selectedVoterStatus) {
+      logger.info(
+        `SERVER POST /slack-interactivity: Determined user interaction is a voter status update or undo.`
+      );
+      await SlackInteractionHandler.handleVoterStatusUpdate({
+        payload,
+        selectedVoterStatus: selectedVoterStatus as SlackInteractionHandler.VoterStatusUpdate,
+        originatingSlackUserName,
+        slackChannelName: originatingSlackChannelName,
+        userPhoneNumber: redisData ? redisData.userPhoneNumber : null,
+        twilioPhoneNumber: redisData ? redisData.twilioPhoneNumber : null,
+        redisClient,
+      });
+    } else if (payload.actions[0].selected_user) {
+      logger.info(
+        `SERVER POST /slack-interactivity: Determined user interaction is a volunteer update.`
+      );
+      await SlackInteractionHandler.handleVolunteerUpdate({
+        payload,
+        originatingSlackUserName,
+        slackChannelName: originatingSlackChannelName,
+        userPhoneNumber: redisData ? redisData.userPhoneNumber : null,
+        twilioPhoneNumber: redisData ? redisData.twilioPhoneNumber : null,
+      });
+    }
+    return;
+  }
+
+  // If the interaction is submission of a modal.
   if (payload.type === 'view_submission') {
+    switch (payload.callback_id) {
+      case SlackCallbackId.OPEN_CLOSE_CHANNELS_MODAL: {
+        logger.info(
+          `SERVER POST /slack-interactivity: Determined user interaction is a OPEN_CLOSE_CHANNELS_MODAL submission.`
+        );
+
+        await SlackInteractionHandler.handleOpenCloseChannels({
+          payload,
+          redisClient,
+          originatingSlackUserName,
+          viewId: getViewId(payload, interactivityMetadata),
+          values: payload?.view?.state?.values,
+          isSubmission: true,
+        });
+        return;
+      }
+
+      case SlackCallbackId.OPEN_CLOSE_CHANNELS_CONFIRM_MODAL: {
+        logger.info(
+          `SERVER POST /slack-interactivity: Determined user interaction is a OPEN_CLOSE_CHANNELS_MODAL_CONFIRM submission.`
+        );
+
+        await SlackInteractionHandler.handleOpenCloseChannels({
+          payload,
+          redisClient,
+          originatingSlackUserName,
+          viewId: payload?.view?.root_view_id,
+          values: JSON.parse(payload?.view?.private_metadata),
+          isSubmission: true,
+        });
+        return;
+      }
+    }
+
+    // This modal uses private_metadata instead of a calblack ID.
     // Get the data associated with the modal used for execution of the
     // action it confirmed.
     const modalPrivateMetadata = JSON.parse(
@@ -284,7 +372,9 @@ async function slackInteractivityHandler(
     // exit and continue down to throw an error.
   }
 
-  throw new Error(`Received an unexpected Slack interaction.`);
+  throw new Error(
+    `Received an unexpected Slack interaction: ${JSON.stringify(payload)}`
+  );
 }
 
 async function slackMessageEventHandler(
@@ -391,6 +481,7 @@ const BACKGROUND_TASKS = {
   slackInteractivityHandler,
   slackMessageEventHandler,
   slackAppMentionEventHandler,
+  slackCommandHandler,
 };
 
 export async function enqueueBackgroundTask(

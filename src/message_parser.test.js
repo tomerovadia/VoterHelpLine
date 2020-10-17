@@ -53,4 +53,11 @@ describe('processMessageText', () => {
       'You can call +18551234567 for additional help and register here: https://registration.elections.myflorida.com/CheckVoterStatus.';
     expect(MessageParser.processMessageText(input)).toBe(expected);
   });
+
+  test('Replaces emoji', () => {
+    const input = 'a :cry: b :joy_cat: c :heart: d :pride: e :bowtie:';
+    const expected = 'a 😢 b 😹 c ❤️ d :pride: e :bowtie:';
+
+    expect(MessageParser.processMessageText(input)).toBe(expected);
+  });
 });

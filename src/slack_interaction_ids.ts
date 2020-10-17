@@ -8,6 +8,9 @@ export enum SlackCallbackId {
   OPEN_CLOSE_CHANNELS_ERROR_MODAL = 'open_close_channels_error_modal',
   RESET_DEMO = 'reset_demo',
   RESET_DEMO_MODAL = 'reset_demo_modal',
+  SHOW_NEEDS_ATTENTION = 'show_needs_attention',
+  SET_NEEDS_ATTENTION = 'set_needs_attention',
+  CLEAR_NEEDS_ATTENTION = 'clear_needs_attention',
 }
 
 // Action IDs are used in interactive blocks

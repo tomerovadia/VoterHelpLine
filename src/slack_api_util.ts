@@ -26,12 +26,73 @@ type SlackSendMessageResponse = {
 type SlackSendMessageOptions = {
   channel: string;
   parentMessageTs?: string;
+  parse?: boolean;
+  unfurl_links?: boolean;
+  unfurl_media?: boolean;
   blocks?: SlackBlock[];
 };
 
 type SlackChannelNamesAndIds = {
   [channelId: string]: string; // mapping of channel ID to channel name
 };
+
+export async function getThreadPermalink(
+  channel: string,
+  message_ts: string
+): Promise<string> {
+  try {
+    // Pick the newest message in the thread
+    const response = await slackAPI.get('chat.getPermalink', {
+      params: {
+        channel: channel,
+        message_ts: message_ts,
+        token: process.env.SLACK_BOT_ACCESS_TOKEN,
+      },
+    });
+    if (!response.data.ok) {
+      logger.error(
+        `SLACKAPIUTIL.getThreadPermalink: ERROR: ${JSON.stringify(
+          response.data
+        )}`
+      );
+    }
+    return response.data.permalink;
+  } catch (error) {
+    logger.error(`SLACKAPIUTIL.getThreadPermalink: ERROR in getting permalink message,
+                  channel: ${channel},
+                  message_ts: ${message_ts}`);
+    throw error;
+  }
+}
+
+export async function sendEphemeralResponse(
+  url: string,
+  message: string
+): Promise<void> {
+  try {
+    const response = await axios.post(url, {
+      text: message,
+      token: process.env.SLACK_BOT_ACCESS_TOKEN,
+      unfurl_media: false,
+      response_type: 'ephemeral',
+    });
+
+    if (!response.data.ok) {
+      throw new Error(
+        `SLACKAPIUTIL.sendEphemeralResponse: ERROR in sending Slack message: ${JSON.stringify(
+          response.data
+        )}`
+      );
+    }
+  } catch (error) {
+    logger.error(
+      `SLACKAPIUTIL.sendEphemeralResponse: ERROR in sending Slack response. Error data from Slack: ${JSON.stringify(
+        error
+      )}`
+    );
+    Sentry.captureException(error);
+  }
+}
 
 export async function sendMessage(
   message: string,
@@ -68,6 +129,7 @@ export async function sendMessage(
       token: process.env.SLACK_BOT_ACCESS_TOKEN,
       thread_ts: options.parentMessageTs,
       blocks: options.blocks,
+      unfurl_media: false,
     });
 
     if (!response.data.ok) {
@@ -95,6 +157,7 @@ export async function sendMessage(
 
       try {
         await DbApiUtil.logMessageToDb(databaseMessageEntry);
+        await DbApiUtil.updateThreadStatusFromMessage(databaseMessageEntry);
       } catch (error) {
         logger.info(
           `SLACKAPIUTIL.sendMessage: failed to log message send success to DB`
@@ -247,32 +310,63 @@ export async function fetchSlackMessageBlocks(
 
 export async function fetchSlackChannelNamesAndIds(): Promise<SlackChannelNamesAndIds | null> {
   logger.info(`ENTERING SLACKAPIUTIL.fetchSlackChannelNamesAndIds`);
-  const response = await slackAPI.get('conversations.list', {
+  const firstPageResponse = await slackAPI.get('conversations.list', {
     params: {
       token: process.env.SLACK_BOT_ACCESS_TOKEN,
       types: 'private_channel',
     },
   });
 
-  if (response.data.ok) {
-    logger.info(
-      `SLACKAPIUTIL.fetchSlackChannelNamesAndIds: Successfully fetched Slack channel names and IDs.`
-    );
-    const slackChannelNamesAndIds = {} as SlackChannelNamesAndIds;
-    for (const idx in response.data.channels) {
-      const channel = response.data.channels[idx];
-      slackChannelNamesAndIds[channel.name] = channel.id;
-    }
-    return slackChannelNamesAndIds;
-    // return response.data.messages[0].blocks;
-  } else {
+  if (!firstPageResponse.data.ok) {
     logger.error(
-      `SLACKAPIUTIL.fetchSlackChannelNamesAndIds: ERROR fetching Slack channel names and IDs. Error: response.data: ${JSON.stringify(
-        response.data
+      `SLACKAPIUTIL.fetchSlackChannelNamesAndIds: ERROR fetching initial page of Slack channel names and IDs. Error: response.data: ${JSON.stringify(
+        firstPageResponse.data
       )}`
     );
     return null;
   }
+  logger.info(
+    `SLACKAPIUTIL.fetchSlackChannelNamesAndIds: Successfully fetched first page of Slack channel names and IDs.`
+  );
+
+  let channels = firstPageResponse.data.channels;
+  let cursor = firstPageResponse.data.response_metadata.next_cursor;
+  // Slack will return a (falsy) empty string when there is no next page.
+  // See 'Pagination' on this reference: https://api.slack.com/methods/conversations.list
+  while (cursor) {
+    logger.info(
+      `SLACKAPIUTIL.fetchSlackChannelNamesAndIds: Fetching subsequent page of Slack channel names and IDs (cursor: ${cursor}).`
+    );
+    const subsequentPageResponse = await slackAPI.get('conversations.list', {
+      params: {
+        token: process.env.SLACK_BOT_ACCESS_TOKEN,
+        types: 'private_channel',
+        cursor,
+      },
+    });
+
+    if (subsequentPageResponse.data.ok) {
+      logger.info(
+        `SLACKAPIUTIL.fetchSlackChannelNamesAndIds: Successfully fetched subsequent page of Slack channel names and IDs (cursor: ${cursor}).`
+      );
+      cursor = subsequentPageResponse.data.response_metadata.next_cursor;
+      channels = channels.concat(subsequentPageResponse.data.channels);
+    } else {
+      logger.error(
+        `SLACKAPIUTIL.fetchSlackChannelNamesAndIds: ERROR fetching subsequent page of Slack channel names and IDs. Error: response.data: ${JSON.stringify(
+          firstPageResponse.data
+        )}`
+      );
+      break;
+    }
+  }
+
+  const slackChannelNamesAndIds = {} as SlackChannelNamesAndIds;
+  for (const idx in channels) {
+    const channel = channels[idx];
+    slackChannelNamesAndIds[channel.name] = channel.id;
+  }
+  return slackChannelNamesAndIds;
 }
 
 export async function updateSlackChannelNamesAndIdsInRedis(
@@ -319,6 +413,35 @@ export async function addSlackMessageReaction(
     throw new Error(
       `SLACKAPIUTIL.addSlackMessageReaction: ERROR in adding reaction: ${response.data.error}`
     );
+  }
+}
+
+export async function isMemberOfAdminChannel(
+  slackUserId: string
+): Promise<boolean> {
+  const channelId = process.env.ADMIN_CONTROL_ROOM_SLACK_CHANNEL_ID;
+
+  // TODO: Consider caching this data. For now, calling every time is the best
+  // way to maintain security though.
+  const response = await slackAPI.get('conversations.members', {
+    params: {
+      channel: channelId,
+      token: process.env.SLACK_BOT_ACCESS_TOKEN,
+    },
+  });
+
+  if (response.data.ok) {
+    logger.info(
+      `SLACKAPIUTIL.isMemberOfAdminChannel: Successfully called isMemberOfAdminChannel`
+    );
+    return response.data.members.includes(slackUserId);
+  } else {
+    logger.error(
+      `SLACKAPIUTIL.isMemberOfAdminChannel: Failed to call conversations.members for ${channelId}. Error: response.data: ${JSON.stringify(
+        response.data
+      )}`
+    );
+    return false;
   }
 }
 
@@ -383,34 +506,5 @@ export async function updateModal(
         view.callback_id
       }). response.data: ${JSON.stringify(response.data)}`
     );
-  }
-}
-
-export async function isMemberOfAdminChannel(
-  slackUserId: string
-): Promise<boolean> {
-  const channelId = process.env.ADMIN_CONTROL_ROOM_SLACK_CHANNEL_ID;
-
-  // TODO: Consider caching this data. For now, calling every time is the best
-  // way to maintain security though.
-  const response = await slackAPI.get('conversations.members', {
-    params: {
-      channel: channelId,
-      token: process.env.SLACK_BOT_ACCESS_TOKEN,
-    },
-  });
-
-  if (response.data.ok) {
-    logger.info(
-      `SLACKAPIUTIL.isMemberOfAdminChannel: Successfully called isMemberOfAdminChannel`
-    );
-    return response.data.members.includes(slackUserId);
-  } else {
-    logger.error(
-      `SLACKAPIUTIL.isMemberOfAdminChannel: Failed to call conversations.members for ${channelId}. Error: response.data: ${JSON.stringify(
-        response.data
-      )}`
-    );
-    return false;
   }
 }

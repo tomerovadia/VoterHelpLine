@@ -17,7 +17,7 @@ import { EntryPoint, UserInfo } from './types';
 import { PromisifiedRedisClient } from './redis_client';
 import * as Sentry from '@sentry/node';
 
-const MINS_BEFORE_WELCOME_BACK_MESSAGE = 60;
+const MINS_BEFORE_WELCOME_BACK_MESSAGE = 60 * 24;
 export const NUM_STATE_SELECTION_ATTEMPTS_LIMIT = 2;
 
 type UserOptions = {
@@ -129,7 +129,9 @@ const introduceNewVoterToSlackChannel = async (
   inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry,
   entryPoint: EntryPoint,
   slackChannelName: string,
-  twilioCallbackURL: string
+  twilioCallbackURL: string,
+  // This is only used by VOTE_AMERICA
+  includeWelcome?: boolean
 ) => {
   logger.debug('ENTERING ROUTER.introduceNewVoterToSlackChannel');
   logger.debug(
@@ -140,7 +142,7 @@ const introduceNewVoterToSlackChannel = async (
     `ROUTER.introduceNewVoterToSlackChannel: Announcing new voter via new thread in ${slackChannelName}.`
   );
   // In Slack, create entry channel message, followed by voter's message and intro text.
-  const operatorMessage = `<!channel> New voter!\n*User ID:* ${userInfo.userId}\n*Connected via:* ${twilioPhoneNumber} (${entryPoint})`;
+  const operatorMessage = `New voter!\n*User ID:* ${userInfo.userId}\n*Connected via:* ${twilioPhoneNumber} (${entryPoint})`;
 
   const slackBlocks = SlackBlockUtil.getVoterStatusBlocks(operatorMessage);
 
@@ -151,7 +153,13 @@ const introduceNewVoterToSlackChannel = async (
 
   let messageToVoter;
   if (process.env.CLIENT_ORGANIZATION === 'VOTE_AMERICA') {
-    messageToVoter = MessageConstants.STATE_QUESTION();
+    if (includeWelcome) {
+      // Voter initiated conversation with "HELPLINE".
+      messageToVoter = MessageConstants.WELCOME_AND_STATE_QUESTION();
+    } else {
+      // Voter has already received automated welcome and is just now responding with "HELPLINE".
+      messageToVoter = MessageConstants.STATE_QUESTION();
+    }
   } else {
     messageToVoter = MessageConstants.WELCOME_VOTER();
   }
@@ -194,6 +202,15 @@ const introduceNewVoterToSlackChannel = async (
   // Remember the thread for this user and this channel,
   // using the ID version of the channel.
   userInfo[response.data.channel] = response.data.ts;
+
+  // Create the thread
+  await DbApiUtil.logThreadToDb({
+    slackParentMessageTs: response.data.ts,
+    channelId: response.data.channel,
+    userId: userInfo.userId,
+    userPhoneNumber: userInfo.userPhoneNumber,
+    needsAttention: true,
+  });
 
   // Set active channel to this first channel, since the voter is new.
   // Makes sure subsequent messages from the voter go to this channel, unless
@@ -243,13 +260,13 @@ const introduceNewVoterToSlackChannel = async (
     );
   } else if (entryPoint === LoadBalancer.PULL_ENTRY_POINT) {
     // Pass the voter's message along to the initial Slack channel thread,
-    // and show in the Slack  thread the welcome message the voter received
+    // and show in the Slack thread the welcome message the voter received
     // in response.
     logger.debug(
       `ROUTER.introduceNewVoterToSlackChannel: Passing voter message to Slack, slackChannelName: ${slackChannelName}, parentMessageTs: ${response.data.ts}.`
     );
     await SlackApiUtil.sendMessage(
-      `*${userInfo.userId.substring(0, 5)}:* ${userMessage}`,
+      `${userMessage}`,
       { parentMessageTs: response.data.ts, channel: response.data.channel },
       inboundDbMessageEntry,
       userInfo
@@ -293,7 +310,8 @@ export async function handleNewVoter(
   twilioPhoneNumber: string,
   inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry,
   entryPoint: EntryPoint,
-  twilioCallbackURL: string
+  twilioCallbackURL: string,
+  includeWelcome?: boolean
 ): Promise<void> {
   logger.debug('ENTERING ROUTER.handleNewVoter');
   const userMessage = userOptions.userMessage;
@@ -355,7 +373,8 @@ export async function handleNewVoter(
     inboundDbMessageEntry,
     entryPoint,
     slackChannelName,
-    twilioCallbackURL
+    twilioCallbackURL,
+    includeWelcome
   );
 }
 
@@ -393,13 +412,20 @@ const postUserMessageHistoryToSlack = async (
     userId.substring(0, 5)
   );
 
-  await SlackApiUtil.sendMessage(
+  const msgInfo = await SlackApiUtil.sendMessage(
     `*Operator:* ${messageHistoryContextText}\n\n${formattedMessageHistory}`,
     {
       parentMessageTs: destinationSlackParentMessageTs,
       channel: destinationSlackChannelId,
     }
   );
+  if (msgInfo) {
+    await DbApiUtil.setThreadHistoryTs(
+      destinationSlackParentMessageTs,
+      destinationSlackChannelId,
+      msgInfo.data.ts
+    );
+  }
 };
 
 // This helper handles all tasks associated with routing a voter to a new
@@ -563,6 +589,17 @@ const routeVoterToSlackChannel = async (
     );
   }
 
+  // The old thread no longer needs attention
+  const needsAttention = await DbApiUtil.getThreadNeedsAttentionFor(
+    userInfo[userInfo.activeChannelId],
+    userInfo.activeChannelId
+  );
+  await DbApiUtil.setThreadNeedsAttentionToDb(
+    userInfo[userInfo.activeChannelId],
+    userInfo.activeChannelId,
+    false
+  );
+
   // Remove the voter status panel from the old thread, in which the voter is no longer active.
   // Note: First we need to fetch the old thread parent message blocks, for both 1. the
   // text to be preserved when changing the parent message, and for 2. the other
@@ -631,6 +668,15 @@ const routeVoterToSlackChannel = async (
 
     // Remember the voter's thread in this channel.
     userInfo[response.data.channel] = response.data.ts;
+
+    // Create the thread with the origin thread's need_attention status
+    await DbApiUtil.logThreadToDb({
+      slackParentMessageTs: response.data.ts,
+      channelId: response.data.channel,
+      userId: userInfo.userId,
+      userPhoneNumber: userInfo.userPhoneNumber,
+      needsAttention: needsAttention,
+    });
 
     // Be able to identify phone number using NEW Slack channel identifying info.
     await RedisApiUtil.setHash(
@@ -704,6 +750,13 @@ const routeVoterToSlackChannel = async (
     `timestampOfLastMessageInThread: ${timestampOfLastMessageInThread}`
   );
 
+  // Set destination thread to have same needs_attention status as origin thread
+  await DbApiUtil.setThreadNeedsAttentionToDb(
+    userInfo[destinationSlackChannelId],
+    destinationSlackChannelId,
+    needsAttention
+  );
+
   await SlackApiUtil.sendMessage(
     `*Operator:* Voter *${userId}* was routed from *${adminCommandParams.previousSlackChannelName}* back to this thread by *${adminCommandParams.routingSlackUserName}*. Messages sent here will again relay to the voter.`,
     {
@@ -752,7 +805,7 @@ export async function determineVoterState(
     `ROUTER.determineVoterState: Passing voter message to Slack, slackChannelName: ${lobbyChannelId}, parentMessageTs: ${lobbyParentMessageTs}.`
   );
   await SlackApiUtil.sendMessage(
-    `*${userId.substring(0, 5)}:* ${userMessage}`,
+    `${userMessage}`,
     { parentMessageTs: lobbyParentMessageTs, channel: lobbyChannelId },
     inboundDbMessageEntry,
     userInfo
@@ -797,7 +850,7 @@ export async function determineVoterState(
     }
   }
 
-  // This is used for display as well as to know later that the voter's
+  // This is used for display, DB logging, as well as to know later that the voter's
   // U.S. state has been determined.
   userInfo.stateName = stateName;
   logger.debug(
@@ -913,7 +966,7 @@ export async function handleDisclaimer(
   userInfo.lastVoterMessageSecsFromEpoch = Math.round(Date.now() / 1000);
 
   await SlackApiUtil.sendMessage(
-    `*${userId.substring(0, 5)}:* ${userMessage}`,
+    `${userMessage}`,
     slackLobbyMessageParams,
     inboundDbMessageEntry,
     userInfo
@@ -980,7 +1033,7 @@ export async function handleClearedVoter(
   userInfo.lastVoterMessageSecsFromEpoch = nowSecondsEpoch;
 
   await SlackApiUtil.sendMessage(
-    `*${userId.substring(0, 5)}:* ${userOptions.userMessage}`,
+    `${userOptions.userMessage}`,
     activeChannelMessageParams,
     inboundDbMessageEntry,
     userInfo
@@ -1002,11 +1055,15 @@ export async function handleClearedVoter(
       } > : ${MINS_BEFORE_WELCOME_BACK_MESSAGE}), sending welcome back message.`
     );
     const welcomeBackMessage = MessageConstants.WELCOME_BACK();
-    await TwilioApiUtil.sendMessage(welcomeBackMessage, {
-      userPhoneNumber: userOptions.userPhoneNumber,
-      twilioPhoneNumber,
-      twilioCallbackURL,
-    });
+    await TwilioApiUtil.sendMessage(
+      welcomeBackMessage,
+      {
+        userPhoneNumber: userOptions.userPhoneNumber,
+        twilioPhoneNumber,
+        twilioCallbackURL,
+      },
+      DbApiUtil.populateAutomatedDbMessageEntry(userInfo)
+    );
     await SlackApiUtil.sendMessage(
       `*Automated Message:* ${welcomeBackMessage}`,
       activeChannelMessageParams
