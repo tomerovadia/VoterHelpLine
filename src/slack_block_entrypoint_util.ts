@@ -4,7 +4,7 @@ import * as PodUtil from './pod_util';
 import { SlackActionId } from './slack_interaction_ids';
 import { SlackCallbackId } from './slack_interaction_ids';
 import { getStateConstants } from './state_constants';
-import { regionsList } from './state_region_config';
+import { regionsListMinusStates } from './state_region_config';
 import { SlackBlock, SlackOption, SlackView } from './slack_block_util';
 
 interface OpenCloseModalProps {
@@ -130,14 +130,14 @@ export function getOpenCloseModal({
         initial_option: selectedStateOrRegionName
           ? getOptionForStateOrRegion(selectedStateOrRegionName)
           : undefined,
-        option_groups: regionsList.length
+        option_groups: regionsListMinusStates.length
           ? [
               {
                 label: {
                   type: 'plain_text',
                   text: 'Regions',
                 },
-                options: regionsList.map(getOptionForStateOrRegion),
+                options: regionsListMinusStates.map(getOptionForStateOrRegion),
               },
               {
                 label: {
@@ -150,7 +150,7 @@ export function getOpenCloseModal({
               },
             ]
           : undefined,
-        options: regionsList.length
+        options: regionsListMinusStates.length
           ? undefined
           : Object.values(getStateConstants()).map(getOptionForStateOrRegion),
       },

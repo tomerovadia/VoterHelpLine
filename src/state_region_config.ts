@@ -1,4 +1,5 @@
-import { uniq } from 'lodash';
+import { difference, uniq } from 'lodash';
+import { getStateConstants } from './state_constants';
 
 export const stateToRegionMap: { [stateCode: string]: string } = {
   Alabama: 'Central',
@@ -59,3 +60,8 @@ export const regionsList =
   process.env.CLIENT_ORGANIZATION === 'VOTE_AMERICA'
     ? uniq(Object.values(stateToRegionMap))
     : [];
+
+export const regionsListMinusStates = difference(
+  regionsList,
+  Object.values(getStateConstants())
+);
