@@ -46,6 +46,13 @@ const getValidStateAndRegionsSet = memoize(
 const isValidStateOrRegionName = (stateOrRegionName: string) =>
   getValidStateAndRegionsSet().has(stateOrRegionName);
 
+export const getEntrypointTypes = (): ENTRYPOINT_TYPE[] => {
+  if (process.env.CLIENT_ORGANIZATION === 'VOTE_AMERICA') {
+    return [ENTRYPOINT_TYPE.PULL];
+  }
+  return [ENTRYPOINT_TYPE.PULL, ENTRYPOINT_TYPE.PUSH];
+};
+
 function getRedisKeyWithStateOrRegionName(
   stateOrRegionName: string,
   channelType: CHANNEL_TYPE,
@@ -83,6 +90,8 @@ async function getPodChannelStateForEntrypoint(
   filters: PodFilters,
   entrypoint: ENTRYPOINT_TYPE
 ) {
+  if (!getEntrypointTypes().includes(entrypoint)) return [];
+
   // Map from channel names to a state
   const ret: Record<string, ChannelInfo> = {};
 

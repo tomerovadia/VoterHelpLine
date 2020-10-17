@@ -1032,10 +1032,18 @@ export function maybeGetConfirmationModal(
     });
   });
 
-  if (hasAtLeastOnePull && hasAtLeastOnePush) return null;
+  const supportedEntrypoints = PodUtil.getEntrypointTypes();
+  const warnOnPull =
+    supportedEntrypoints.includes(PodUtil.ENTRYPOINT_TYPE.PULL) &&
+    !hasAtLeastOnePull;
+  const warnOnPush =
+    supportedEntrypoints.includes(PodUtil.ENTRYPOINT_TYPE.PUSH) &&
+    !hasAtLeastOnePush;
+
+  if (!warnOnPull && !warnOnPush) return null;
   return SlackBlockEntrypointUtil.openCloseConfirmationView({
-    hasAtLeastOnePull,
-    hasAtLeastOnePush,
+    warnOnPull,
+    warnOnPush,
     values,
   });
 }

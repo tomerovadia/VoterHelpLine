@@ -235,14 +235,14 @@ export function getOpenCloseModal({
 }
 
 interface OpenCloseConfirmationProps {
-  hasAtLeastOnePull: boolean;
-  hasAtLeastOnePush: boolean;
+  warnOnPull: boolean;
+  warnOnPush: boolean;
   values: any;
 }
 
 export function openCloseConfirmationView({
-  hasAtLeastOnePull,
-  hasAtLeastOnePush,
+  warnOnPull,
+  warnOnPush,
   values,
 }: OpenCloseConfirmationProps): SlackView {
   const blocks: SlackBlock[] = [
@@ -254,7 +254,7 @@ export function openCloseConfirmationView({
       },
     },
   ];
-  if (!hasAtLeastOnePull) {
+  if (warnOnPull) {
     blocks.push({
       type: 'section',
       text: {
@@ -264,7 +264,7 @@ export function openCloseConfirmationView({
       },
     });
   }
-  if (!hasAtLeastOnePush) {
+  if (warnOnPush) {
     blocks.push({
       type: 'section',
       text: {
