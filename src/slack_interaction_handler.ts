@@ -755,7 +755,7 @@ export async function receiveResetDemo({
       // Store the relevant information in the modal so that when the requested action is confirmed
       // the data needed for the necessary actions is available.
       slackView = SlackBlockUtil.resetConfirmationSlackView(
-        'RESET_DEMO',
+        SlackCallbackId.RESET_DEMO,
         modalPrivateMetadata
       );
     }
@@ -907,7 +907,7 @@ export async function handleOpenCloseChannels({
     await SlackApiUtil.updateModal(
       viewId,
       SlackBlockUtil.getErrorSlackView(
-        SlackCallbackId.OPEN_CLOSE_CHANNELS_ERROR_MODAL,
+        SlackCallbackId.OPEN_CLOSE_CHANNELS_ERROR,
         'You must have access to #admin-control-room to do that'
       )
     );

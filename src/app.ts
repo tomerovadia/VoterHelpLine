@@ -680,7 +680,7 @@ app.post(
     if (
       payload.type === 'view_submission' &&
       (payload.view?.callback_id as SlackCallbackId) ===
-        SlackCallbackId.OPEN_CLOSE_CHANNELS_MODAL
+        SlackCallbackId.OPEN_CLOSE_CHANNELS
     ) {
       // Check if we need to render a confirmation modal. This needs to happen
       // synchronously to avoid 3 second timeout.

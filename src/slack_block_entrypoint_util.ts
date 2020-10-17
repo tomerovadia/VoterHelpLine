@@ -218,7 +218,7 @@ export function getOpenCloseModal({
 
   return {
     type: 'modal',
-    callback_id: SlackCallbackId.OPEN_CLOSE_CHANNELS_MODAL,
+    callback_id: SlackCallbackId.OPEN_CLOSE_CHANNELS,
     title: {
       type: 'plain_text',
       text: 'Open / Close Channels',
@@ -277,7 +277,7 @@ export function openCloseConfirmationView({
 
   return {
     type: 'modal',
-    callback_id: SlackCallbackId.OPEN_CLOSE_CHANNELS_CONFIRM_MODAL,
+    callback_id: SlackCallbackId.OPEN_CLOSE_CHANNELS_CONFIRM,
     title: {
       type: 'plain_text',
       text: 'Please confirm',

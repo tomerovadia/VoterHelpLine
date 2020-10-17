@@ -3,11 +3,9 @@
 // Callback IDs are strings used in shortcuts, mostly.
 export enum SlackCallbackId {
   OPEN_CLOSE_CHANNELS = 'open_close_channels',
-  OPEN_CLOSE_CHANNELS_MODAL = 'open_close_channels_modal',
-  OPEN_CLOSE_CHANNELS_CONFIRM_MODAL = 'open_close_channels_confirm_modal',
-  OPEN_CLOSE_CHANNELS_ERROR_MODAL = 'open_close_channels_error_modal',
+  OPEN_CLOSE_CHANNELS_CONFIRM = 'open_close_channels_confirm',
+  OPEN_CLOSE_CHANNELS_ERROR = 'open_close_channels_error',
   RESET_DEMO = 'reset_demo',
-  RESET_DEMO_MODAL = 'reset_demo_modal',
   SHOW_NEEDS_ATTENTION = 'show_needs_attention',
   SET_NEEDS_ATTENTION = 'set_needs_attention',
   CLEAR_NEEDS_ATTENTION = 'clear_needs_attention',

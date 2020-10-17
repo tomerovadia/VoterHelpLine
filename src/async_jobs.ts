@@ -321,7 +321,7 @@ async function slackInteractivityHandler(
     switch (payload.view.callback_id) {
       // The OPEN_CLOSE_CHANNELS_MODAL callback ID is set when the user submits options
       // for adjusting the weights of different channels for load balancing.
-      case SlackCallbackId.OPEN_CLOSE_CHANNELS_MODAL: {
+      case SlackCallbackId.OPEN_CLOSE_CHANNELS: {
         logger.info(
           `SERVER POST /slack-interactivity: Determined user interaction is a OPEN_CLOSE_CHANNELS_MODAL submission.`
         );
@@ -341,7 +341,7 @@ async function slackInteractivityHandler(
       // a particular entrypoint, we warn the user and ask for confirmation. If they
       // confirm, we get this OPEN_CLOSE_CHANNELS_CONFIRM_MODAL callback ID which
       // contains the original view's values in its private_metadata
-      case SlackCallbackId.OPEN_CLOSE_CHANNELS_CONFIRM_MODAL: {
+      case SlackCallbackId.OPEN_CLOSE_CHANNELS_CONFIRM: {
         logger.info(
           `SERVER POST /slack-interactivity: Determined user interaction is a OPEN_CLOSE_CHANNELS_MODAL_CONFIRM submission.`
         );
@@ -362,21 +362,30 @@ async function slackInteractivityHandler(
         });
         return;
       }
+
+      case SlackCallbackId.RESET_DEMO: {
+        const modalPrivateMetadata = JSON.parse(
+          payload.view.private_metadata
+        ) as SlackModalPrivateMetadata;
+        if (modalPrivateMetadata.commandType !== 'RESET_DEMO') {
+          throw new Error(
+            `Got callback ID RESET_DEMO but private commandType was ${modalPrivateMetadata.commandType}`
+          );
+        }
+        await SlackInteractionHandler.handleResetDemo(
+          redisClient,
+          modalPrivateMetadata
+        );
+        return;
+      }
+
+      default: {
+        throw new Error(
+          `SERVER POST /slack-interactivity: Unrecognized callback_id for view_submission ${payload.view.callback_id}`
+        );
+      }
     }
 
-    // This modal uses private_metadata instead of a calblack ID.
-    // Get the data associated with the modal used for execution of the
-    // action it confirmed.
-    const modalPrivateMetadata = JSON.parse(
-      payload.view.private_metadata
-    ) as SlackModalPrivateMetadata;
-    if (modalPrivateMetadata.commandType === 'RESET_DEMO') {
-      await SlackInteractionHandler.handleResetDemo(
-        redisClient,
-        modalPrivateMetadata
-      );
-      return;
-    }
     // If the view_submission interaction does not match one of the above types
     // exit and continue down to throw an error.
   }
