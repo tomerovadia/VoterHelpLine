@@ -395,6 +395,8 @@ export async function handleCommandUnclaimed(
     arg = '';
   }
 
+  const lines = ['`/unclaimed' + (arg ? ` ${arg}` : '') + '`'];
+
   const slackChannelIds = arg
     ? await RedisApiUtil.getHash(redisClient, 'slackPodChannelIds')
     : {};
@@ -423,10 +425,10 @@ export async function handleCommandUnclaimed(
   const threads = await DbApiUtil.getUnclaimedVoters(
     arg === '*' ? null : showChannelId
   );
-  const lines: string[] = [
+  lines.push(
     `${threads.length} unclaimed voters` +
-      (arg === '*' ? ' in all channels' : ''),
-  ];
+      (arg === '*' ? ' in all channels' : '')
+  );
 
   for (const thread of threads) {
     const messageTs =
@@ -507,7 +509,7 @@ export async function handleCommandNeedsAttention(
     arg = '';
   }
 
-  let lines = [] as string[];
+  let lines = ['`/needs-attention' + (arg ? ` ${arg}` : '') + '`'];
 
   // Which user we'll show voters for (if the command arg doesn't have us show * or a channel)
   // Empty arg means current user.
