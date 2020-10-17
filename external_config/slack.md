@@ -156,6 +156,14 @@ This should be added as a **global** shortcut.
 - **Short Description:** Show voters needing attention
 - **Callback ID:** show_needs_attention
 
+#### Open / Close Channels
+
+This should be added as a **global** shortcut.
+
+- **Name:** Open / Close Channels
+- **Short Description:** Open & Close Channels
+- **Callback ID:** open_close_channels
+
 ### Slash commands
 
 #### Unclaimed
