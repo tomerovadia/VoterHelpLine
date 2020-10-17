@@ -11,7 +11,7 @@ import * as RedisApiUtil from './redis_api_util';
 import logger from './logger';
 import { VoterStatus } from './types';
 import { PromisifiedRedisClient } from './redis_client';
-import { UserInfo, SlackThreadInfo } from './types';
+import { ChannelType, UserInfo, SlackThreadInfo } from './types';
 import redisClient from './redis_client';
 
 const maxCommandLines = 100; // this is about half of slacks message size limit
@@ -916,7 +916,7 @@ export async function handleOpenCloseChannels({
 
   // Process action to decide what to render
   let stateOrRegionName: string | undefined;
-  let channelType: PodUtil.CHANNEL_TYPE = PodUtil.CHANNEL_TYPE.NORMAL;
+  let channelType: ChannelType = 'NORMAL';
   const channelInfo: PodUtil.ChannelInfo[] = [];
   let flashMessage: string | undefined;
 
@@ -944,7 +944,7 @@ export async function handleOpenCloseChannels({
           stateOrRegionName = values[blockId][actionId].selected_option?.value;
         } else if (actionId === SlackActionId.OPEN_CLOSE_CHANNELS_FILTER_TYPE) {
           channelType = values[blockId][actionId].selected_option
-            ?.value as PodUtil.CHANNEL_TYPE;
+            ?.value as ChannelType;
         }
       });
     });
@@ -1022,7 +1022,7 @@ export function maybeGetConfirmationModal(
           values[blockId][actionId].selected_option?.value || '0'
         );
         if (weight > 0) {
-          if (entrypoint === PodUtil.ENTRYPOINT_TYPE.PUSH) {
+          if (entrypoint === 'PUSH') {
             hasAtLeastOnePush = true;
           } else {
             hasAtLeastOnePull = true;
@@ -1034,11 +1034,9 @@ export function maybeGetConfirmationModal(
 
   const supportedEntrypoints = PodUtil.getEntrypointTypes();
   const warnOnPull =
-    supportedEntrypoints.includes(PodUtil.ENTRYPOINT_TYPE.PULL) &&
-    !hasAtLeastOnePull;
+    supportedEntrypoints.includes('PULL') && !hasAtLeastOnePull;
   const warnOnPush =
-    supportedEntrypoints.includes(PodUtil.ENTRYPOINT_TYPE.PUSH) &&
-    !hasAtLeastOnePush;
+    supportedEntrypoints.includes('PUSH') && !hasAtLeastOnePush;
 
   if (!warnOnPull && !warnOnPush) return null;
   return SlackBlockEntrypointUtil.openCloseConfirmationView({

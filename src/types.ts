@@ -2,6 +2,7 @@ import type express from 'express';
 
 export type MessageDirection = 'INBOUND' | 'OUTBOUND';
 export type EntryPoint = 'PULL' | 'PUSH';
+export type ChannelType = 'DEMO' | 'NORMAL';
 export type VoterStatus =
   | 'UNKNOWN'
   | 'UNREGISTERED'

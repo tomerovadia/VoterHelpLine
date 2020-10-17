@@ -6,12 +6,13 @@ import { SlackCallbackId } from './slack_interaction_ids';
 import { getStateConstants } from './state_constants';
 import { regionsListMinusStates } from './state_region_config';
 import { SlackBlock, SlackOption, SlackView } from './slack_block_util';
+import { ChannelType, EntryPoint } from './types';
 
 interface OpenCloseModalProps {
   /** Selected state or region */
   stateOrRegionName?: string;
   /** Selected filter type, if any */
-  channelType?: PodUtil.CHANNEL_TYPE;
+  channelType?: ChannelType;
   /** Pull channels to display, if any */
   pullRows?: PodUtil.ChannelInfo[];
   /** Push channels to display, if any */
@@ -19,6 +20,8 @@ interface OpenCloseModalProps {
   /** Optional status message of some kind */
   flashMessage?: string;
 }
+
+const CHANNEL_TYPES: ChannelType[] = ['NORMAL', 'DEMO'];
 
 const getOptionForStateOrRegion = (stateOrRegionName: string): SlackOption => ({
   text: {
@@ -28,10 +31,10 @@ const getOptionForStateOrRegion = (stateOrRegionName: string): SlackOption => ({
   value: stateOrRegionName,
 });
 
-const getOptionForChannelType = (value: PodUtil.CHANNEL_TYPE): SlackOption => {
+const getOptionForChannelType = (value: ChannelType): SlackOption => {
   const text = {
-    [PodUtil.CHANNEL_TYPE.NORMAL]: 'Normal',
-    [PodUtil.CHANNEL_TYPE.DEMO]: 'Demo',
+    NORMAL: 'Normal',
+    DEMO: 'Demo',
   }[value];
   return {
     text: {
@@ -53,7 +56,7 @@ const getOptionForWeight = (n: number): SlackOption => ({
 
 const weightOptions: SlackOption[] = times(10, getOptionForWeight);
 
-const getBlocksForChannelInfo = (entrypoint: PodUtil.ENTRYPOINT_TYPE) => ({
+const getBlocksForChannelInfo = (entrypoint: EntryPoint) => ({
   id,
   channelName,
   weight,
@@ -94,12 +97,8 @@ export function getOpenCloseModal({
   logger.info('ENTERING SLACKBLOCKUTIL.getOpenCloseModal');
 
   // Create rows for each channel + entrypoint type
-  const pullBlocks = pullRows.map(
-    getBlocksForChannelInfo(PodUtil.ENTRYPOINT_TYPE.PULL)
-  );
-  const pushBlocks = pushRows.map(
-    getBlocksForChannelInfo(PodUtil.ENTRYPOINT_TYPE.PUSH)
-  );
+  const pullBlocks = pullRows.map(getBlocksForChannelInfo('PULL'));
+  const pushBlocks = pushRows.map(getBlocksForChannelInfo('PUSH'));
 
   let rows: SlackBlock[] = [];
   if (flashMessage) {
@@ -164,9 +163,7 @@ export function getOpenCloseModal({
         initial_option: selectedChannelType
           ? getOptionForChannelType(selectedChannelType)
           : undefined,
-        options: Object.keys(PodUtil.CHANNEL_TYPE).map((channelType) =>
-          getOptionForChannelType(channelType as PodUtil.CHANNEL_TYPE)
-        ),
+        options: CHANNEL_TYPES.map(getOptionForChannelType),
       },
     ],
   });
