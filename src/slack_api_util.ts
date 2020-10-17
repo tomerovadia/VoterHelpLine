@@ -83,8 +83,7 @@ export async function sendEphemeralResponse(
       unfurl_media: false,
       response_type: 'ephemeral',
     });
-
-    if (!response.data.ok) {
+    if (response.status != 200) {
       throw new Error(
         `SLACKAPIUTIL.sendEphemeralResponse: ERROR in sending Slack message: ${JSON.stringify(
           response.data
