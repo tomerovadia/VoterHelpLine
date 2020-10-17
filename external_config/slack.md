@@ -156,13 +156,13 @@ This should be added as a **global** shortcut.
 - **Short Description:** Show voters needing attention
 - **Callback ID:** show_needs_attention
 
-#### Open / Close Channels
+#### Manage Entry Points
 
 This should be added as a **global** shortcut.
 
-- **Name:** Open / Close Channels
-- **Short Description:** Open & Close Channels
-- **Callback ID:** open_close_channels
+- **Name:** Manage Entry Points
+- **Short Description:** Manage entry points by state or region
+- **Callback ID:** manage_entry_points
 
 ### Slash commands
 

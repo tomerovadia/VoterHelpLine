@@ -879,7 +879,7 @@ export async function handleResetDemo(
   return;
 }
 
-export async function handleOpenCloseChannels({
+export async function handleManageEntryPoints({
   payload,
   viewId,
   originatingSlackUserName,
@@ -896,18 +896,18 @@ export async function handleOpenCloseChannels({
   values?: SlackInteractionEventValuesPayload;
   isSubmission?: boolean;
 }): Promise<void> {
-  logger.info('Entering SLACKINTERACTIONHANDLER.handleOpenCloseChannels');
+  logger.info('Entering SLACKINTERACTIONHANDLER.handleManageEntryPoints');
 
   // Auth check
   const isAdmin = await SlackApiUtil.isMemberOfAdminChannel(payload.user.id);
   if (!isAdmin) {
     logger.warn(
-      `SLACKINTERACTIONHANDLER.handleOpenCloseChannels: ${payload.user.id} is not an admin`
+      `SLACKINTERACTIONHANDLER.handleManageEntryPoints: ${payload.user.id} is not an admin`
     );
     await SlackApiUtil.updateModal(
       viewId,
       SlackBlockUtil.getErrorSlackView(
-        SlackCallbackId.OPEN_CLOSE_CHANNELS_ERROR,
+        SlackCallbackId.MANAGE_ENTRY_POINTS_ERROR,
         'You must have access to #admin-control-room to do that'
       )
     );
@@ -922,7 +922,7 @@ export async function handleOpenCloseChannels({
 
   if (action) {
     logger.info(
-      `SLACKINTERACTIONHANDLER.handleOpenCloseChannels: processing action ${action.action_id}`
+      `SLACKINTERACTIONHANDLER.handleManageEntryPoints: processing action ${action.action_id}`
     );
   }
 
@@ -931,7 +931,7 @@ export async function handleOpenCloseChannels({
     Object.keys(values).forEach((blockId) => {
       Object.keys(values[blockId]).forEach((actionId) => {
         if (
-          actionId === SlackActionId.OPEN_CLOSE_CHANNELS_CHANNEL_STATE_DROPDOWN
+          actionId === SlackActionId.MANAGE_ENTRY_POINTS_CHANNEL_STATE_DROPDOWN
         ) {
           const weight = parseInt(
             values[blockId][actionId].selected_option?.value || '0'
@@ -939,10 +939,10 @@ export async function handleOpenCloseChannels({
           const { entrypoint, channelName } = PodUtil.parseBlockId(blockId);
           channelInfo.push({ entrypoint, channelName, weight });
         } else if (
-          actionId === SlackActionId.OPEN_CLOSE_CHANNELS_FILTER_STATE
+          actionId === SlackActionId.MANAGE_ENTRY_POINTS_FILTER_STATE
         ) {
           stateOrRegionName = values[blockId][actionId].selected_option?.value;
-        } else if (actionId === SlackActionId.OPEN_CLOSE_CHANNELS_FILTER_TYPE) {
+        } else if (actionId === SlackActionId.MANAGE_ENTRY_POINTS_FILTER_TYPE) {
           channelType = values[blockId][actionId].selected_option
             ?.value as ChannelType;
         }
@@ -958,7 +958,7 @@ export async function handleOpenCloseChannels({
       channelInfo
     );
     logger.info(
-      'SLACKINTERACTIONHANDLER.handleOpenCloseChannels: setChannelWeights success'
+      'SLACKINTERACTIONHANDLER.handleManageEntryPoints: setChannelWeights success'
     );
     flashMessage = ':white_check_mark: _Channels updated_';
 
@@ -1003,7 +1003,7 @@ export async function handleOpenCloseChannels({
   await SlackApiUtil.updateModal(viewId, slackView);
 }
 
-export function maybeGetConfirmationModal(
+export function maybeGetManageEntryPointsConfirmationModal(
   payload: SlackInteractionEventPayload
 ): SlackBlockUtil.SlackView | null {
   const values = payload.view?.state?.values;
@@ -1015,7 +1015,7 @@ export function maybeGetConfirmationModal(
   Object.keys(values).forEach((blockId) => {
     Object.keys(values[blockId]).forEach((actionId) => {
       if (
-        actionId === SlackActionId.OPEN_CLOSE_CHANNELS_CHANNEL_STATE_DROPDOWN
+        actionId === SlackActionId.MANAGE_ENTRY_POINTS_CHANNEL_STATE_DROPDOWN
       ) {
         const { entrypoint } = PodUtil.parseBlockId(blockId);
         const weight = parseInt(

@@ -71,7 +71,7 @@ const getBlocksForChannelInfo = (entrypoint: EntryPoint) => ({
 
   const accessory = {
     type: 'static_select',
-    action_id: SlackActionId.OPEN_CLOSE_CHANNELS_CHANNEL_STATE_DROPDOWN,
+    action_id: SlackActionId.MANAGE_ENTRY_POINTS_CHANNEL_STATE_DROPDOWN,
     initial_option: getOptionForWeight(weight),
     options: weightOptions,
   };
@@ -121,7 +121,7 @@ export function getOpenCloseModal({
     elements: [
       {
         type: 'static_select',
-        action_id: SlackActionId.OPEN_CLOSE_CHANNELS_FILTER_STATE,
+        action_id: SlackActionId.MANAGE_ENTRY_POINTS_FILTER_STATE,
         placeholder: {
           type: 'plain_text',
           text: 'Select State',
@@ -155,7 +155,7 @@ export function getOpenCloseModal({
       },
       {
         type: 'static_select',
-        action_id: SlackActionId.OPEN_CLOSE_CHANNELS_FILTER_TYPE,
+        action_id: SlackActionId.MANAGE_ENTRY_POINTS_FILTER_TYPE,
         placeholder: {
           type: 'plain_text',
           text: 'Select Type',
@@ -215,7 +215,7 @@ export function getOpenCloseModal({
 
   return {
     type: 'modal',
-    callback_id: SlackCallbackId.OPEN_CLOSE_CHANNELS,
+    callback_id: SlackCallbackId.MANAGE_ENTRY_POINTS,
     title: {
       type: 'plain_text',
       text: 'Open / Close Channels',
@@ -274,7 +274,7 @@ export function openCloseConfirmationView({
 
   return {
     type: 'modal',
-    callback_id: SlackCallbackId.OPEN_CLOSE_CHANNELS_CONFIRM,
+    callback_id: SlackCallbackId.MANAGE_ENTRY_POINTS_CONFIRM,
     title: {
       type: 'plain_text',
       text: 'Please confirm',

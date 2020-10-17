@@ -659,7 +659,7 @@ app.post(
     if (
       [
         SlackCallbackId.RESET_DEMO,
-        SlackCallbackId.OPEN_CLOSE_CHANNELS,
+        SlackCallbackId.MANAGE_ENTRY_POINTS,
         SlackCallbackId.SHOW_NEEDS_ATTENTION,
       ].includes(payload.callback_id as SlackCallbackId)
     ) {
@@ -680,11 +680,11 @@ app.post(
     if (
       payload.type === 'view_submission' &&
       (payload.view?.callback_id as SlackCallbackId) ===
-        SlackCallbackId.OPEN_CLOSE_CHANNELS
+        SlackCallbackId.MANAGE_ENTRY_POINTS
     ) {
       // Check if we need to render a confirmation modal. This needs to happen
       // synchronously to avoid 3 second timeout.
-      const confirmationModal = SlackInteractionHandler.maybeGetConfirmationModal(
+      const confirmationModal = SlackInteractionHandler.maybeGetManageEntryPointsConfirmationModal(
         payload
       );
       if (confirmationModal) {
