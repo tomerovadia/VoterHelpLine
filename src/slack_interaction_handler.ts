@@ -12,7 +12,7 @@ import { PromisifiedRedisClient } from './redis_client';
 import { UserInfo, SlackThreadInfo } from './types';
 import redisClient from './redis_client';
 
-const maxCommandLines = 100; // this is about half of slacks message size limit
+const maxCommandLines = 50; // if we go bigger slack tends to truncate the msg
 
 export type VoterStatusUpdate = VoterStatus | 'UNDO';
 
