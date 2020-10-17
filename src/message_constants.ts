@@ -1,7 +1,7 @@
 export function STATE_CONFIRMATION(state: string): string {
   switch (process.env.CLIENT_ORGANIZATION) {
     case 'VOTE_AMERICA':
-      return `Great! We are finding a ${state} volunteer. We try to reply within minutes but may take 24 hours. Meanwhile, please share more about how we can help.`;
+      return `Thanks! We are finding a ${state} volunteer. We try to reply within minutes but may take 24 hours. Meanwhile, please share more about how we can help.`;
     case 'VOTE_FROM_HOME_2020':
       return `Great! We are finding a ${state} volunteer. We try to reply within minutes but may take 24 hours. Meanwhile, please share more about how we can help.`;
     case 'VOTER_HELP_LINE':
@@ -40,7 +40,7 @@ export function CLARIFY_STATE(): string {
 export function WELCOME_VOTER(): string {
   switch (process.env.CLIENT_ORGANIZATION) {
     case 'VOTE_AMERICA':
-      return 'Welcome to VoteAmerica! We are excited to help you vote and can connect you to a trained volunteer to help answer your questions.\n\nReply HELPLINE to be connected to a volunteer. Reply STOP to unsubscribe from VoteAmerica texts. (Msg & data rates may apply).';
+      return "Welcome to VoteAmerica! We're excited to help you vote.\n\nReply HELPLINE to connect with a trained volunteer, or STOP to unsubscribe. (Msg&data rates may apply)";
     case 'VOTE_FROM_HOME_2020':
       return 'Welcome to Voter From Home 2020! We are excited to help you vote.\n\nPlease note that this is not an official or government-affiliated service. Volunteers will do their best to share official links that support their answers to your questions, but by using this service you release Vote From Home of all liability for your personal voting experience.\n\nReply "agree" to confirm that you understand and would like to continue. (Msg & data rates may apply).';
     case 'VOTER_HELP_LINE':
@@ -72,7 +72,7 @@ export function CLARIFY_HELPLINE_REQUEST(): string {
 
 // Only used by VOTE_AMERICA.
 export function WELCOME_AND_STATE_QUESTION(): string {
-  return 'Welcome to VoteAmerica! We are excited to help you vote and can connect you to a trained volunteer to help answer your questions.\n\nTo match you with the most knowledgeable volunteer, in which U.S. state are you looking to vote? (Msg & data rates may apply)\n\nReply STOP to unsubscribe from VoteAmerica texts.';
+  return 'Welcome to the VoteAmerica Helpline! We are excited to help. Msg&data rates may apply. Reply STOP to unsubscribe.\n\nIn which U.S. state are you looking to vote?';
 }
 
 export function STATE_QUESTION(): string {

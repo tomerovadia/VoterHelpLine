@@ -36,6 +36,13 @@ type SlackChannelNamesAndIds = {
   [channelId: string]: string; // mapping of channel ID to channel name
 };
 
+export function linkToSlackChannel(
+  channelId: string,
+  channelName: string
+): string {
+  return `<slack://channel?team=${process.env.TEAM_ID}&id=${channelId}|#${channelName}>`;
+}
+
 export async function getThreadPermalink(
   channel: string,
   message_ts: string

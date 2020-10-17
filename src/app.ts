@@ -602,11 +602,17 @@ app.post(
       res.sendStatus(401);
       return;
     }
+    if (req.body.team_id != process.env.TEAM_ID) {
+      logger.error(
+        'SERVER POST /slack-command: Wrong team id ${req.body.team_id}'
+      );
+      res.sendStatus(401);
+      return;
+    }
     logger.info('SERVER POST /slack-command: PASSES AUTH');
 
     await enqueueBackgroundTask(
       'slackCommandHandler',
-      req.body.team_id,
       req.body.channel_id,
       req.body.channel_name,
       req.body.user_id,

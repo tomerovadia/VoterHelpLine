@@ -145,7 +145,7 @@ describe('handleNewVoter', () => {
   });
 
   test('Announces new voter message in Slack', () => {
-    expect(SlackApiUtil.sendMessage.mock.calls[0][0]).toContain('New voter');
+    expect(SlackApiUtil.sendMessage.mock.calls[0][0]).toContain('User ID');
   });
 
   test('Announces new voter message to Slack #lobby channel if non-demo line', () => {
