@@ -382,7 +382,6 @@ export function prettyTimeInterval(seconds: number): string {
 }
 
 export async function handleCommandUnclaimed(
-  teamId: string,
   channelId: string,
   channelName: string,
   userId: string,
@@ -443,14 +442,15 @@ export async function handleCommandUnclaimed(
     if (arg === '*') {
       let channelName = thread.channelId;
       if (slackChannelNames && thread.channelId in slackChannelNames) {
-        channelName = `#${slackChannelNames[thread.channelId]}`;
+        channelName = slackChannelNames[thread.channelId];
       }
       lines.push(
         `:bust_in_silhouette: ${thread.userId} - age ${prettyTimeInterval(
           thread.lastUpdateAge || 0
-        )} - <slack://channel?team=${teamId}&id=${
-          thread.channelId
-        }|${channelName}> - <${url}|Open>`
+        )} - ${SlackApiUtil.linkToSlackChannel(
+          thread.channelId,
+          channelName
+        )} - <${url}|Open>`
       );
     } else {
       lines.push(
@@ -495,7 +495,6 @@ async function getNeedsAttentionList(userId: string): Promise<string[]> {
 }
 
 export async function handleCommandNeedsAttention(
-  teamId: string,
   channelId: string,
   channelName: string,
   userId: string,
@@ -531,9 +530,10 @@ export async function handleCommandNeedsAttention(
     lines = lines.concat(
       stats.map(
         (x) =>
-          `${x.count} in <slack://channel?team=${teamId}&id=${x.channelId}|#${
+          `${x.count} in ${SlackApiUtil.linkToSlackChannel(
+            x.channelId,
             slackChannelNames[x.channelId]
-          }> - oldest ${prettyTimeInterval(x.maxLastUpdateAge)}`
+          )} - oldest ${prettyTimeInterval(x.maxLastUpdateAge)}`
       )
     );
 
@@ -579,7 +579,10 @@ export async function handleCommandNeedsAttention(
       lines.push(`Unrecognized channel ${arg}`);
     } else {
       lines.push(
-        `Voters needing attention for <slack://channel?team=${teamId}&id=${channelId}|#${channelName}>`
+        `Voters needing attention for ${SlackApiUtil.linkToSlackChannel(
+          channelId,
+          channelName
+        )}`
       );
       const threads = await DbApiUtil.getThreadsNeedingAttentionForChannel(
         channelId

@@ -142,7 +142,7 @@ const introduceNewVoterToSlackChannel = async (
     `ROUTER.introduceNewVoterToSlackChannel: Announcing new voter via new thread in ${slackChannelName}.`
   );
   // In Slack, create entry channel message, followed by voter's message and intro text.
-  const operatorMessage = `New voter!\n*User ID:* ${userInfo.userId}\n*Connected via:* ${twilioPhoneNumber} (${entryPoint})`;
+  const operatorMessage = `*User ID:* ${userInfo.userId}\n*Connected via:* ${twilioPhoneNumber} (${entryPoint})`;
 
   const slackBlocks = SlackBlockUtil.getVoterStatusBlocks(operatorMessage);
 
@@ -615,7 +615,10 @@ const routeVoterToSlackChannel = async (
 
   // return SlackBlockUtil.populateDropdownWithLatestVoterStatus(previousParentMessageBlocks, userId).then(() => {
   // make deep copy of previousParentMessageBlocks
-  const closedVoterPanelMessage = `Voter has been routed to *${destinationSlackChannelName}*.`;
+  const closedVoterPanelMessage = `Voter has been routed to ${SlackApiUtil.linkToSlackChannel(
+    destinationSlackChannelId,
+    destinationSlackChannelName
+  )}.`;
   const closedVoterPanelBlocks = SlackBlockUtil.makeClosedVoterPanelBlocks(
     closedVoterPanelMessage,
     false /* include undo button */

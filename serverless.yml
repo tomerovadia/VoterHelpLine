@@ -37,6 +37,7 @@ provider:
     SLACK_AUTH_TOKEN_HASH: ${ssm:helpline.${self:custom.stage}.slack_auth_token_hash~true}
     SLACK_SIGNING_SECRET: ${ssm:helpline.${self:custom.stage}.slack_signing_secret~true}
     ADMIN_CONTROL_ROOM_SLACK_CHANNEL_ID: ${ssm:helpline.${self:custom.stage}.admin_control_room_slack_channel_id~true}
+    TEAM_ID: ${ssm:helpline.${self:custom.stage}.team_id~true}
     TWILIO_ACCOUNT_SID: ${ssm:helpline.${self:custom.stage}.twilio_account_sid~true}
     TWILIO_AUTH_TOKEN: ${ssm:helpline.${self:custom.stage}.twilio_auth_token~true}
     CLIENT_ORGANIZATION: ${ssm:helpline.${self:custom.stage}.client_organization~true}
