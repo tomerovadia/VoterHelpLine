@@ -2,27 +2,48 @@ import Hashes from 'jshashes';
 import * as DbApiUtil from './db_api_util';
 import * as SlackApiUtil from './slack_api_util';
 import * as LoadBalancer from './load_balancer';
+import * as PodUtil from './pod_util';
 import * as SlackBlockUtil from './slack_block_util';
+import * as SlackBlockEntrypointUtil from './slack_block_entrypoint_util';
 import * as SlackInteractionApiUtil from './slack_interaction_api_util';
-import { SlackActionId } from './slack_interaction_ids';
+import { SlackActionId, SlackCallbackId } from './slack_interaction_ids';
 import * as RedisApiUtil from './redis_api_util';
 import logger from './logger';
 import { VoterStatus } from './types';
 import { PromisifiedRedisClient } from './redis_client';
-import { UserInfo, SlackThreadInfo } from './types';
+import { ChannelType, UserInfo, SlackThreadInfo } from './types';
 import redisClient from './redis_client';
 
 const maxCommandLines = 50; // if we go bigger slack tends to truncate the msg
 
 export type VoterStatusUpdate = VoterStatus | 'UNDO';
 
+type SlackInteractionEventValuesPayload = Record<
+  string,
+  Record<
+    string,
+    {
+      type: string;
+      value?: string;
+      selected_option?: SlackBlockUtil.SlackOption;
+      selected_options?: SlackBlockUtil.SlackOption[];
+    }
+  >
+>;
+
 export type SlackInteractionEventPayload = {
   type: string;
   callback_id: string;
   trigger_id: string;
   view: {
+    id: string;
+    blocks: SlackBlockUtil.SlackBlock[];
     callback_id: string;
     private_metadata: string;
+    root_view_id: string;
+    state?: {
+      values: SlackInteractionEventValuesPayload;
+    };
   };
   container: {
     thread_ts: string;
@@ -30,7 +51,7 @@ export type SlackInteractionEventPayload = {
   channel: {
     id: string;
   };
-  actions: SlackBlockUtil.SlackBlock[];
+  actions: SlackBlockUtil.SlackAction[];
   user: {
     id: string;
   };
@@ -39,8 +60,13 @@ export type SlackInteractionEventPayload = {
     thread_ts: string | null;
     blocks: SlackBlockUtil.SlackBlock[];
   };
-  automatedButtonSelection: boolean | undefined;
   action_ts: string;
+
+  // Not a Slack prop.
+  automatedButtonSelection: boolean | undefined;
+
+  // Added in cases where we've opened a loading modal. Not a Slack prop.
+  modalExternalId?: string;
 };
 
 export type SlackSyntheticPayload = {
@@ -230,7 +256,7 @@ export async function handleVoterStatusUpdate({
       if (
         !SlackBlockUtil.populateDropdownNewInitialValue(
           payload.message.blocks,
-          payload.actions
+          payload.actions && payload.actions[0].action_id
             ? payload.actions[0].action_id
             : SlackActionId.VOTER_STATUS_DROPDOWN,
           selectedVoterStatus as VoterStatus
@@ -301,6 +327,15 @@ export async function handleVolunteerUpdate({
   logger.info(
     `SLACKINTERACTIONHANDLER.handleVolunteerUpdate: Determined user interaction is a volunteer update`
   );
+  if (
+    !payload.actions ||
+    !payload.actions[0] ||
+    !payload.actions[0].selected_user
+  ) {
+    throw new Error(
+      'Expected selected_user in SLACKINTERACTIONHANDLER.handleVolunteerUpdate'
+    );
+  }
   const selectedVolunteerSlackUserName = await SlackApiUtil.fetchSlackUserName(
     payload.actions && payload.actions[0].selected_user
   );
@@ -349,7 +384,7 @@ export async function handleVolunteerUpdate({
   if (
     !SlackBlockUtil.populateDropdownNewInitialValue(
       payload.message.blocks,
-      payload.actions
+      payload.actions && payload.actions[0].action_id
         ? payload.actions[0].action_id
         : SlackActionId.VOLUNTEER_DROPDOWN,
       payload.actions ? payload.actions[0].selected_user : null
@@ -725,7 +760,7 @@ export async function receiveResetDemo({
       // Store the relevant information in the modal so that when the requested action is confirmed
       // the data needed for the necessary actions is available.
       slackView = SlackBlockUtil.resetConfirmationSlackView(
-        'RESET_DEMO',
+        SlackCallbackId.RESET_DEMO,
         modalPrivateMetadata
       );
     }
@@ -847,4 +882,171 @@ export async function handleResetDemo(
   await DbApiUtil.logCommandToDb(modalPrivateMetadata);
 
   return;
+}
+
+export async function handleManageEntryPoints({
+  payload,
+  viewId,
+  originatingSlackUserName,
+  redisClient,
+  action,
+  values,
+  isSubmission,
+}: {
+  payload: SlackInteractionEventPayload;
+  viewId: string;
+  originatingSlackUserName: string;
+  redisClient: PromisifiedRedisClient;
+  action?: SlackBlockUtil.SlackAction;
+  values?: SlackInteractionEventValuesPayload;
+  isSubmission?: boolean;
+}): Promise<void> {
+  logger.info('Entering SLACKINTERACTIONHANDLER.handleManageEntryPoints');
+
+  // Auth check
+  const isAdmin = await SlackApiUtil.isMemberOfAdminChannel(payload.user.id);
+  if (!isAdmin) {
+    logger.warn(
+      `SLACKINTERACTIONHANDLER.handleManageEntryPoints: ${payload.user.id} is not an admin`
+    );
+    await SlackApiUtil.updateModal(
+      viewId,
+      SlackBlockUtil.getErrorSlackView(
+        SlackCallbackId.MANAGE_ENTRY_POINTS_ERROR,
+        'You must have access to #admin-control-room to do that'
+      )
+    );
+    return;
+  }
+
+  // Process action to decide what to render
+  let stateOrRegionName: string | undefined;
+  let channelType: ChannelType = 'NORMAL';
+  const channelInfo: PodUtil.ChannelInfo[] = [];
+  let flashMessage: string | undefined;
+
+  if (action) {
+    logger.info(
+      `SLACKINTERACTIONHANDLER.handleManageEntryPoints: processing action ${action.action_id}`
+    );
+  }
+
+  // Populate filters + data from values
+  if (values) {
+    Object.keys(values).forEach((blockId) => {
+      Object.keys(values[blockId]).forEach((actionId) => {
+        if (
+          actionId === SlackActionId.MANAGE_ENTRY_POINTS_CHANNEL_STATE_DROPDOWN
+        ) {
+          const weight = parseInt(
+            values[blockId][actionId].selected_option?.value || '0'
+          );
+          const { entrypoint, channelName } = PodUtil.parseBlockId(blockId);
+          channelInfo.push({ entrypoint, channelName, weight });
+        } else if (
+          actionId === SlackActionId.MANAGE_ENTRY_POINTS_FILTER_STATE
+        ) {
+          stateOrRegionName = values[blockId][actionId].selected_option?.value;
+        } else if (actionId === SlackActionId.MANAGE_ENTRY_POINTS_FILTER_TYPE) {
+          channelType = values[blockId][actionId].selected_option
+            ?.value as ChannelType;
+        }
+      });
+    });
+  }
+
+  // Handle submission
+  if (stateOrRegionName && channelType && channelInfo.length && isSubmission) {
+    await PodUtil.setChannelWeights(
+      redisClient,
+      { stateOrRegionName, channelType },
+      channelInfo
+    );
+    logger.info(
+      'SLACKINTERACTIONHANDLER.handleManageEntryPoints: setChannelWeights success'
+    );
+    flashMessage = ':white_check_mark: _Channels updated_';
+
+    // Post a message in the admin thread recording this status change.
+    const channelString = channelInfo
+      .map(
+        ({ channelName, weight, entrypoint }) =>
+          `• ${entrypoint} \`${channelName}\` - *${weight}*`
+      )
+      .sort()
+      .join('\n');
+    const timeSinceEpochSecs = Math.round(Date.now() / 1000);
+    // See https://api.slack.com/reference/surfaces/formatting#visual-styles
+    const specialSlackTimestamp = `<!date^${timeSinceEpochSecs}^{date_num} {time_secs}|${new Date()}>`;
+    await SlackApiUtil.sendMessage(
+      `*Operator:* Channel weights changed by *${originatingSlackUserName}* at *${specialSlackTimestamp}*:\n${channelString}`,
+      {
+        channel: process.env.ADMIN_CONTROL_ROOM_SLACK_CHANNEL_ID as string,
+      }
+    );
+  }
+
+  const { push, pull } =
+    stateOrRegionName && channelType
+      ? await PodUtil.getPodChannelState(redisClient, {
+          stateOrRegionName,
+          channelType,
+        })
+      : {
+          push: [],
+          pull: [],
+        };
+
+  const slackView = SlackBlockEntrypointUtil.getOpenCloseModal({
+    stateOrRegionName,
+    channelType,
+    pushRows: push,
+    pullRows: pull,
+    flashMessage,
+  });
+
+  await SlackApiUtil.updateModal(viewId, slackView);
+}
+
+export function maybeGetManageEntryPointsConfirmationModal(
+  payload: SlackInteractionEventPayload
+): SlackBlockUtil.SlackView | null {
+  const values = payload.view?.state?.values;
+  if (!values) return null;
+
+  let hasAtLeastOnePull = false;
+  let hasAtLeastOnePush = false;
+
+  Object.keys(values).forEach((blockId) => {
+    Object.keys(values[blockId]).forEach((actionId) => {
+      if (
+        actionId === SlackActionId.MANAGE_ENTRY_POINTS_CHANNEL_STATE_DROPDOWN
+      ) {
+        const { entrypoint } = PodUtil.parseBlockId(blockId);
+        const weight = parseInt(
+          values[blockId][actionId].selected_option?.value || '0'
+        );
+        if (weight > 0) {
+          if (entrypoint === 'PUSH') {
+            hasAtLeastOnePush = true;
+          } else {
+            hasAtLeastOnePull = true;
+          }
+        }
+      }
+    });
+  });
+
+  const supportedEntrypoints = PodUtil.getEntrypointTypes();
+  const warnOnPull =
+    supportedEntrypoints.includes('PULL') && !hasAtLeastOnePull;
+  const warnOnPush =
+    supportedEntrypoints.includes('PUSH') && !hasAtLeastOnePush;
+
+  if (!warnOnPull && !warnOnPush) return null;
+  return SlackBlockEntrypointUtil.openCloseConfirmationView({
+    warnOnPull,
+    warnOnPush,
+    values,
+  });
 }

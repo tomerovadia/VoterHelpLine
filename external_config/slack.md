@@ -156,6 +156,14 @@ This should be added as a **global** shortcut.
 - **Short Description:** Show voters needing attention
 - **Callback ID:** show_needs_attention
 
+#### Manage Entry Points
+
+This should be added as a **global** shortcut.
+
+- **Name:** Manage Entry Points
+- **Short Description:** Manage entry points by state or region
+- **Callback ID:** manage_entry_points
+
 ### Slash commands
 
 #### Unclaimed

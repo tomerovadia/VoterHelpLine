@@ -12,28 +12,49 @@ export type SlackOption = {
   text: {
     type: 'plain_text' | 'mrkdwn';
     text: string;
-    emoji: boolean;
+    emoji?: boolean;
   };
   value: string;
 };
 
+export type SlackText = {
+  type: 'plain_text' | 'mrkdwn';
+  text: string;
+  emoji?: boolean;
+};
+
+export type SlackElement = {
+  type: string;
+  action_id?: string;
+  value?: string;
+  initial_option?: SlackOption;
+  initial_options?: SlackOption[];
+  initial_user?: string;
+  initial_users?: string[];
+  placeholder?: SlackText;
+  options?: SlackOption[];
+};
+
+export type SlackAction = SlackElement & {
+  block_id: string;
+  selected_option?: SlackOption;
+  selected_options?: SlackOption[];
+  selected_user?: string;
+  selected_users?: string[];
+  action_ts: string;
+};
+
 export type SlackView = {
   callback_id?: string;
+  external_id?: string;
   private_metadata?: string;
-  title: {
-    type: string;
-    text: string;
-  };
-  submit?: {
-    type: string;
-    text: string;
-  };
+  title: SlackText;
+  submit?: SlackText;
+  close?: SlackText;
   blocks: {
     type: string;
-    text: {
-      type: string;
-      text: string;
-    };
+    text?: SlackText;
+    elements?: SlackElement[];
   }[];
   type: 'modal';
 };
@@ -412,12 +433,11 @@ export function replaceVoterPanelBlocks(
   return newBlocks;
 }
 
-// This function mutates the blocks input.
-export function populateDropdownNewInitialValue(
+// This function finds the element for a given action ID in a set of blocks
+export function findElementWithActionId(
   blocks: SlackBlock[],
-  actionId: SlackActionId,
-  newInitialValue: VoterStatus
-): boolean {
+  actionId: string
+): SlackElement | null {
   for (const i in blocks) {
     const block = blocks[i];
     if (block.type === 'actions') {
@@ -425,32 +445,54 @@ export function populateDropdownNewInitialValue(
       for (const j in elements) {
         const element = elements[j];
         if (element.action_id === actionId) {
-          if (element.type === 'static_select') {
-            // Assume new options is already in the list of old options
-            const newOption = element.options.find(
-              (o: SlackOption) => o.value === newInitialValue
-            );
-            if (!newOption) {
-              logger.error(
-                `Option with value ${newInitialValue} was not found`
-              );
-              return false;
-            }
-
-            element.initial_option = newOption;
-            // Javascript modifies the blocks by reference, return success
-            return true;
-          }
-          if (element.type === 'users_select') {
-            element.initial_user = newInitialValue;
-            // Javascript modifies the blocks by reference, return success
-            return true;
-          }
+          return element;
         }
       }
     }
   }
 
   // If we get here, we were unable to find the element with the specified action ID
+  return null;
+}
+
+// This function mutates the blocks input.
+export function populateDropdownNewInitialValue(
+  blocks: SlackBlock[],
+  actionId: string,
+  newInitialValue?: string | null
+): boolean {
+  const element = findElementWithActionId(blocks, actionId);
+  if (!element) return false;
+
+  if (element.type === 'static_select') {
+    // Assume new options is already in the list of old options
+
+    element.initial_option =
+      element.options &&
+      element.options.find((o: SlackOption) => o.value === newInitialValue);
+    if (newInitialValue && !element.initial_option) {
+      logger.error(`Option with value ${newInitialValue} was not found`);
+      return false;
+    }
+
+    // Javascript modifies the blocks by reference, return success
+    return true;
+  }
+
+  if (element.type === 'users_select') {
+    if (newInitialValue) {
+      element.initial_user = newInitialValue;
+    } else {
+      delete element.initial_user;
+    }
+
+    // Javascript modifies the blocks by reference, return success
+    return true;
+  }
+
+  // Unsupported element type, probably not what we'r looking for
+  logger.warn(
+    `Unexpected element type in populateDropdownNewInitialValue: ${element.type}`
+  );
   return false;
 }

@@ -7,6 +7,7 @@ import axios, { AxiosResponse } from 'axios';
 import { Pool } from 'pg';
 
 import * as SlackApiUtil from './slack_api_util';
+import * as SlackInteractionHandler from './slack_interaction_handler';
 import * as TwilioApiUtil from './twilio_api_util';
 import * as Router from './router';
 import * as DbApiUtil from './db_api_util';
@@ -18,6 +19,7 @@ import * as SlackInteractionApiUtil from './slack_interaction_api_util';
 import * as SlackBlockUtil from './slack_block_util';
 import logger from './logger';
 import redisClient from './redis_client';
+import { SlackCallbackId } from './slack_interaction_ids';
 import { EntryPoint, Request, UserInfo } from './types';
 import {
   enqueueBackgroundTask,
@@ -661,27 +663,69 @@ app.post(
     const metadata: InteractivityHandlerMetadata = {};
 
     if (
-      (payload.type === 'message_action' &&
-        payload.callback_id === 'reset_demo') ||
-      payload.type === 'shortcut'
+      [
+        SlackCallbackId.RESET_DEMO,
+        SlackCallbackId.MANAGE_ENTRY_POINTS,
+        SlackCallbackId.SHOW_NEEDS_ATTENTION,
+      ].includes(payload.callback_id as SlackCallbackId)
     ) {
-      // For message actions, we always show a confirmation modal. Because we
-      // have to show this modal within 3 seconds, we immediately make the call
-      // to show a loading state, and then pass the modal ID on to the async
-      // task to update the modal
+      logger.info(
+        `SERVER POST /slack-interactivity: Determined ${payload.callback_id} opens a modal`
+      );
+
+      // For certain actions, we always show a modal. Because we have to show
+      // this modal within 3 seconds, we immediately make the call to show a
+      // loading state, and then pass the modal ID on to the async task to
+      // update the modal
       metadata.viewId = await SlackApiUtil.renderModal(
         payload.trigger_id,
         SlackBlockUtil.loadingSlackView()
       );
     }
 
+    if (
+      payload.type === 'view_submission' &&
+      (payload.view?.callback_id as SlackCallbackId) ===
+        SlackCallbackId.MANAGE_ENTRY_POINTS
+    ) {
+      // Check if we need to render a confirmation modal. This needs to happen
+      // synchronously to avoid 3 second timeout.
+      const confirmationModal = SlackInteractionHandler.maybeGetManageEntryPointsConfirmationModal(
+        payload
+      );
+      if (confirmationModal) {
+        logger.info(
+          `SERVER POST /slack-interactivity: Determined ${payload.view?.callback_id} pushes a view onto modal`
+        );
+
+        res.json({
+          response_action: 'push',
+          view: confirmationModal,
+        });
+        return; // Return early to avoid background task
+      } else {
+        logger.info(
+          `SERVER POST /slack-interactivity: Determined ${payload.view?.callback_id} updates the view in modal`
+        );
+
+        // This will change, so show loading state again.
+        res.json({
+          response_action: 'update',
+          view: SlackBlockUtil.loadingSlackView(),
+        });
+      }
+    }
+
     await enqueueBackgroundTask('slackInteractivityHandler', payload, metadata);
 
-    // Use res.end instead of res.sendStatus because the latter sends the code as
-    // a string in the body, and modal responses require an empty body in some cases.
-    // See https://api.slack.com/surfaces/modals/using#close_current_view.
-    res.writeHead(200);
-    res.end();
+    // res.headersSent check because res.json may make this unnecessary
+    if (!res.headersSent) {
+      // Use res.end instead of res.sendStatus because the latter sends the code as
+      // a string in the body, and modal responses require an empty body in some cases.
+      // See https://api.slack.com/surfaces/modals/using#close_current_view.
+      res.writeHead(200);
+      res.end();
+    }
   })
 );
 

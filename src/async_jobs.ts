@@ -26,6 +26,7 @@ import {
 import { wrapLambdaHandlerForSentry } from './sentry_wrapper';
 import { SlackEventRequestBody } from './router';
 import { UserInfo } from './types';
+import { SlackActionId, SlackCallbackId } from './slack_interaction_ids';
 
 export type InteractivityHandlerMetadata = { viewId?: string };
 
@@ -81,16 +82,39 @@ async function slackInteractivityHandler(
 
   // Global shortcut
   if (payload.type === 'shortcut') {
+    // Technically it's possible to have a shortcut that doesn't open a global but all of ours
+    // do at the moment, so check for it.
     const { viewId } = interactivityMetadata;
     if (!viewId) {
       throw new Error(
         'slackInteractivityHandler called for message_action without viewId'
       );
     }
+
     switch (payload.callback_id) {
-      case 'show_needs_attention': {
+      case SlackCallbackId.SHOW_NEEDS_ATTENTION: {
         await SlackInteractionHandler.handleShortcutShowNeedsAttention({
           payload,
+          viewId,
+        });
+        return;
+      }
+
+      case SlackCallbackId.MANAGE_ENTRY_POINTS: {
+        logger.info(
+          `SERVER POST /slack-interactivity: Determined user interaction is a MANAGE_ENTRY_POINTS_MODAL submission.`
+        );
+
+        // This shortcut is called infrequently enough that we can update this cache
+        // (and call `conversations.list`) every time the shortcut is called. If this
+        // proves to be an issue, we can require an explicit action from the user to
+        // update or do something around Slack events for channel creation.
+        await SlackApiUtil.updateSlackChannelNamesAndIdsInRedis(redisClient);
+
+        await SlackInteractionHandler.handleManageEntryPoints({
+          payload,
+          redisClient,
+          originatingSlackUserName,
           viewId,
         });
         return;
@@ -113,7 +137,7 @@ async function slackInteractivityHandler(
     );
 
     switch (payload.callback_id) {
-      case 'set_needs_attention': {
+      case SlackCallbackId.SET_NEEDS_ATTENTION: {
         // Use thread if message is threaded; original channel msg if there is no thread yet
         await DbApiUtil.setThreadNeedsAttentionToDb(
           payload.message.thread_ts || payload.message.ts,
@@ -130,7 +154,7 @@ async function slackInteractivityHandler(
         return;
       }
 
-      case 'clear_needs_attention': {
+      case SlackCallbackId.CLEAR_NEEDS_ATTENTION: {
         // Use thread if message is threaded; original channel msg if there is no thread yet
         await DbApiUtil.setThreadNeedsAttentionToDb(
           payload.message.thread_ts || payload.message.ts,
@@ -147,7 +171,7 @@ async function slackInteractivityHandler(
         return;
       }
 
-      case 'reset_demo': {
+      case SlackCallbackId.RESET_DEMO: {
         const { viewId } = interactivityMetadata;
         if (!viewId) {
           throw new Error(
@@ -208,6 +232,37 @@ async function slackInteractivityHandler(
 
   // Block action
   if (payload.type === 'block_actions') {
+    const actionId = payload.actions[0]?.action_id;
+    switch (actionId) {
+      case SlackActionId.MANAGE_ENTRY_POINTS_FILTER_STATE:
+      case SlackActionId.MANAGE_ENTRY_POINTS_FILTER_TYPE: {
+        logger.info(
+          `SERVER POST /slack-interactivity: Determined user interaction is in MANAGE_ENTRY_POINTS modal`
+        );
+
+        const view = payload.view;
+        if (!view) {
+          throw new Error('MANAGE_ENTRY_POINTS block_actions expected view');
+        }
+
+        await SlackInteractionHandler.handleManageEntryPoints({
+          payload,
+          redisClient,
+          originatingSlackUserName,
+          viewId: payload.view.id,
+          values: payload.view.state?.values,
+          action: payload.actions[0],
+        });
+        return;
+      }
+
+      case SlackActionId.MANAGE_ENTRY_POINTS_CHANNEL_STATE_DROPDOWN: {
+        // Noop -- this gets handled with submission
+        return;
+      }
+    }
+
+    // Fallback behavior for block actions introduced prior to use of action IDs
     const originatingSlackChannelName = await SlackApiUtil.fetchSlackChannelName(
       payload.channel.id
     );
@@ -235,7 +290,7 @@ async function slackInteractivityHandler(
       );
       await SlackInteractionHandler.handleVoterStatusUpdate({
         payload,
-        selectedVoterStatus,
+        selectedVoterStatus: selectedVoterStatus as SlackInteractionHandler.VoterStatusUpdate,
         originatingSlackUserName,
         slackChannelName: originatingSlackChannelName,
         userPhoneNumber: redisData ? redisData.userPhoneNumber : null,
@@ -257,20 +312,82 @@ async function slackInteractivityHandler(
     return;
   }
 
-  // Modal confirmation
+  // If the interaction is submission of a modal.
   if (payload.type === 'view_submission') {
-    // Get the data associated with the modal used for execution of the
-    // action it confirmed.
-    const modalPrivateMetadata = JSON.parse(
-      payload.view.private_metadata
-    ) as SlackModalPrivateMetadata;
-    if (modalPrivateMetadata.commandType === 'RESET_DEMO') {
-      await SlackInteractionHandler.handleResetDemo(
-        redisClient,
-        modalPrivateMetadata
-      );
-      return;
+    const viewId = payload.view?.id;
+    if (!viewId) {
+      // This should never happen. If it does, it's a Slack bug.
+      throw new Error('view_submission missing view.id?');
     }
+
+    switch (payload.view.callback_id) {
+      // The MANAGE_ENTRY_POINTS_MODAL callback ID is set when the user submits options
+      // for adjusting the weights of different channels for load balancing.
+      case SlackCallbackId.MANAGE_ENTRY_POINTS: {
+        logger.info(
+          `SERVER POST /slack-interactivity: Determined user interaction is a MANAGE_ENTRY_POINTS_MODAL submission.`
+        );
+
+        await SlackInteractionHandler.handleManageEntryPoints({
+          payload,
+          redisClient,
+          originatingSlackUserName,
+          viewId,
+          values: payload?.view?.state?.values,
+          isSubmission: true,
+        });
+        return;
+      }
+
+      // If the submission for MANAGE_ENTRY_POINTS_MODAL zero-ed out the weights for
+      // a particular entrypoint, we warn the user and ask for confirmation. If they
+      // confirm, we get this MANAGE_ENTRY_POINTS_CONFIRM_MODAL callback ID which
+      // contains the original view's values in its private_metadata
+      case SlackCallbackId.MANAGE_ENTRY_POINTS_CONFIRM: {
+        logger.info(
+          `SERVER POST /slack-interactivity: Determined user interaction is a MANAGE_ENTRY_POINTS_MODAL_CONFIRM submission.`
+        );
+
+        const rootViewId = payload.view?.root_view_id;
+        if (!rootViewId) {
+          // This should never happen. If it does, it's a Slack bug.
+          throw new Error('view_submission missing view.root_view_id"');
+        }
+
+        await SlackInteractionHandler.handleManageEntryPoints({
+          payload,
+          redisClient,
+          originatingSlackUserName,
+          viewId: rootViewId,
+          values: JSON.parse(payload?.view?.private_metadata),
+          isSubmission: true,
+        });
+        return;
+      }
+
+      case SlackCallbackId.RESET_DEMO: {
+        const modalPrivateMetadata = JSON.parse(
+          payload.view.private_metadata
+        ) as SlackModalPrivateMetadata;
+        if (modalPrivateMetadata.commandType !== 'RESET_DEMO') {
+          throw new Error(
+            `Got callback ID RESET_DEMO but private commandType was ${modalPrivateMetadata.commandType}`
+          );
+        }
+        await SlackInteractionHandler.handleResetDemo(
+          redisClient,
+          modalPrivateMetadata
+        );
+        return;
+      }
+
+      default: {
+        throw new Error(
+          `SERVER POST /slack-interactivity: Unrecognized callback_id for view_submission ${payload.view.callback_id}`
+        );
+      }
+    }
+
     // If the view_submission interaction does not match one of the above types
     // exit and continue down to throw an error.
   }

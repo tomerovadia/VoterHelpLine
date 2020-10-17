@@ -1,3 +1,5 @@
+import bluebird from 'bluebird';
+import { Multi } from 'redis';
 import logger from './logger';
 import type { PromisifiedRedisClient } from './redis_client';
 
@@ -102,4 +104,12 @@ export function deleteKeys(
   logger.debug(`ENTERING REDISAPIUTIL.deleteKeys`);
 
   return redisClient.delAsync(...keys);
+}
+
+export async function transactAsync(
+  redisClient: PromisifiedRedisClient,
+  callback: (multi: Multi) => Multi
+): Promise<any[]> {
+  const multi = callback(redisClient.multi());
+  return bluebird.promisify(multi.exec.bind(multi))();
 }

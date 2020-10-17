@@ -31,6 +31,7 @@ export type PromisifiedRedisClient = typeof redisClient & {
   existsAsync(...keys: string[]): Promise<number>;
   delAsync(...keys: string[]): Promise<number>;
   hdelAsync(key: string, field: string): Promise<number>;
+  execAsync(): Promise<any>;
   pingAsync(): Promise<void>;
 };
 
