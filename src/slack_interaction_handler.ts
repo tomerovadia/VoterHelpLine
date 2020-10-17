@@ -4,6 +4,7 @@ import * as SlackApiUtil from './slack_api_util';
 import * as LoadBalancer from './load_balancer';
 import * as PodUtil from './pod_util';
 import * as SlackBlockUtil from './slack_block_util';
+import * as SlackBlockEntrypointUtil from './slack_block_entrypoint_util';
 import * as SlackInteractionApiUtil from './slack_interaction_api_util';
 import { SlackActionId, SlackCallbackId } from './slack_interaction_ids';
 import * as RedisApiUtil from './redis_api_util';
@@ -332,7 +333,7 @@ export async function handleVolunteerUpdate({
     !payload.actions[0].selected_user
   ) {
     throw new Error(
-      'Expected seelcted_user in LACKINTERACTIONHANDLER.handleVolunteerUpdate'
+      'Expected selected_user in SLACKINTERACTIONHANDLER.handleVolunteerUpdate'
     );
   }
   const selectedVolunteerSlackUserName = await SlackApiUtil.fetchSlackUserName(
@@ -907,7 +908,7 @@ export async function handleOpenCloseChannels({
       viewId,
       SlackBlockUtil.getErrorSlackView(
         SlackCallbackId.OPEN_CLOSE_CHANNELS_ERROR_MODAL,
-        'You must have access to the admin channel to do that'
+        'You must have access to #admin-control-room to do that'
       )
     );
     return;
@@ -991,7 +992,7 @@ export async function handleOpenCloseChannels({
           pull: [],
         };
 
-  const slackView = SlackBlockUtil.getOpenCloseModal({
+  const slackView = SlackBlockEntrypointUtil.getOpenCloseModal({
     stateOrRegionName,
     channelType,
     pushRows: push,
@@ -1032,7 +1033,7 @@ export function maybeGetConfirmationModal(
   });
 
   if (hasAtLeastOnePull && hasAtLeastOnePush) return null;
-  return SlackBlockUtil.openCloseConfirmationView({
+  return SlackBlockEntrypointUtil.openCloseConfirmationView({
     hasAtLeastOnePull,
     hasAtLeastOnePush,
     values,

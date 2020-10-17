@@ -30,18 +30,6 @@ import { SlackActionId, SlackCallbackId } from './slack_interaction_ids';
 
 export type InteractivityHandlerMetadata = { viewId?: string };
 
-function getViewId(
-  payload: SlackInteractionEventPayload,
-  interactivityMetadata: InteractivityHandlerMetadata
-) {
-  if (payload.view && payload.view.id) return payload.view.id;
-
-  const { viewId } = interactivityMetadata;
-  if (viewId) return viewId;
-
-  throw new Error('slackInteractivityHandler called without viewId');
-}
-
 async function slackCommandHandler(
   teamId: string,
   channelId: string,
@@ -97,12 +85,15 @@ async function slackInteractivityHandler(
 
   // Global shortcut
   if (payload.type === 'shortcut') {
+    // Technically it's possible to have a shortcut that doesn't open a global but all of ours
+    // do at the moment, so check for it.
     const { viewId } = interactivityMetadata;
     if (!viewId) {
       throw new Error(
         'slackInteractivityHandler called for message_action without viewId'
       );
     }
+
     switch (payload.callback_id) {
       case SlackCallbackId.SHOW_NEEDS_ATTENTION: {
         await SlackInteractionHandler.handleShortcutShowNeedsAttention({
@@ -120,7 +111,7 @@ async function slackInteractivityHandler(
           payload,
           redisClient,
           originatingSlackUserName,
-          viewId: getViewId(payload, interactivityMetadata),
+          viewId,
           values: payload?.view?.state?.values,
           isSubmission: true,
         });
@@ -256,8 +247,8 @@ async function slackInteractivityHandler(
           payload,
           redisClient,
           originatingSlackUserName,
-          viewId: getViewId(payload, interactivityMetadata),
-          values: payload?.view?.state?.values,
+          viewId: payload.view.id,
+          values: payload.view.state?.values,
           action: payload.actions[0],
         });
         return;
@@ -321,7 +312,15 @@ async function slackInteractivityHandler(
 
   // If the interaction is submission of a modal.
   if (payload.type === 'view_submission') {
-    switch (payload.callback_id) {
+    const viewId = payload.view?.id;
+    if (!viewId) {
+      // This should never happen. If it does, it's a Slack bug.
+      throw new Error('view_submission missing view.id?');
+    }
+
+    switch (payload.view.callback_id) {
+      // The OPEN_CLOSE_CHANNELS_MODAL callback ID is set when the user submits options
+      // for adjusting the weights of different channels for load balancing.
       case SlackCallbackId.OPEN_CLOSE_CHANNELS_MODAL: {
         logger.info(
           `SERVER POST /slack-interactivity: Determined user interaction is a OPEN_CLOSE_CHANNELS_MODAL submission.`
@@ -331,23 +330,33 @@ async function slackInteractivityHandler(
           payload,
           redisClient,
           originatingSlackUserName,
-          viewId: getViewId(payload, interactivityMetadata),
+          viewId,
           values: payload?.view?.state?.values,
           isSubmission: true,
         });
         return;
       }
 
+      // If the submission for OPEN_CLOSE_CHANNELS_MODAL zero-ed out the weights for
+      // a particular entrypoint, we warn the user and ask for confirmation. If they
+      // confirm, we get this OPEN_CLOSE_CHANNELS_CONFIRM_MODAL callback ID which
+      // contains the original view's values in its private_metadata
       case SlackCallbackId.OPEN_CLOSE_CHANNELS_CONFIRM_MODAL: {
         logger.info(
           `SERVER POST /slack-interactivity: Determined user interaction is a OPEN_CLOSE_CHANNELS_MODAL_CONFIRM submission.`
         );
 
+        const rootViewId = payload.view?.root_view_id;
+        if (!rootViewId) {
+          // This should never happen. If it does, it's a Slack bug.
+          throw new Error('view_submission missing view.root_view_id"');
+        }
+
         await SlackInteractionHandler.handleOpenCloseChannels({
           payload,
           redisClient,
           originatingSlackUserName,
-          viewId: payload?.view?.root_view_id,
+          viewId: rootViewId,
           values: JSON.parse(payload?.view?.private_metadata),
           isSubmission: true,
         });

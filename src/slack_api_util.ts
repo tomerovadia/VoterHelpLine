@@ -386,7 +386,7 @@ export async function updateSlackChannelNamesAndIdsInRedis(
   return slackChannelNamesAndIds;
 }
 
-// Get Slack Channel Name / ID map, using cache if needed
+// Get Slack Channel Name / ID map, populating cache if needed
 export async function getSlackChannelNamesAndIds(
   redisClient: PromisifiedRedisClient
 ): Promise<SlackChannelNamesAndIds | null> {
