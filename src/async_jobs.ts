@@ -107,13 +107,18 @@ async function slackInteractivityHandler(
         logger.info(
           `SERVER POST /slack-interactivity: Determined user interaction is a OPEN_CLOSE_CHANNELS_MODAL submission.`
         );
+
+        // This shortcut is called infrequently enough that we can update this cache
+        // (and call `conversations.list`) every time the shortcut is called. If this
+        // proves to be an issue, we can require an explicit action from the user to
+        // update or do something around Slack events for channel creation.
+        await SlackApiUtil.updateSlackChannelNamesAndIdsInRedis(redisClient);
+
         await SlackInteractionHandler.handleOpenCloseChannels({
           payload,
           redisClient,
           originatingSlackUserName,
           viewId,
-          values: payload?.view?.state?.values,
-          isSubmission: true,
         });
         return;
       }
