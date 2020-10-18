@@ -63,7 +63,7 @@ export async function selectSlackChannel(
     if (stateRegionConfig && stateRegionConfig[stateName]) {
       stateOrRegionName = stateRegionConfig[stateName];
     } else {
-      stateOrRegionName = 'National';
+      // Leave stateOrRegionName = stateName as fallback.
       logger.error(
         `LOADBALANCER.selectSlackChannel: ERROR with stateToRegionMap: no stateRegionConfig in Redis or no value found for key (${stateName}). stateRegionConfig: ${JSON.stringify(
           stateRegionConfig
@@ -100,23 +100,23 @@ export async function selectSlackChannel(
     `LOADBALANCER.selectSlackChannel: Successfully found numVoters with voterCounterKey ${voterCounterKey} in Redis: ${numVoters}`
   );
 
-  const openPods = await redisClient.lrangeAsync(
+  let openPods = await redisClient.lrangeAsync(
     openPodsKey,
     0,
-    1000 /* max # of pods */
+    -1 /* max # of pods */
   );
   if (!openPods) {
     logger.error(
       `LOADBALANCER.selectSlackChannel: ERROR finding openPodsKey ${openPodsKey} in Redis: err || !openPods`
     );
-    return null;
+    openPods = isDemo ? ['demo-national-0'] : ['national-0'];
+  } else {
+    logger.debug(
+      `LOADBALANCER.selectSlackChannel: Successfully found openPods with openPodsKey ${openPodsKey} in Redis: ${JSON.stringify(
+        openPods
+      )}`
+    );
   }
-
-  logger.debug(
-    `LOADBALANCER.selectSlackChannel: Successfully found openPods with openPodsKey ${openPodsKey} in Redis: ${JSON.stringify(
-      openPods
-    )}`
-  );
 
   const selectedPodNumber = numVoters % openPods.length;
   logger.debug(

@@ -21,9 +21,10 @@ export async function fetchStateRegionConfig(
 export async function regionsList(
   redisClient: PromisifiedRedisClient
 ): Promise<string[]> {
-  return process.env.CLIENT_ORGANIZATION === 'VOTE_AMERICA'
-    ? uniq(Object.values(fetchStateRegionConfig(redisClient)))
-    : [];
+  const stateRegionConfig = await fetchStateRegionConfig(redisClient);
+  console.log("TOMERTOMERTOMERTOMERTOMERTOMEROMTERTOMERTOMERTOMER");
+  console.log(stateRegionConfig)
+  return uniq(Object.values(stateRegionConfig));
 }
 
 export async function getRegionsListMinusStates(
