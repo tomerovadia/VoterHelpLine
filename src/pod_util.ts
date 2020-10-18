@@ -26,17 +26,24 @@ export type ChannelInfo = {
   weight: number;
 };
 
-async function listStateAndRegions(redisClient: PromisifiedRedisClient): Promise<string[]> {
+async function listStateAndRegions(
+  redisClient: PromisifiedRedisClient
+): Promise<string[]> {
   const regions = await regionsList(redisClient);
   return Object.values(getStateConstants()).concat(regions).sort();
 }
 
-async function getValidStateAndRegionsSet(redisClient: PromisifiedRedisClient): Promise<Set<string>> {
+async function getValidStateAndRegionsSet(
+  redisClient: PromisifiedRedisClient
+): Promise<Set<string>> {
   const statesAndRegions = await listStateAndRegions(redisClient);
   return new Set(statesAndRegions);
 }
 
-async function isValidStateOrRegionName(redisClient: PromisifiedRedisClient, stateOrRegionName: string): Promise<boolean> {
+async function isValidStateOrRegionName(
+  redisClient: PromisifiedRedisClient,
+  stateOrRegionName: string
+): Promise<boolean> {
   const stateAndRegionSet = await getValidStateAndRegionsSet(redisClient);
   return stateAndRegionSet.has(stateOrRegionName);
 }
@@ -170,7 +177,10 @@ export async function setChannelWeights(
     })}`
   );
 
-  const nameIsValidStateOrRegion = await isValidStateOrRegionName(redisClient, filters.stateOrRegionName);
+  const nameIsValidStateOrRegion = await isValidStateOrRegionName(
+    redisClient,
+    filters.stateOrRegionName
+  );
   if (!nameIsValidStateOrRegion) {
     throw new Error(
       `Unrecognized state or region ${filters.stateOrRegionName}`

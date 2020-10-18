@@ -18,16 +18,17 @@ export async function fetchStateRegionConfig(
   return {} as StateRegionConfig;
 }
 
-export async function regionsList(redisClient: PromisifiedRedisClient): Promise<string[]> {
+export async function regionsList(
+  redisClient: PromisifiedRedisClient
+): Promise<string[]> {
   return process.env.CLIENT_ORGANIZATION === 'VOTE_AMERICA'
     ? uniq(Object.values(fetchStateRegionConfig(redisClient)))
     : [];
 }
 
-export async function getRegionsListMinusStates(redisClient: PromisifiedRedisClient): Promise<string[]> {
+export async function getRegionsListMinusStates(
+  redisClient: PromisifiedRedisClient
+): Promise<string[]> {
   const regions = await regionsList(redisClient);
-  return difference(
-    regions,
-    Object.values(getStateConstants())
-  );
+  return difference(regions, Object.values(getStateConstants()));
 }
