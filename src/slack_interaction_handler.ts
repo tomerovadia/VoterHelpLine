@@ -655,7 +655,7 @@ export async function handleCommandNeedsAttention(
     );
   }
 
-  if (lines.length == 0) {
+  if (lines.length == 1) {
     // For a single user
     const ulines = await getNeedsAttentionList(showUserId);
     lines.push(
