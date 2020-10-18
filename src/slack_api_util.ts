@@ -30,6 +30,7 @@ type SlackSendMessageOptions = {
   unfurl_links?: boolean;
   unfurl_media?: boolean;
   blocks?: SlackBlock[];
+  isVoterMessage?: boolean;
 };
 
 type SlackChannelNamesAndIds = {
@@ -129,14 +130,21 @@ export async function sendMessage(
   }
 
   try {
-    const response = await slackAPI.post('chat.postMessage', {
+    const slackArgs = {
       channel: options.channel,
       text: message,
       token: process.env.SLACK_BOT_ACCESS_TOKEN,
       thread_ts: options.parentMessageTs,
       blocks: options.blocks,
       unfurl_media: false,
-    });
+    } as { [key: string]: any };
+
+    if (options.isVoterMessage) {
+      slackArgs.username = `Voter ${userInfo?.userId.substring(0, 5)}`;
+      slackArgs.icon_emoji = ':bust_in_silhouette:';
+    }
+
+    const response = await slackAPI.post('chat.postMessage', slackArgs);
 
     if (!response.data.ok) {
       logger.error(

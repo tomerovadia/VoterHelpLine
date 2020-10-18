@@ -267,7 +267,11 @@ const introduceNewVoterToSlackChannel = async (
     );
     await SlackApiUtil.sendMessage(
       `${userMessage}`,
-      { parentMessageTs: response.data.ts, channel: response.data.channel },
+      {
+        parentMessageTs: response.data.ts,
+        channel: response.data.channel,
+        isVoterMessage: true,
+      },
       inboundDbMessageEntry,
       userInfo
     );
@@ -809,7 +813,11 @@ export async function determineVoterState(
   );
   await SlackApiUtil.sendMessage(
     `${userMessage}`,
-    { parentMessageTs: lobbyParentMessageTs, channel: lobbyChannelId },
+    {
+      parentMessageTs: lobbyParentMessageTs,
+      channel: lobbyChannelId,
+      isVoterMessage: true,
+    },
     inboundDbMessageEntry,
     userInfo
   );
@@ -970,7 +978,7 @@ export async function handleDisclaimer(
 
   await SlackApiUtil.sendMessage(
     `${userMessage}`,
-    slackLobbyMessageParams,
+    { ...slackLobbyMessageParams, isVoterMessage: true },
     inboundDbMessageEntry,
     userInfo
   );
@@ -1037,7 +1045,7 @@ export async function handleClearedVoter(
 
   await SlackApiUtil.sendMessage(
     `${userOptions.userMessage}`,
-    activeChannelMessageParams,
+    { ...activeChannelMessageParams, isVoterMessage: true },
     inboundDbMessageEntry,
     userInfo
   );

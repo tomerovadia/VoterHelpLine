@@ -191,10 +191,11 @@ export async function handleKnownVoterBlockLogic(
     if ('activeChannelId' in userInfo) {
       // This includes a DB write of the message.
       await SlackApiUtil.sendMessage(
-        `*${userInfo.userId.substring(0, 5)}:* ${userMessage}`,
+        userMessage,
         {
           parentMessageTs: userInfo[userInfo.activeChannelId],
           channel: userInfo.activeChannelId,
+          isVoterMessage: true,
         },
         inboundDbMessageEntry,
         userInfo
@@ -567,7 +568,10 @@ app.post(
     // messages from the bot itself, hidden events, etc.
     if (
       reqBody.event.type === 'message' &&
-      reqBody.event.user != process.env.SLACK_BOT_USER_ID &&
+      // Most message include user id as event.user, but bot messages with
+      // a custom username include the user id as parent_user_id
+      (reqBody.event.user || reqBody.event.parent_user_id) !=
+        process.env.SLACK_BOT_USER_ID &&
       !reqBody.event.hidden
     ) {
       await enqueueBackgroundTask(
