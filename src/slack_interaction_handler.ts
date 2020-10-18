@@ -997,7 +997,8 @@ export async function handleManageEntryPoints({
           pull: [],
         };
 
-  const slackView = SlackBlockEntrypointUtil.getOpenCloseModal({
+  const slackView = await SlackBlockEntrypointUtil.getOpenCloseModal({
+    redisClient,
     stateOrRegionName,
     channelType,
     pushRows: push,
