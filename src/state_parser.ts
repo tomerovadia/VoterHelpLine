@@ -48,7 +48,10 @@ export function determineState(userMessage: string): string | null {
     // sought.
     if (['IN', 'OK', 'ME', 'OR'].includes(abbrev)) {
       // Remove spaces in case message is state abbreviation plus spaces and punctuation (e.g. "O.K. ")
-      const userMessageNoPunctuationOrSpaces = userMessageNoPunctuation.replace(/\s/g, '');
+      const userMessageNoPunctuationOrSpaces = userMessageNoPunctuation.replace(
+        /\s/g,
+        ''
+      );
       if (userMessageNoPunctuationOrSpaces.length > 2) {
         continue;
       }
