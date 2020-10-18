@@ -9,21 +9,25 @@ type StateRegionConfig = {
 
 export async function fetchStateRegionConfig(
   redisClient: PromisifiedRedisClient
-): Promise<StateRegionConfig | null> {
+): Promise<StateRegionConfig> {
   const stateRegionConfig = await RedisApiUtil.getHash(
     redisClient,
     'stateRegionConfig'
   );
   if (stateRegionConfig) return stateRegionConfig;
-  return null;
+  return {} as StateRegionConfig;
 }
 
-export const regionsList =
-  process.env.CLIENT_ORGANIZATION === 'VOTE_AMERICA'
-    ? uniq(Object.values(fetchStateRegionConfig()))
+export async function regionsList(redisClient: PromisifiedRedisClient): Promise<string[]> {
+  return process.env.CLIENT_ORGANIZATION === 'VOTE_AMERICA'
+    ? uniq(Object.values(fetchStateRegionConfig(redisClient)))
     : [];
+}
 
-export const regionsListMinusStates = difference(
-  regionsList,
-  Object.values(getStateConstants())
-);
+export async function getRegionsListMinusStates(redisClient: PromisifiedRedisClient): Promise<string[]> {
+  const regions = await regionsList(redisClient);
+  return difference(
+    regions,
+    Object.values(getStateConstants())
+  );
+}

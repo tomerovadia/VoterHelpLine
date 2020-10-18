@@ -92,6 +92,10 @@ Important: The Slack bot must be given access to each of these channels.
 - RPUSH openPodsPullNorthCarolina north-carolina-0
 - RPUSH openPodsPullDemoNorthCarolina demo-north-carolina-0
 
+#### Example State-to-Region Config (valid as of Oct 18, 2020)
+
+HMSET stateRegionConfig "Alabama" "Central" "Alaska" "Pacific" "Arizona" "Arizona" "Arkansas" "Central" "California" "California" "Colorado" "Colorado" "Connecticut" "Eastern North" "Delaware" "Eastern North" "District of Columbia" "Eastern South" "Florida" "Florida" "Georgia" "Georgia" "Hawaii" "Pacific" "Idaho" "Mountain" "Illinois" "Illinois" "Indiana" "Eastern North" "Iowa" "Central" "Kansas" "Central" "Kentucky" "Eastern South" "Louisiana" "Central" "Maine" "Eastern North" "Maryland" "Eastern South" "Massachusetts" "Eastern North" "Michigan" "Eastern North" "Minnesota" "Minnesota" "Mississippi" "Central" "Missouri" "Central" "Montana" "Mountain" "Nebraska" "Central" "Nevada" "Pacific" "New Hampshire" "Eastern North" "New Jersey" "Eastern North" "New Mexico" "Mountain" "New York" "New York" "North Carolina" "North Carolina" "North Dakota" "Central" "Ohio" "Eastern North" "Oklahoma" "Central" "Oregon" "Pacific" "Pennsylvania" "Pennsylvania" "Rhode Island" "Eastern North" "South Carolina" "Eastern South" "South Dakota" "Central" "Tennessee" "Eastern South" "Texas" "Texas" "Utah" "Mountain" "Vermont" "Eastern North" "Virginia" "Eastern South" "Washington" "Pacific" "West Virginia" "Eastern South" "Wisconsin" "Wisconsin" "Wyoming" "Mountain" "National" "National"
+
 ## Slack App
 
 ### OAuth & Permissions
@@ -156,7 +160,7 @@ This should be added as a **global** shortcut.
 - **Short Description:** Show voters needing attention
 - **Callback ID:** show_needs_attention
 
-#### Manage Entry Points
+##### Manage Entry Points
 
 This should be added as a **global** shortcut.
 

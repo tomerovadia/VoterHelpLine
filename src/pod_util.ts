@@ -1,4 +1,4 @@
-import { memoize, sortBy, times } from 'lodash';
+import { sortBy, times } from 'lodash';
 import { PromisifiedRedisClient } from './redis_client';
 import logger from './logger';
 import * as RedisApiUtil from './redis_api_util';
@@ -26,16 +26,20 @@ export type ChannelInfo = {
   weight: number;
 };
 
-export const listStateAndRegions = memoize(() =>
-  Object.values(getStateConstants()).concat(regionsList).sort()
-);
+async function listStateAndRegions(redisClient: PromisifiedRedisClient): Promise<string[]> {
+  const regions = await regionsList(redisClient);
+  return Object.values(getStateConstants()).concat(regions).sort();
+}
 
-const getValidStateAndRegionsSet = memoize(
-  () => new Set(listStateAndRegions())
-);
+async function getValidStateAndRegionsSet(redisClient: PromisifiedRedisClient): Promise<Set<string>> {
+  const statesAndRegions = await listStateAndRegions(redisClient);
+  return new Set(statesAndRegions);
+}
 
-const isValidStateOrRegionName = (stateOrRegionName: string) =>
-  getValidStateAndRegionsSet().has(stateOrRegionName);
+async function isValidStateOrRegionName(redisClient: PromisifiedRedisClient, stateOrRegionName: string): Promise<boolean> {
+  const stateAndRegionSet = await getValidStateAndRegionsSet(redisClient);
+  return stateAndRegionSet.has(stateOrRegionName);
+}
 
 export const getEntrypointTypes = (): EntryPoint[] => {
   if (process.env.CLIENT_ORGANIZATION === 'VOTE_AMERICA') {
@@ -166,7 +170,8 @@ export async function setChannelWeights(
     })}`
   );
 
-  if (!isValidStateOrRegionName(filters.stateOrRegionName)) {
+  const nameIsValidStateOrRegion = await isValidStateOrRegionName(redisClient, filters.stateOrRegionName);
+  if (!nameIsValidStateOrRegion) {
     throw new Error(
       `Unrecognized state or region ${filters.stateOrRegionName}`
     );

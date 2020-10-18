@@ -57,13 +57,13 @@ export async function selectSlackChannel(
   let stateOrRegionName = stateName;
   // Translate stateName potentially into a region.
   if (process.env.CLIENT_ORGANIZATION === 'VOTE_AMERICA') {
-    const stateRegionConfig = await StateRegionConfig.fetchStateRegionConfig();
+    const stateRegionConfig = await StateRegionConfig.fetchStateRegionConfig(redisClient);
     if (stateRegionConfig && stateRegionConfig[stateName]) {
       stateOrRegionName = stateRegionConfig[stateName];
     } else {
       stateOrRegionName = "National";
       logger.error(
-        `LOADBALANCER.selectSlackChannel: ERROR with stateToRegionMap: no ${stateRegionConfig} in Redis or no value found for key (${stateName}). stateRegionConfig: ${JSON.stringify(stateRegionConfig)}.`
+        `LOADBALANCER.selectSlackChannel: ERROR with stateToRegionMap: no stateRegionConfig in Redis or no value found for key (${stateName}). stateRegionConfig: ${JSON.stringify(stateRegionConfig)}.`
       );
     }
   }
