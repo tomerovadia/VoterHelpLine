@@ -3,25 +3,16 @@ import { PromisifiedRedisClient } from './redis_client';
 import logger from './logger';
 import * as RedisApiUtil from './redis_api_util';
 import * as SlackApiUtil from './slack_api_util';
-import { OPEN_CLOSE_CHANNELS_BLOCK_ID_PREFIX } from './slack_interaction_ids';
+import { MANAGE_ENTRY_POINTS_BLOCK_ID_PREFIX } from './slack_interaction_ids';
 import { getStateConstants } from './state_constants';
 import { regionsList } from './state_region_config';
-
-export enum CHANNEL_TYPE {
-  DEMO = 'DEMO',
-  NORMAL = 'NORMAL',
-}
-
-export enum ENTRYPOINT_TYPE {
-  PUSH = 'PUSH',
-  PULL = 'PULL',
-}
+import { ChannelType, EntryPoint } from './types';
 
 export interface PodFilters {
   /** Selected state or region name. Must be full name like "North Carolina" */
   stateOrRegionName: string;
   /** Selected filter type, if any */
-  channelType: CHANNEL_TYPE;
+  channelType: ChannelType;
 }
 
 export type ChannelInfo = {
@@ -30,7 +21,7 @@ export type ChannelInfo = {
   // Channel Name, e.g. north-carolina
   channelName: string;
   // What kind of entrypoint is this?
-  entrypoint: ENTRYPOINT_TYPE;
+  entrypoint: EntryPoint;
   // Relative weight in round-robin ranking. 0 is off.
   weight: number;
 };
@@ -46,18 +37,24 @@ const getValidStateAndRegionsSet = memoize(
 const isValidStateOrRegionName = (stateOrRegionName: string) =>
   getValidStateAndRegionsSet().has(stateOrRegionName);
 
+export const getEntrypointTypes = (): EntryPoint[] => {
+  if (process.env.CLIENT_ORGANIZATION === 'VOTE_AMERICA') {
+    return ['PULL'];
+  }
+  return ['PULL', 'PUSH'];
+};
+
 function getRedisKeyWithStateOrRegionName(
   stateOrRegionName: string,
-  channelType: CHANNEL_TYPE,
-  entryPointType: ENTRYPOINT_TYPE
+  channelType: ChannelType,
+  entryPointType: EntryPoint
 ) {
   const nameNoSpaces = stateOrRegionName.replace(/\s+/g, '');
-  const entrypointString =
-    entryPointType === ENTRYPOINT_TYPE.PULL ? 'Pull' : 'Push';
+  const entrypointString = entryPointType === 'PULL' ? 'Pull' : 'Push';
   switch (channelType) {
-    case CHANNEL_TYPE.NORMAL:
+    case 'NORMAL':
       return `openPods${entrypointString}${nameNoSpaces}`;
-    case CHANNEL_TYPE.DEMO:
+    case 'DEMO':
       return `openPods${entrypointString}Demo${nameNoSpaces}`;
   }
   throw new Error(`Unexpected channelType: ${channelType}`);
@@ -65,13 +62,13 @@ function getRedisKeyWithStateOrRegionName(
 
 export function getChannelNamePrefixForStateOrRegionName(
   stateOrRegionName: string,
-  channelType: CHANNEL_TYPE
+  channelType: ChannelType
 ): string {
   const nameWithHyphens = stateOrRegionName.toLowerCase().replace(/\s+/g, '-');
   switch (channelType) {
-    case CHANNEL_TYPE.NORMAL:
+    case 'NORMAL':
       return `${nameWithHyphens}-`;
-    case CHANNEL_TYPE.DEMO:
+    case 'DEMO':
       return `demo-${nameWithHyphens}-`;
   }
   throw new Error(`Unexpected channelType: ${channelType}`);
@@ -81,8 +78,10 @@ async function getPodChannelStateForEntrypoint(
   redisClient: PromisifiedRedisClient,
   channelNamesAndIds: Record<string, string>,
   filters: PodFilters,
-  entrypoint: ENTRYPOINT_TYPE
+  entrypoint: EntryPoint
 ) {
+  if (!getEntrypointTypes().includes(entrypoint)) return [];
+
   // Map from channel names to a state
   const ret: Record<string, ChannelInfo> = {};
 
@@ -139,13 +138,13 @@ export async function getPodChannelState(
       redisClient,
       channelNamesAndIds,
       filters,
-      ENTRYPOINT_TYPE.PULL
+      'PULL'
     ),
     getPodChannelStateForEntrypoint(
       redisClient,
       channelNamesAndIds,
       filters,
-      ENTRYPOINT_TYPE.PUSH
+      'PUSH'
     ),
   ]);
 
@@ -176,11 +175,11 @@ export async function setChannelWeights(
   const pullList: string[] = [];
   const pushList: string[] = [];
   channelInfo.forEach(({ channelName, entrypoint, weight }) => {
-    if (entrypoint === ENTRYPOINT_TYPE.PULL) {
+    if (entrypoint === 'PULL') {
       times(weight, () => pullList.push(channelName));
       return;
     }
-    if (entrypoint === ENTRYPOINT_TYPE.PUSH) {
+    if (entrypoint === 'PUSH') {
       times(weight, () => pushList.push(channelName));
       return;
     }
@@ -190,12 +189,12 @@ export async function setChannelWeights(
   const pullKey = getRedisKeyWithStateOrRegionName(
     filters.stateOrRegionName,
     filters.channelType,
-    ENTRYPOINT_TYPE.PULL
+    'PULL'
   );
   const pushKey = getRedisKeyWithStateOrRegionName(
     filters.stateOrRegionName,
     filters.channelType,
-    ENTRYPOINT_TYPE.PUSH
+    'PUSH'
   );
 
   // Update keys in a transaction to temporarily avoid leaving list in an empty state
@@ -213,28 +212,28 @@ export function getBlockId({
   entrypoint,
   channelName,
 }: {
-  entrypoint: ENTRYPOINT_TYPE;
+  entrypoint: EntryPoint;
   channelName: string;
 }): string {
-  return `${OPEN_CLOSE_CHANNELS_BLOCK_ID_PREFIX}${entrypoint}:${channelName}`;
+  return `${MANAGE_ENTRY_POINTS_BLOCK_ID_PREFIX}${entrypoint}:${channelName}`;
 }
 
 // Parse string generated by getBlockId
 export function parseBlockId(
   value = ''
 ): {
-  entrypoint: ENTRYPOINT_TYPE;
+  entrypoint: EntryPoint;
   channelName: string;
 } {
-  if (!value.startsWith(OPEN_CLOSE_CHANNELS_BLOCK_ID_PREFIX)) {
+  if (!value.startsWith(MANAGE_ENTRY_POINTS_BLOCK_ID_PREFIX)) {
     throw new Error(`PodUtil.parseBlockId: Unexpected value ${value}`);
   }
 
   const [entrypoint, channelName] = value
-    .slice(OPEN_CLOSE_CHANNELS_BLOCK_ID_PREFIX.length)
+    .slice(MANAGE_ENTRY_POINTS_BLOCK_ID_PREFIX.length)
     .split(':');
   return {
-    entrypoint: entrypoint as ENTRYPOINT_TYPE,
+    entrypoint: entrypoint as EntryPoint,
     channelName,
   };
 }

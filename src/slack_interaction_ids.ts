@@ -2,9 +2,9 @@
 
 // Callback IDs are strings used in shortcuts, mostly.
 export enum SlackCallbackId {
-  OPEN_CLOSE_CHANNELS = 'open_close_channels',
-  OPEN_CLOSE_CHANNELS_CONFIRM = 'open_close_channels_confirm',
-  OPEN_CLOSE_CHANNELS_ERROR = 'open_close_channels_error',
+  MANAGE_ENTRY_POINTS = 'manage_entry_points',
+  MANAGE_ENTRY_POINTS_CONFIRM = 'manage_entry_points_confirm',
+  MANAGE_ENTRY_POINTS_ERROR = 'manage_entry_points_error',
   RESET_DEMO = 'reset_demo',
   SHOW_NEEDS_ATTENTION = 'show_needs_attention',
   SET_NEEDS_ATTENTION = 'set_needs_attention',
@@ -14,9 +14,9 @@ export enum SlackCallbackId {
 // Action IDs are used in interactive blocks
 export enum SlackActionId {
   // Open/Close Channel Modal
-  OPEN_CLOSE_CHANNELS_FILTER_STATE = 'OPEN_CLOSE_CHANNELS_FILTER_STATE',
-  OPEN_CLOSE_CHANNELS_FILTER_TYPE = 'OPEN_CLOSE_CHANNELS_FILTER_TYPE',
-  OPEN_CLOSE_CHANNELS_CHANNEL_STATE_DROPDOWN = 'OPEN_CLOSE_CHANNELS_CHANNEL_STATE_DROPDOWN',
+  MANAGE_ENTRY_POINTS_FILTER_STATE = 'MANAGE_ENTRY_POINTS_FILTER_STATE',
+  MANAGE_ENTRY_POINTS_FILTER_TYPE = 'MANAGE_ENTRY_POINTS_FILTER_TYPE',
+  MANAGE_ENTRY_POINTS_CHANNEL_STATE_DROPDOWN = 'MANAGE_ENTRY_POINTS_CHANNEL_STATE_DROPDOWN',
 
   // Voter status messages
   CLOSED_VOTER_PANEL_UNDO_BUTTON = 'CLOSED_VOTER_PANEL_UNDO_BUTTON',
@@ -28,4 +28,4 @@ export enum SlackActionId {
 }
 
 // Prefixes per-state blocks in open-close channel modal
-export const OPEN_CLOSE_CHANNELS_BLOCK_ID_PREFIX = 'OPEN_CLOSE_CHANNELS:';
+export const MANAGE_ENTRY_POINTS_BLOCK_ID_PREFIX = 'MANAGE_ENTRY_POINTS:';

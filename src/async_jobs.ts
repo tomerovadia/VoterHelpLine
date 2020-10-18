@@ -100,17 +100,22 @@ async function slackInteractivityHandler(
         return;
       }
 
-      case SlackCallbackId.OPEN_CLOSE_CHANNELS: {
+      case SlackCallbackId.MANAGE_ENTRY_POINTS: {
         logger.info(
-          `SERVER POST /slack-interactivity: Determined user interaction is a OPEN_CLOSE_CHANNELS_MODAL submission.`
+          `SERVER POST /slack-interactivity: Determined user interaction is a MANAGE_ENTRY_POINTS_MODAL submission.`
         );
-        await SlackInteractionHandler.handleOpenCloseChannels({
+
+        // This shortcut is called infrequently enough that we can update this cache
+        // (and call `conversations.list`) every time the shortcut is called. If this
+        // proves to be an issue, we can require an explicit action from the user to
+        // update or do something around Slack events for channel creation.
+        await SlackApiUtil.updateSlackChannelNamesAndIdsInRedis(redisClient);
+
+        await SlackInteractionHandler.handleManageEntryPoints({
           payload,
           redisClient,
           originatingSlackUserName,
           viewId,
-          values: payload?.view?.state?.values,
-          isSubmission: true,
         });
         return;
       }
@@ -140,7 +145,7 @@ async function slackInteractivityHandler(
           true
         );
         await SlackApiUtil.sendMessage(
-          '*Operator:* Marked thread as *Needs Attention*',
+          `*Operator:* Thread marked as *Needs Attention* by <@${payload.user.id}>`,
           {
             parentMessageTs: payload.message.thread_ts || payload.message.ts,
             channel: payload.channel.id,
@@ -157,7 +162,7 @@ async function slackInteractivityHandler(
           false
         );
         await SlackApiUtil.sendMessage(
-          '*Operator:* Cleared *Needs Attention*',
+          `*Operator:* *Needs Attention* cleared by <@${payload.user.id}>`,
           {
             parentMessageTs: payload.message.thread_ts || payload.message.ts,
             channel: payload.channel.id,
@@ -229,18 +234,18 @@ async function slackInteractivityHandler(
   if (payload.type === 'block_actions') {
     const actionId = payload.actions[0]?.action_id;
     switch (actionId) {
-      case SlackActionId.OPEN_CLOSE_CHANNELS_FILTER_STATE:
-      case SlackActionId.OPEN_CLOSE_CHANNELS_FILTER_TYPE: {
+      case SlackActionId.MANAGE_ENTRY_POINTS_FILTER_STATE:
+      case SlackActionId.MANAGE_ENTRY_POINTS_FILTER_TYPE: {
         logger.info(
-          `SERVER POST /slack-interactivity: Determined user interaction is in OPEN_CLOSE_CHANNELS modal`
+          `SERVER POST /slack-interactivity: Determined user interaction is in MANAGE_ENTRY_POINTS modal`
         );
 
         const view = payload.view;
         if (!view) {
-          throw new Error('OPEN_CLOSE_CHANNELS block_actions expected view');
+          throw new Error('MANAGE_ENTRY_POINTS block_actions expected view');
         }
 
-        await SlackInteractionHandler.handleOpenCloseChannels({
+        await SlackInteractionHandler.handleManageEntryPoints({
           payload,
           redisClient,
           originatingSlackUserName,
@@ -251,7 +256,7 @@ async function slackInteractivityHandler(
         return;
       }
 
-      case SlackActionId.OPEN_CLOSE_CHANNELS_CHANNEL_STATE_DROPDOWN: {
+      case SlackActionId.MANAGE_ENTRY_POINTS_CHANNEL_STATE_DROPDOWN: {
         // Noop -- this gets handled with submission
         return;
       }
@@ -316,14 +321,14 @@ async function slackInteractivityHandler(
     }
 
     switch (payload.view.callback_id) {
-      // The OPEN_CLOSE_CHANNELS_MODAL callback ID is set when the user submits options
+      // The MANAGE_ENTRY_POINTS_MODAL callback ID is set when the user submits options
       // for adjusting the weights of different channels for load balancing.
-      case SlackCallbackId.OPEN_CLOSE_CHANNELS: {
+      case SlackCallbackId.MANAGE_ENTRY_POINTS: {
         logger.info(
-          `SERVER POST /slack-interactivity: Determined user interaction is a OPEN_CLOSE_CHANNELS_MODAL submission.`
+          `SERVER POST /slack-interactivity: Determined user interaction is a MANAGE_ENTRY_POINTS_MODAL submission.`
         );
 
-        await SlackInteractionHandler.handleOpenCloseChannels({
+        await SlackInteractionHandler.handleManageEntryPoints({
           payload,
           redisClient,
           originatingSlackUserName,
@@ -334,13 +339,13 @@ async function slackInteractivityHandler(
         return;
       }
 
-      // If the submission for OPEN_CLOSE_CHANNELS_MODAL zero-ed out the weights for
+      // If the submission for MANAGE_ENTRY_POINTS_MODAL zero-ed out the weights for
       // a particular entrypoint, we warn the user and ask for confirmation. If they
-      // confirm, we get this OPEN_CLOSE_CHANNELS_CONFIRM_MODAL callback ID which
+      // confirm, we get this MANAGE_ENTRY_POINTS_CONFIRM_MODAL callback ID which
       // contains the original view's values in its private_metadata
-      case SlackCallbackId.OPEN_CLOSE_CHANNELS_CONFIRM: {
+      case SlackCallbackId.MANAGE_ENTRY_POINTS_CONFIRM: {
         logger.info(
-          `SERVER POST /slack-interactivity: Determined user interaction is a OPEN_CLOSE_CHANNELS_MODAL_CONFIRM submission.`
+          `SERVER POST /slack-interactivity: Determined user interaction is a MANAGE_ENTRY_POINTS_MODAL_CONFIRM submission.`
         );
 
         const rootViewId = payload.view?.root_view_id;
@@ -349,7 +354,7 @@ async function slackInteractivityHandler(
           throw new Error('view_submission missing view.root_view_id"');
         }
 
-        await SlackInteractionHandler.handleOpenCloseChannels({
+        await SlackInteractionHandler.handleManageEntryPoints({
           payload,
           redisClient,
           originatingSlackUserName,

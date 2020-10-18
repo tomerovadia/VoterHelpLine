@@ -658,6 +658,9 @@ app.post(
       return;
     }
 
+    let response: any;
+    let shouldEnqueueBackgroundTask = true;
+
     const payload: SlackInteractionEventPayload = JSON.parse(req.body.payload);
 
     const metadata: InteractivityHandlerMetadata = {};
@@ -665,7 +668,7 @@ app.post(
     if (
       [
         SlackCallbackId.RESET_DEMO,
-        SlackCallbackId.OPEN_CLOSE_CHANNELS,
+        SlackCallbackId.MANAGE_ENTRY_POINTS,
         SlackCallbackId.SHOW_NEEDS_ATTENTION,
       ].includes(payload.callback_id as SlackCallbackId)
     ) {
@@ -686,11 +689,11 @@ app.post(
     if (
       payload.type === 'view_submission' &&
       (payload.view?.callback_id as SlackCallbackId) ===
-        SlackCallbackId.OPEN_CLOSE_CHANNELS
+        SlackCallbackId.MANAGE_ENTRY_POINTS
     ) {
       // Check if we need to render a confirmation modal. This needs to happen
       // synchronously to avoid 3 second timeout.
-      const confirmationModal = SlackInteractionHandler.maybeGetConfirmationModal(
+      const confirmationModal = SlackInteractionHandler.maybeGetManageEntryPointsConfirmationModal(
         payload
       );
       if (confirmationModal) {
@@ -698,28 +701,39 @@ app.post(
           `SERVER POST /slack-interactivity: Determined ${payload.view?.callback_id} pushes a view onto modal`
         );
 
-        res.json({
+        response = {
           response_action: 'push',
           view: confirmationModal,
-        });
-        return; // Return early to avoid background task
+        };
+
+        shouldEnqueueBackgroundTask = false;
       } else {
         logger.info(
           `SERVER POST /slack-interactivity: Determined ${payload.view?.callback_id} updates the view in modal`
         );
 
         // This will change, so show loading state again.
-        res.json({
+        response = {
           response_action: 'update',
           view: SlackBlockUtil.loadingSlackView(),
-        });
+        };
       }
     }
 
-    await enqueueBackgroundTask('slackInteractivityHandler', payload, metadata);
+    // On AWS Lambda, returning a response will immediately pause execution. So it's
+    // important to enqueue the background task BEFORE responding with anything.
+    if (shouldEnqueueBackgroundTask) {
+      await enqueueBackgroundTask(
+        'slackInteractivityHandler',
+        payload,
+        metadata
+      );
+    }
 
-    // res.headersSent check because res.json may make this unnecessary
-    if (!res.headersSent) {
+    if (response) {
+      // If there's an explicit response we want to send, use that
+      res.json(response);
+    } else {
       // Use res.end instead of res.sendStatus because the latter sends the code as
       // a string in the body, and modal responses require an empty body in some cases.
       // See https://api.slack.com/surfaces/modals/using#close_current_view.

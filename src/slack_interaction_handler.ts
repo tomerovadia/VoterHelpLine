@@ -11,7 +11,7 @@ import * as RedisApiUtil from './redis_api_util';
 import logger from './logger';
 import { VoterStatus } from './types';
 import { PromisifiedRedisClient } from './redis_client';
-import { UserInfo, SlackThreadInfo } from './types';
+import { ChannelType, UserInfo, SlackThreadInfo } from './types';
 import redisClient from './redis_client';
 
 const maxCommandLines = 50; // if we go bigger slack tends to truncate the msg
@@ -884,7 +884,7 @@ export async function handleResetDemo(
   return;
 }
 
-export async function handleOpenCloseChannels({
+export async function handleManageEntryPoints({
   payload,
   viewId,
   originatingSlackUserName,
@@ -901,18 +901,18 @@ export async function handleOpenCloseChannels({
   values?: SlackInteractionEventValuesPayload;
   isSubmission?: boolean;
 }): Promise<void> {
-  logger.info('Entering SLACKINTERACTIONHANDLER.handleOpenCloseChannels');
+  logger.info('Entering SLACKINTERACTIONHANDLER.handleManageEntryPoints');
 
   // Auth check
   const isAdmin = await SlackApiUtil.isMemberOfAdminChannel(payload.user.id);
   if (!isAdmin) {
     logger.warn(
-      `SLACKINTERACTIONHANDLER.handleOpenCloseChannels: ${payload.user.id} is not an admin`
+      `SLACKINTERACTIONHANDLER.handleManageEntryPoints: ${payload.user.id} is not an admin`
     );
     await SlackApiUtil.updateModal(
       viewId,
       SlackBlockUtil.getErrorSlackView(
-        SlackCallbackId.OPEN_CLOSE_CHANNELS_ERROR,
+        SlackCallbackId.MANAGE_ENTRY_POINTS_ERROR,
         'You must have access to #admin-control-room to do that'
       )
     );
@@ -921,13 +921,13 @@ export async function handleOpenCloseChannels({
 
   // Process action to decide what to render
   let stateOrRegionName: string | undefined;
-  let channelType: PodUtil.CHANNEL_TYPE = PodUtil.CHANNEL_TYPE.NORMAL;
+  let channelType: ChannelType = 'NORMAL';
   const channelInfo: PodUtil.ChannelInfo[] = [];
   let flashMessage: string | undefined;
 
   if (action) {
     logger.info(
-      `SLACKINTERACTIONHANDLER.handleOpenCloseChannels: processing action ${action.action_id}`
+      `SLACKINTERACTIONHANDLER.handleManageEntryPoints: processing action ${action.action_id}`
     );
   }
 
@@ -936,7 +936,7 @@ export async function handleOpenCloseChannels({
     Object.keys(values).forEach((blockId) => {
       Object.keys(values[blockId]).forEach((actionId) => {
         if (
-          actionId === SlackActionId.OPEN_CLOSE_CHANNELS_CHANNEL_STATE_DROPDOWN
+          actionId === SlackActionId.MANAGE_ENTRY_POINTS_CHANNEL_STATE_DROPDOWN
         ) {
           const weight = parseInt(
             values[blockId][actionId].selected_option?.value || '0'
@@ -944,12 +944,12 @@ export async function handleOpenCloseChannels({
           const { entrypoint, channelName } = PodUtil.parseBlockId(blockId);
           channelInfo.push({ entrypoint, channelName, weight });
         } else if (
-          actionId === SlackActionId.OPEN_CLOSE_CHANNELS_FILTER_STATE
+          actionId === SlackActionId.MANAGE_ENTRY_POINTS_FILTER_STATE
         ) {
           stateOrRegionName = values[blockId][actionId].selected_option?.value;
-        } else if (actionId === SlackActionId.OPEN_CLOSE_CHANNELS_FILTER_TYPE) {
+        } else if (actionId === SlackActionId.MANAGE_ENTRY_POINTS_FILTER_TYPE) {
           channelType = values[blockId][actionId].selected_option
-            ?.value as PodUtil.CHANNEL_TYPE;
+            ?.value as ChannelType;
         }
       });
     });
@@ -963,7 +963,7 @@ export async function handleOpenCloseChannels({
       channelInfo
     );
     logger.info(
-      'SLACKINTERACTIONHANDLER.handleOpenCloseChannels: setChannelWeights success'
+      'SLACKINTERACTIONHANDLER.handleManageEntryPoints: setChannelWeights success'
     );
     flashMessage = ':white_check_mark: _Channels updated_';
 
@@ -1008,7 +1008,7 @@ export async function handleOpenCloseChannels({
   await SlackApiUtil.updateModal(viewId, slackView);
 }
 
-export function maybeGetConfirmationModal(
+export function maybeGetManageEntryPointsConfirmationModal(
   payload: SlackInteractionEventPayload
 ): SlackBlockUtil.SlackView | null {
   const values = payload.view?.state?.values;
@@ -1020,14 +1020,14 @@ export function maybeGetConfirmationModal(
   Object.keys(values).forEach((blockId) => {
     Object.keys(values[blockId]).forEach((actionId) => {
       if (
-        actionId === SlackActionId.OPEN_CLOSE_CHANNELS_CHANNEL_STATE_DROPDOWN
+        actionId === SlackActionId.MANAGE_ENTRY_POINTS_CHANNEL_STATE_DROPDOWN
       ) {
         const { entrypoint } = PodUtil.parseBlockId(blockId);
         const weight = parseInt(
           values[blockId][actionId].selected_option?.value || '0'
         );
         if (weight > 0) {
-          if (entrypoint === PodUtil.ENTRYPOINT_TYPE.PUSH) {
+          if (entrypoint === 'PUSH') {
             hasAtLeastOnePush = true;
           } else {
             hasAtLeastOnePull = true;
@@ -1037,10 +1037,16 @@ export function maybeGetConfirmationModal(
     });
   });
 
-  if (hasAtLeastOnePull && hasAtLeastOnePush) return null;
+  const supportedEntrypoints = PodUtil.getEntrypointTypes();
+  const warnOnPull =
+    supportedEntrypoints.includes('PULL') && !hasAtLeastOnePull;
+  const warnOnPush =
+    supportedEntrypoints.includes('PUSH') && !hasAtLeastOnePush;
+
+  if (!warnOnPull && !warnOnPush) return null;
   return SlackBlockEntrypointUtil.openCloseConfirmationView({
-    hasAtLeastOnePull,
-    hasAtLeastOnePush,
+    warnOnPull,
+    warnOnPush,
     values,
   });
 }
