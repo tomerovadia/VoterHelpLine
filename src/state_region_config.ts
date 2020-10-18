@@ -22,8 +22,8 @@ export async function regionsList(
   redisClient: PromisifiedRedisClient
 ): Promise<string[]> {
   const stateRegionConfig = await fetchStateRegionConfig(redisClient);
-  console.log("TOMERTOMERTOMERTOMERTOMERTOMEROMTERTOMERTOMERTOMER");
-  console.log(stateRegionConfig)
+  console.log('TOMERTOMERTOMERTOMERTOMERTOMEROMTERTOMERTOMERTOMER');
+  console.log(stateRegionConfig);
   return uniq(Object.values(stateRegionConfig));
 }
 
