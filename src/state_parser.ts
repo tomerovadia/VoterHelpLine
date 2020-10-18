@@ -28,6 +28,32 @@ export function determineState(userMessage: string): string | null {
       nameRegEx = new RegExp(stateName, 'i');
     }
 
+    const nameMatch = nameRegEx.test(userMessageNoPunctuation);
+
+    // For abbreviated names (e.g. n.carolina).
+    const abbrevNameMatch = abbrevNameRegEx
+      ? abbrevNameRegEx.test(userMessageNoPunctuation)
+      : false;
+
+    if (nameMatch || abbrevNameMatch) {
+      return stateName;
+    }
+
+    // Handle IN, OK, ME and OR as special edge cases given they are common English words.
+    // Err on the side of NOT recognizing a U.S. state selection so that admins can correct
+    // instead of incorrectly recognizing a U.S. state, which calls for an apology.
+    // Require that for these states, the U.S. state abbreviation NOT be in the context
+    // of a longer message (e.g. "I hope my ballot is O.K." != Oklahoma).
+    // Note: This check occurs if a state name isn't found and before a state abbreviation is
+    // sought.
+    if (['IN', 'OK', 'ME', 'OR'].includes(abbrev)) {
+      // Remove spaces in case message is state abbreviation plus spaces and punctuation (e.g. "O.K. ")
+      const userMessageNoPunctuationOrSpaces = userMessageNoPunctuation.replace(/\s/g, '');
+      if (userMessageNoPunctuationOrSpaces.length > 2) {
+        continue;
+      }
+    }
+
     // Look for abbreviations differently than names, because they are more
     // likely to be part of unrelated words (e.g. "wi" for Wisconsin in "with").
     // Look for abbreviations to:
@@ -42,14 +68,7 @@ export function determineState(userMessage: string): string | null {
       abbrevRegEx.test(userMessageNoPunctuation) ||
       abbrevExactRegEx.test(userMessageNoPunctuation);
 
-    const nameMatch = nameRegEx.test(userMessageNoPunctuation);
-
-    // For abbreviated names (e.g. n.carolina).
-    const abbrevNameMatch = abbrevNameRegEx
-      ? abbrevNameRegEx.test(userMessageNoPunctuation)
-      : false;
-
-    if (abbrevMatch || nameMatch || abbrevNameMatch) {
+    if (abbrevMatch) {
       return stateName;
     }
   }
