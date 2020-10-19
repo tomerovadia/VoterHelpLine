@@ -183,3 +183,10 @@ This should be added as a **global** shortcut.
 - **Request URL:** base URL + /slack-command
 - **Short Description:** List voters needing your attention
 - **Usage Hint:** (None)
+
+#### Announce
+
+- **Command:** /announce
+- **Request URL:** base URL + /slack-command
+- **Short Description:** Announce helpline status to channel or volunteers
+- **Usage Hint:** channel-status|volunteer-status [preamble]
