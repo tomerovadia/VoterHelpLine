@@ -441,7 +441,20 @@ export async function handleCommandUnclaimed(
 
   if (arg === '*') {
     // summary view
-    
+    const ustats = await DbApiUtil.getUnclaimedVotersByChannel();
+    let lines = ['Unclaimed voters by channel'];
+    const stats = await DbApiUtil.getThreadsNeedingAttentionByChannel();
+    lines = lines.concat(
+      stats.map(
+        (x) =>
+          `${x.count} in ${SlackApiUtil.linkToSlackChannel(
+            x.channelId,
+            slackChannelNames[x.channelId]
+          )} - oldest ${prettyTimeInterval(x.maxLastUpdateAge)}`
+      )
+    );
+    await SlackApiUtil.sendEphemeralResponse(responseUrl, lines.join('\n'));
+    return;
   }
 
   // Is arg a channel (either #foo or foo)?  Empty arg means use current channel.

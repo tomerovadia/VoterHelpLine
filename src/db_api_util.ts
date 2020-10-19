@@ -742,6 +742,51 @@ export async function getUnclaimedVoters(
   }
 }
 
+// Return a list of ChannelStat's for all unclaimed voters
+export async function getUnclaimedVotersByChannel(): Promise<ChannelStat[]> {
+  const client = await pool.connect();
+  try {
+    const result = await client.query(
+      `WITH all_status AS (
+        SELECT
+          user_id, voter_status
+          , row_number() OVER (PARTITION BY user_id ORDER BY created_at DESC) AS rn
+        FROM voter_status_updates
+      ), latest_status AS (
+        SELECT user_id, voter_status FROM all_status WHERE rn=1
+      )
+      SELECT
+        count(*)
+        , slack_channel_id
+        , MAX(EXTRACT(EPOCH FROM now() - updated_at)) as max_last_update_age
+      FROM threads t
+      LEFT JOIN latest_status s ON (t.user_id = s.user_id)
+      WHERE
+        needs_attention
+        AND s.voter_status NOT IN ('REFUSED', 'SPAM')
+        AND NOT EXISTS (
+          SELECT FROM volunteer_voter_claims c
+          WHERE t.user_id=c.user_id
+        )
+      GROUP BY slack_channel_id
+      ORDER BY max_last_update_age DESC`
+    );
+    return result.rows.map(
+      (x) =>
+        ({
+          channelId: x['slack_channel_id'],
+          count: x['count'],
+          maxLastUpdateAge: x['max_last_update_age'],
+        } as ChannelStat)
+    );
+  } catch (error) {
+    logger.info('Failed to query all threads for channel; ignoring for now!');
+    return [];
+  } finally {
+    client.release();
+  }
+}
+
 // Return a list of ChannelStat's for all threads needing attention
 export async function getThreadsNeedingAttentionByChannel(): Promise<
   ChannelStat[]
