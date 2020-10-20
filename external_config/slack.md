@@ -184,9 +184,9 @@ This should be added as a **global** shortcut.
 - **Short Description:** List voters needing your attention
 - **Usage Hint:** (None)
 
-#### Announce
+#### Broadcast
 
-- **Command:** /announce
+- **Command:** /broadcast
 - **Request URL:** base URL + /slack-command
-- **Short Description:** Announce helpline status to channel or volunteers
-- **Usage Hint:** channel-status|volunteer-status [preamble]
+- **Short Description:** Broadcast helpline status to channels or volunteers
+- **Usage Hint:** channel-status|volunteer-status [optional preamble message]

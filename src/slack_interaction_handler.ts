@@ -666,7 +666,7 @@ export async function handleCommandNeedsAttention(
   await SlackApiUtil.sendEphemeralResponse(responseUrl, lines.join('\n'));
 }
 
-export async function handleCommandAnnounce(
+export async function handleCommandBroadcast(
   channelId: string,
   channelName: string,
   userId: string,
