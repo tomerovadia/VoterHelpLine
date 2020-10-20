@@ -1059,7 +1059,7 @@ const LAST_VOTER_STATUS_SQL_SCRIPT = `SELECT voter_status
 // the block initial_option on the front-end, and is copied over with the blocks during the move.
 export async function getLatestVoterStatus(
   userId: string
-): Promise<DatabaseVoterStatusEntry | null> {
+): Promise<string | null> {
   logger.info(`ENTERING DBAPIUTIL.getLatest`);
   logger.info(
     `DBAPIUTIL.getLatestVoterStatus: Looking up last voter status for userId: ${userId}.`
