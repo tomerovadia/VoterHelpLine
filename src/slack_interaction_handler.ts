@@ -687,12 +687,12 @@ export async function handleCommandAnnounce(
   if (!args) {
     return;
   }
-  const what = args.shift();
+  const whatToAnnounce = args.shift();
   if (args.length > 1) {
     preamble = args.join(' ');
   }
 
-  switch (what) {
+  switch (whatToAnnounce) {
     case 'channel-status': {
       const channels = [] as string[];
 
@@ -715,7 +715,6 @@ export async function handleCommandAnnounce(
           channels.push(stat.channelId);
         }
       }
-      logger.info(JSON.stringify(channels));
       for (const channelId of channels) {
         logger.info(channelId);
         const lines = [] as string[];
@@ -800,8 +799,8 @@ export async function handleCommandAnnounce(
       if (preamble) {
         preamble += '\n\n';
       }
-      const vstats = await DbApiUtil.getThreadsNeedingAttentionByVolunteer();
-      for (const v of vstats) {
+      const volunteerStats = await DbApiUtil.getThreadsNeedingAttentionByVolunteer();
+      for (const v of volunteerStats) {
         const ulines = await getNeedsAttentionList(v.volunteerSlackUserId);
         await SlackApiUtil.sendMessage(
           preamble +
@@ -817,7 +816,10 @@ export async function handleCommandAnnounce(
 
       await SlackApiUtil.sendEphemeralResponse(
         responseUrl,
-        `Sent announcements to ${vstats.length} volunteers.`
+        `Sent announcements to ${volunteerStats.length} volunteers.`
+      );
+      return;
+    }
       );
       return;
     }
