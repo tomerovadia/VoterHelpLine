@@ -1021,6 +1021,33 @@ export async function logVoterStatusToDb(
   }
 }
 
+export async function logInitialVoterStatusToDb(
+  userId: string,
+  userPhoneNumber: string,
+  twilioPhoneNumber: string
+): Promise<void> {
+  logger.info(`ENTERING DBAPIUTIL.logInitialVoterStatusToDb`);
+  const client = await pool.connect();
+  try {
+    const isDemo =
+      twilioPhoneNumber === process.env.DEMO_PHONE_NUMBER ? true : null;
+    await client.query(
+      `INSERT INTO voter_status_updates (user_id, user_phone_number, voter_status, is_demo)
+      SELECT $1, $2, 'UNKNOWN', $3
+      WHERE NOT EXISTS (
+        SELECT null FROM voter_status_updates
+        WHERE user_id = $4 AND user_phone_number = $5
+      )`,
+      [userId, userPhoneNumber, isDemo, userId, userPhoneNumber]
+    );
+    logger.info(
+      `DBAPIUTIL.logInitialVoterStatusToDb: Successfully inserted initial voter status into PostgreSQL database.`
+    );
+  } finally {
+    client.release();
+  }
+}
+
 const LAST_VOTER_STATUS_SQL_SCRIPT = `SELECT voter_status
                                         FROM voter_status_updates
                                         WHERE user_id = $1

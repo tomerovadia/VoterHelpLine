@@ -325,18 +325,11 @@ export async function handleNewVoter(
     entryPoint,
   });
 
-  await DbApiUtil.logVoterStatusToDb({
-    userId: userInfo.userId!,
-    userPhoneNumber: userOptions.userPhoneNumber,
-    twilioPhoneNumber,
-    voterStatus: 'UNKNOWN',
-    originatingSlackUserName: null,
-    originatingSlackUserId: null,
-    slackChannelName: null,
-    slackChannelId: null,
-    slackParentMessageTs: null,
-    isDemo: userInfo.isDemo || null,
-  });
+  await DbApiUtil.logInitialVoterStatusToDb(
+    userInfo.userId,
+    userOptions.userPhoneNumber,
+    twilioPhoneNumber
+  );
 
   let slackChannelName = userInfo.isDemo ? 'demo-lobby' : 'lobby';
   if (entryPoint === LoadBalancer.PULL_ENTRY_POINT) {
