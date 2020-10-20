@@ -27,8 +27,6 @@ type SlackSendMessageOptions = {
   channel: string;
   parentMessageTs?: string;
   parse?: boolean;
-  unfurl_links?: boolean;
-  unfurl_media?: boolean;
   blocks?: SlackBlock[];
   isVoterMessage?: boolean;
 };
@@ -138,6 +136,7 @@ export async function sendMessage(
       thread_ts: options.parentMessageTs,
       blocks: options.blocks,
       unfurl_media: false,
+      unfurl_links: false,
     } as { [key: string]: any };
 
     if (options.isVoterMessage) {

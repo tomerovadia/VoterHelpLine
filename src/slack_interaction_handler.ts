@@ -784,8 +784,6 @@ export async function handleCommandBroadcast(
 
         await SlackApiUtil.sendMessage(lines.join('\n'), {
           channel: channelId,
-          unfurl_links: false,
-          unfurl_media: false,
         });
       }
 
@@ -808,8 +806,6 @@ export async function handleCommandBroadcast(
             ulines.join('\n'),
           {
             channel: v.volunteerSlackUserId,
-            unfurl_media: false,
-            unfurl_links: false,
           }
         );
       }
