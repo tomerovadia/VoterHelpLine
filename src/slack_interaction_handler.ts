@@ -441,7 +441,6 @@ export async function handleCommandUnclaimed(
 
   if (arg === '*') {
     // summary view
-    const ustats = await DbApiUtil.getUnclaimedVotersByChannel();
     let lines = ['Unclaimed voters by channel'];
     const stats = await DbApiUtil.getThreadsNeedingAttentionByChannel();
     lines = lines.concat(
