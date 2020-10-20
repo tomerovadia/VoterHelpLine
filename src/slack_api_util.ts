@@ -82,6 +82,7 @@ export async function sendEphemeralResponse(
       text: message,
       token: process.env.SLACK_BOT_ACCESS_TOKEN,
       unfurl_media: false,
+      unfurl_links: false,
       response_type: 'ephemeral',
     });
     if (response.status != 200) {
