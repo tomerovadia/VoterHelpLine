@@ -20,6 +20,16 @@ import * as Sentry from '@sentry/node';
 const MINS_BEFORE_WELCOME_BACK_MESSAGE = 60 * 24;
 export const NUM_STATE_SELECTION_ATTEMPTS_LIMIT = 2;
 
+const VOTED_KEYWORDS = [
+  'voted',
+  'i voted',
+  'already voted',
+  'i already voted',
+  "i've already voted",
+  'i voted already',
+  "i've voted already",
+];
+
 type UserOptions = {
   userMessage: string;
   userPhoneNumber: string;
@@ -30,6 +40,10 @@ type AdminCommandParams = {
   routingSlackUserName: string;
   previousSlackChannelName: string;
 };
+
+export function isVotedMessage(message: string): boolean {
+  return VOTED_KEYWORDS.includes(message.toLowerCase().trim());
+}
 
 // prepareUserInfoForNewVoter is used by functions that handle
 // phone numbers not previously seen.
@@ -49,7 +63,7 @@ function prepareUserInfoForNewVoter({
       userOptions.userPhoneNumber
     );
     logger.debug(
-      `ROUTER.handleNewVoter (${userOptions.userId}): Evaluating isDemo based on userPhoneNumber/twilioPhoneNumber: ${isDemo}`
+      `ROUTER.prepareUserInfoForNewVoter (${userOptions.userId}): Evaluating isDemo based on userPhoneNumber/twilioPhoneNumber: ${isDemo}`
     );
     confirmedDisclaimer = false;
     volunteerEngaged = false;
@@ -86,8 +100,31 @@ export async function welcomePotentialVoter(
     entryPoint,
   });
 
+  let message = MessageConstants.WELCOME_VOTER();
+  if (
+    process.env.CLIENT_ORGANIZATION === 'VOTE_AMERICA' &&
+    isVotedMessage(inboundDbMessageEntry.message || '')
+  ) {
+    message = MessageConstants.VOTED_WELCOME_RESPONSE();
+    await DbApiUtil.logVoterStatusToDb({
+      userId: userInfo.userId,
+      userPhoneNumber: userInfo.userPhoneNumber,
+      twilioPhoneNumber: twilioPhoneNumber,
+      isDemo: LoadBalancer.phoneNumbersAreDemo(
+        twilioPhoneNumber,
+        userInfo.userPhoneNumber
+      ),
+      voterStatus: 'VOTED',
+      originatingSlackUserName: null,
+      originatingSlackUserId: null,
+      slackChannelName: null,
+      slackChannelId: null,
+      slackParentMessageTs: null,
+      actionTs: null,
+    });
+  }
   await TwilioApiUtil.sendMessage(
-    MessageConstants.WELCOME_VOTER(),
+    message,
     {
       userPhoneNumber: userOptions.userPhoneNumber,
       twilioPhoneNumber,
