@@ -820,6 +820,10 @@ export async function handleCommandAnnounce(
       );
       return;
     }
+    default: {
+      await SlackApiUtil.sendEphemeralResponse(
+        responseUrl,
+        'Must pass either `channel-status` or `volunteer-status`'
       );
       return;
     }
