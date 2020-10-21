@@ -51,7 +51,6 @@ async function slackCommandHandler(
       );
       return;
     }
-    case '/todo':
     case '/needs-attention': {
       await SlackInteractionHandler.handleCommandNeedsAttention(
         channelId,
@@ -64,6 +63,7 @@ async function slackCommandHandler(
       return;
     }
     case '/broadcast': {
+      logger.info('calling handleCommandBroadcast');
       await SlackInteractionHandler.handleCommandBroadcast(
         channelId,
         channelName,
