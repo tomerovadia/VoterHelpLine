@@ -671,9 +671,9 @@ export async function handleCommandBroadcast(
   text: string,
   responseUrl: string
 ): Promise<void> {
-  logger.info('Entering handleCommandBroadcast')
+  logger.info('Entering handleCommandBroadcast');
   if (!SlackApiUtil.isMemberOfAdminChannel(userId)) {
-    logger.info('must be admin')
+    logger.info('must be admin');
     await SlackApiUtil.sendEphemeralResponse(
       responseUrl,
       'Must be admin for this command'
