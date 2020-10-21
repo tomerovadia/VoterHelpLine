@@ -63,6 +63,17 @@ async function slackCommandHandler(
       );
       return;
     }
+    case '/broadcast': {
+      await SlackInteractionHandler.handleCommandBroadcast(
+        channelId,
+        channelName,
+        userId,
+        userName,
+        text,
+        responseUrl
+      );
+      return;
+    }
   }
   throw new Error(`Unrecognized command ${command}`);
 }

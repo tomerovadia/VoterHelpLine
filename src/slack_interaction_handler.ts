@@ -663,6 +663,166 @@ export async function handleCommandNeedsAttention(
   await SlackApiUtil.sendEphemeralResponse(responseUrl, lines.join('\n'));
 }
 
+export async function handleCommandBroadcast(
+  channelId: string,
+  channelName: string,
+  userId: string,
+  userName: string,
+  text: string,
+  responseUrl: string
+): Promise<void> {
+  if (!SlackApiUtil.isMemberOfAdminChannel(userId)) {
+    await SlackApiUtil.sendEphemeralResponse(
+      responseUrl,
+      'Must be admin for this command'
+    );
+    return;
+  }
+
+  let preamble = '';
+  const args = text.split(' ');
+  if (!args) {
+    return;
+  }
+  const whatToAnnounce = args.shift();
+  if (args.length > 1) {
+    preamble = args.join(' ');
+  }
+
+  switch (whatToAnnounce) {
+    case 'channel-status': {
+      const channels = [] as string[];
+
+      // Gather unclaimed by channel
+      const unclaimed = {} as Record<string, DbApiUtil.ThreadInfo[]>;
+      for (const thread of await DbApiUtil.getUnclaimedVoters(null)) {
+        if (!channels.includes(thread.channelId)) {
+          channels.push(thread.channelId);
+        }
+        if (!(thread.channelId in unclaimed)) {
+          unclaimed[thread.channelId] = [];
+        }
+        unclaimed[thread.channelId].push(thread);
+      }
+
+      // Identify which channels have threads needing attention
+      for (const stat of await DbApiUtil.getThreadsNeedingAttentionByChannel()) {
+        logger.info(JSON.stringify(stat));
+        if (!channels.includes(stat.channelId)) {
+          channels.push(stat.channelId);
+        }
+      }
+      for (const channelId of channels) {
+        logger.info(channelId);
+        const lines = [] as string[];
+        if (preamble) {
+          lines.push(preamble);
+          lines.push('');
+        }
+        lines.push(`<!channel> Status Update`);
+
+        // unclaimed
+        if (channelId in unclaimed) {
+          lines.push('*Unclaimed voters in this channel*');
+          for (const thread of unclaimed[channelId]) {
+            const messageTs =
+              (await DbApiUtil.getThreadLatestMessageTs(
+                thread.slackParentMessageTs,
+                thread.channelId
+              )) || thread.slackParentMessageTs;
+            const url = await SlackApiUtil.getThreadPermalink(
+              thread.channelId,
+              messageTs
+            );
+            lines.push(
+              `:bust_in_silhouette: ${thread.userId} - age ${prettyTimeInterval(
+                thread.lastUpdateAge || 0
+              )} - <${url}|Open>`
+            );
+            if (lines.length >= maxCommandLines) {
+              lines.push('... (truncated for brevity) ...');
+              break;
+            }
+          }
+        }
+
+        // needs attention
+        const threads = await DbApiUtil.getThreadsNeedingAttentionForChannel(
+          channelId
+        );
+        if (threads.length > 0) {
+          lines.push('*Voters needing attention in this channel*');
+          for (const thread of threads) {
+            const messageTs =
+              (await DbApiUtil.getThreadLatestMessageTs(
+                thread.slackParentMessageTs,
+                thread.channelId
+              )) || thread.slackParentMessageTs;
+            const url = await SlackApiUtil.getThreadPermalink(
+              thread.channelId,
+              messageTs
+            );
+            const owner = thread.volunteerSlackUserId
+              ? `<@${thread.volunteerSlackUserId}>`
+              : 'unassigned';
+            lines.push(
+              `:bust_in_silhouette: ${
+                thread.userId
+              } - ${owner} - age ${prettyTimeInterval(
+                thread.lastUpdateAge || 0
+              )} - <${url}|Open>`
+            );
+            if (lines.length >= maxCommandLines) {
+              lines.push('... (truncated for brevity) ...');
+              break;
+            }
+          }
+        }
+
+        await SlackApiUtil.sendMessage(lines.join('\n'), {
+          channel: channelId,
+        });
+      }
+
+      await SlackApiUtil.sendEphemeralResponse(
+        responseUrl,
+        `Sent announcements to ${channels.length} channels.`
+      );
+      return;
+    }
+    case 'volunteer-status': {
+      if (preamble) {
+        preamble += '\n\n';
+      }
+      const volunteerStats = await DbApiUtil.getThreadsNeedingAttentionByVolunteer();
+      for (const v of volunteerStats) {
+        const ulines = await getNeedsAttentionList(v.volunteerSlackUserId);
+        await SlackApiUtil.sendMessage(
+          preamble +
+            '*Current threads needing attention*:\n' +
+            ulines.join('\n'),
+          {
+            channel: v.volunteerSlackUserId,
+          }
+        );
+      }
+
+      await SlackApiUtil.sendEphemeralResponse(
+        responseUrl,
+        `Sent announcements to ${volunteerStats.length} volunteers.`
+      );
+      return;
+    }
+    default: {
+      await SlackApiUtil.sendEphemeralResponse(
+        responseUrl,
+        'Must pass either `channel-status` or `volunteer-status`'
+      );
+      return;
+    }
+  }
+}
+
 export async function handleShortcutShowNeedsAttention({
   payload,
   viewId,
