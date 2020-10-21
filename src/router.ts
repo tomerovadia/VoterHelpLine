@@ -114,7 +114,7 @@ export async function welcomePotentialVoter(
         twilioPhoneNumber,
         userInfo.userPhoneNumber
       ),
-      voterStatus: 'VOTED',
+      voterStatus: 'ALREADY_VOTED',
       originatingSlackUserName: null,
       originatingSlackUserId: null,
       slackChannelName: null,
@@ -185,7 +185,7 @@ const introduceNewVoterToSlackChannel = async (
 
   // already voted?
   const status = await DbApiUtil.getLatestVoterStatus(userInfo.userId);
-  if (status === 'VOTED') {
+  if (status === 'ALREADY_VOTED') {
     const votedBlocks = SlackBlockUtil.makeClosedVoterPanelBlocks(
       'Voter marked *VOTED* because they texted `VOTED` (or similar)',
       true /* include undo button */
