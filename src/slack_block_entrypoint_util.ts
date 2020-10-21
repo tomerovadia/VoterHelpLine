@@ -4,11 +4,13 @@ import * as PodUtil from './pod_util';
 import { SlackActionId } from './slack_interaction_ids';
 import { SlackCallbackId } from './slack_interaction_ids';
 import { getStateConstants } from './state_constants';
-import { regionsListMinusStates } from './state_region_config';
+import { getRegionsListMinusStates } from './state_region_config';
 import { SlackBlock, SlackOption, SlackView } from './slack_block_util';
 import { ChannelType, EntryPoint } from './types';
+import { PromisifiedRedisClient } from './redis_client';
 
 interface OpenCloseModalProps {
+  redisClient: PromisifiedRedisClient;
   /** Selected state or region */
   stateOrRegionName?: string;
   /** Selected filter type, if any */
@@ -87,13 +89,14 @@ const getBlocksForChannelInfo = (entrypoint: EntryPoint) => ({
   };
 };
 
-export function getOpenCloseModal({
+export async function getOpenCloseModal({
+  redisClient,
   stateOrRegionName: selectedStateOrRegionName,
   channelType: selectedChannelType,
   pullRows = [],
   pushRows = [],
   flashMessage,
-}: OpenCloseModalProps = {}): SlackView {
+}: OpenCloseModalProps): Promise<SlackView> {
   logger.info('ENTERING SLACKBLOCKUTIL.getOpenCloseModal');
 
   // Create rows for each channel + entrypoint type
@@ -114,6 +117,8 @@ export function getOpenCloseModal({
       type: 'divider',
     });
   }
+
+  const regionsListMinusStates = await getRegionsListMinusStates(redisClient);
 
   // Selectors
   rows.push({

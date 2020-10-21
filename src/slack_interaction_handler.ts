@@ -439,10 +439,27 @@ export async function handleCommandUnclaimed(
     slackChannelNames[slackChannelIds[name]] = name;
   }
 
+  if (arg === '*') {
+    // summary view
+    let lines = ['Unclaimed voters by channel'];
+    const stats = await DbApiUtil.getThreadsNeedingAttentionByChannel();
+    lines = lines.concat(
+      stats.map(
+        (x) =>
+          `${x.count} in ${SlackApiUtil.linkToSlackChannel(
+            x.channelId,
+            slackChannelNames[x.channelId]
+          )} - oldest ${prettyTimeInterval(x.maxLastUpdateAge)}`
+      )
+    );
+    await SlackApiUtil.sendEphemeralResponse(responseUrl, lines.join('\n'));
+    return;
+  }
+
   // Is arg a channel (either #foo or foo)?  Empty arg means use current channel.
   let showChannelName = channelName;
   let showChannelId = channelId;
-  if (arg && arg != '*') {
+  if (arg) {
     if (arg[0] == '#') {
       arg = arg.substr(1); // strip off the # prefix
     }
@@ -456,13 +473,8 @@ export async function handleCommandUnclaimed(
     showChannelId = slackChannelIds[showChannelName];
   }
 
-  const threads = await DbApiUtil.getUnclaimedVoters(
-    arg === '*' ? null : showChannelId
-  );
-  lines.push(
-    `${threads.length} unclaimed voters` +
-      (arg === '*' ? ' in all channels' : '')
-  );
+  const threads = await DbApiUtil.getUnclaimedVoters(showChannelId);
+  lines.push(`${threads.length} unclaimed voters`);
 
   for (const thread of threads) {
     const messageTs =
@@ -474,26 +486,11 @@ export async function handleCommandUnclaimed(
       thread.channelId,
       messageTs
     );
-    if (arg === '*') {
-      let channelName = thread.channelId;
-      if (slackChannelNames && thread.channelId in slackChannelNames) {
-        channelName = slackChannelNames[thread.channelId];
-      }
-      lines.push(
-        `:bust_in_silhouette: ${thread.userId} - age ${prettyTimeInterval(
-          thread.lastUpdateAge || 0
-        )} - ${SlackApiUtil.linkToSlackChannel(
-          thread.channelId,
-          channelName
-        )} - <${url}|Open>`
-      );
-    } else {
-      lines.push(
-        `:bust_in_silhouette: ${thread.userId} - age ${prettyTimeInterval(
-          thread.lastUpdateAge || 0
-        )} - <${url}|Open>`
-      );
-    }
+    lines.push(
+      `:bust_in_silhouette: ${thread.userId} - age ${prettyTimeInterval(
+        thread.lastUpdateAge || 0
+      )} - <${url}|Open>`
+    );
     if (lines.length >= maxCommandLines) {
       lines.push('... (truncated for brevity) ...');
       break;
@@ -655,7 +652,7 @@ export async function handleCommandNeedsAttention(
     );
   }
 
-  if (lines.length == 0) {
+  if (lines.length == 1) {
     // For a single user
     const ulines = await getNeedsAttentionList(showUserId);
     lines.push(
@@ -664,6 +661,159 @@ export async function handleCommandNeedsAttention(
     lines = lines.concat(ulines);
   }
   await SlackApiUtil.sendEphemeralResponse(responseUrl, lines.join('\n'));
+}
+
+export async function handleCommandBroadcast(
+  channelId: string,
+  channelName: string,
+  userId: string,
+  userName: string,
+  text: string,
+  responseUrl: string
+): Promise<void> {
+  if (!SlackApiUtil.isMemberOfAdminChannel(userId)) {
+    await SlackApiUtil.sendEphemeralResponse(
+      responseUrl,
+      'Must be admin for this command'
+    );
+    return;
+  }
+
+  let preamble = '';
+  const args = text.split(' ');
+  if (!args) {
+    return;
+  }
+  const whatToAnnounce = args.shift();
+  if (args.length > 1) {
+    preamble = args.join(' ');
+  }
+
+  switch (whatToAnnounce) {
+    case 'channel-status': {
+      const channels = [] as string[];
+
+      // Gather unclaimed by channel
+      for (const stat of await DbApiUtil.getUnclaimedVotersByChannel()) {
+        channels.push(stat.channelId);
+      }
+
+      // Identify which channels have threads needing attention
+      for (const stat of await DbApiUtil.getThreadsNeedingAttentionByChannel()) {
+        if (!channels.includes(stat.channelId)) {
+          channels.push(stat.channelId);
+        }
+      }
+      for (const channelId of channels) {
+        logger.info(channelId);
+        const lines = [] as string[];
+        if (preamble) {
+          lines.push(preamble);
+          lines.push('');
+        }
+        lines.push(`<!channel> Status Update`);
+
+        // unclaimed
+        let threads = await DbApiUtil.getUnclaimedVoters(channelId);
+        if (threads.length > 0) {
+          lines.push('*Unclaimed voters in this channel*');
+          for (const thread of threads) {
+            const messageTs =
+              (await DbApiUtil.getThreadLatestMessageTs(
+                thread.slackParentMessageTs,
+                thread.channelId
+              )) || thread.slackParentMessageTs;
+            const url = await SlackApiUtil.getThreadPermalink(
+              thread.channelId,
+              messageTs
+            );
+            lines.push(
+              `:bust_in_silhouette: ${thread.userId} - age ${prettyTimeInterval(
+                thread.lastUpdateAge || 0
+              )} - <${url}|Open>`
+            );
+            if (lines.length >= maxCommandLines) {
+              lines.push('... (truncated for brevity) ...');
+              break;
+            }
+          }
+        }
+
+        // needs attention
+        threads = await DbApiUtil.getThreadsNeedingAttentionForChannel(
+          channelId
+        );
+        if (threads.length > 0) {
+          lines.push('*Voters needing attention in this channel*');
+          for (const thread of threads) {
+            const messageTs =
+              (await DbApiUtil.getThreadLatestMessageTs(
+                thread.slackParentMessageTs,
+                thread.channelId
+              )) || thread.slackParentMessageTs;
+            const url = await SlackApiUtil.getThreadPermalink(
+              thread.channelId,
+              messageTs
+            );
+            const owner = thread.volunteerSlackUserId
+              ? `<@${thread.volunteerSlackUserId}>`
+              : 'unassigned';
+            lines.push(
+              `:bust_in_silhouette: ${
+                thread.userId
+              } - ${owner} - age ${prettyTimeInterval(
+                thread.lastUpdateAge || 0
+              )} - <${url}|Open>`
+            );
+            if (lines.length >= maxCommandLines) {
+              lines.push('... (truncated for brevity) ...');
+              break;
+            }
+          }
+        }
+
+        await SlackApiUtil.sendMessage(lines.join('\n'), {
+          channel: channelId,
+        });
+      }
+
+      await SlackApiUtil.sendEphemeralResponse(
+        responseUrl,
+        `Sent announcements to ${channels.length} channels.`
+      );
+      return;
+    }
+    case 'volunteer-status': {
+      if (preamble) {
+        preamble += '\n\n';
+      }
+      const volunteerStats = await DbApiUtil.getThreadsNeedingAttentionByVolunteer();
+      for (const v of volunteerStats) {
+        const ulines = await getNeedsAttentionList(v.volunteerSlackUserId);
+        await SlackApiUtil.sendMessage(
+          preamble +
+            '*Current threads needing attention*:\n' +
+            ulines.join('\n'),
+          {
+            channel: v.volunteerSlackUserId,
+          }
+        );
+      }
+
+      await SlackApiUtil.sendEphemeralResponse(
+        responseUrl,
+        `Sent announcements to ${volunteerStats.length} volunteers.`
+      );
+      return;
+    }
+    default: {
+      await SlackApiUtil.sendEphemeralResponse(
+        responseUrl,
+        'Must pass either `channel-status` or `volunteer-status`'
+      );
+      return;
+    }
+  }
 }
 
 export async function handleShortcutShowNeedsAttention({
@@ -997,7 +1147,8 @@ export async function handleManageEntryPoints({
           pull: [],
         };
 
-  const slackView = SlackBlockEntrypointUtil.getOpenCloseModal({
+  const slackView = await SlackBlockEntrypointUtil.getOpenCloseModal({
+    redisClient,
     stateOrRegionName,
     channelType,
     pushRows: push,

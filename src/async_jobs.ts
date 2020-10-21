@@ -63,6 +63,17 @@ async function slackCommandHandler(
       );
       return;
     }
+    case '/broadcast': {
+      await SlackInteractionHandler.handleCommandBroadcast(
+        channelId,
+        channelName,
+        userId,
+        userName,
+        text,
+        responseUrl
+      );
+      return;
+    }
   }
   throw new Error(`Unrecognized command ${command}`);
 }
@@ -162,7 +173,7 @@ async function slackInteractivityHandler(
           false
         );
         await SlackApiUtil.sendMessage(
-          `*Operator:* *Needs Attention* cleared by <@${payload.user.id}>`,
+          `*Operator:* *Needs Attention* cleared by ${payload.user.id}`,
           {
             parentMessageTs: payload.message.thread_ts || payload.message.ts,
             channel: payload.channel.id,
