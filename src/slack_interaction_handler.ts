@@ -671,7 +671,9 @@ export async function handleCommandBroadcast(
   text: string,
   responseUrl: string
 ): Promise<void> {
+  logger.info('Entering handleCommandBroadcast');
   if (!SlackApiUtil.isMemberOfAdminChannel(userId)) {
+    logger.info('must be admin');
     await SlackApiUtil.sendEphemeralResponse(
       responseUrl,
       'Must be admin for this command'
@@ -682,10 +684,14 @@ export async function handleCommandBroadcast(
   let preamble = '';
   const args = text.split(' ');
   if (!args) {
+    await SlackApiUtil.sendEphemeralResponse(
+      responseUrl,
+      'Missing required argument `channel-status`|`volunteer-status`'
+    );
     return;
   }
   const whatToAnnounce = args.shift();
-  if (args.length > 1) {
+  if (args.length) {
     preamble = args.join(' ');
   }
 
@@ -705,7 +711,7 @@ export async function handleCommandBroadcast(
         }
       }
       for (const channelId of channels) {
-        logger.info(channelId);
+        logger.info(`Sending status update message to ${channelId}`);
         const lines = [] as string[];
         if (preamble) {
           lines.push(preamble);
