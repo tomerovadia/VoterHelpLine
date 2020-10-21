@@ -29,6 +29,7 @@ type SlackSendMessageOptions = {
   parse?: boolean;
   blocks?: SlackBlock[];
   isVoterMessage?: boolean;
+  isAutomatedMessage?: boolean;
 };
 
 type SlackChannelNamesAndIds = {
@@ -142,6 +143,9 @@ export async function sendMessage(
     if (options.isVoterMessage) {
       slackArgs.username = `Voter ${userInfo?.userId.substring(0, 5)}`;
       slackArgs.icon_emoji = ':bust_in_silhouette:';
+    } else if (options.isAutomatedMessage) {
+      slackArgs.username = `Helpline (Automated)`;
+      slackArgs.icon_emoji = ':gear:';
     }
 
     const response = await slackAPI.post('chat.postMessage', slackArgs);

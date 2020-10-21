@@ -279,9 +279,10 @@ const introduceNewVoterToSlackChannel = async (
     logger.debug(
       `ROUTER.introduceNewVoterToSlackChannel: Passing automated welcome message to Slack, slackChannelName: ${slackChannelName}, parentMessageTs: ${response.data.channel}.`
     );
-    await SlackApiUtil.sendMessage(`*Automated Message:* ${messageToVoter}`, {
+    await SlackApiUtil.sendMessage(messageToVoter, {
       parentMessageTs: response.data.ts,
       channel: response.data.channel,
+      isAutomatedMessage: true,
     });
   }
 
@@ -841,10 +842,11 @@ export async function determineVoterState(
         DbApiUtil.populateAutomatedDbMessageEntry(userInfo)
       );
       await SlackApiUtil.sendMessage(
-        `*Automated Message:* ${MessageConstants.CLARIFY_STATE()}`,
+        MessageConstants.CLARIFY_STATE(),
         {
           parentMessageTs: lobbyParentMessageTs,
           channel: lobbyChannelId,
+          isAutomatedMessage: true,
         }
       );
 
@@ -878,9 +880,10 @@ export async function determineVoterState(
     { userPhoneNumber, twilioPhoneNumber, twilioCallbackURL },
     DbApiUtil.populateAutomatedDbMessageEntry(userInfo)
   );
-  await SlackApiUtil.sendMessage(`*Automated Message:* ${messageToVoter}`, {
+  await SlackApiUtil.sendMessage(messageToVoter, {
     parentMessageTs: lobbyParentMessageTs,
     channel: lobbyChannelId,
+    isAutomatedMessage: true,
   });
 
   let selectedStateChannelName = await LoadBalancer.selectSlackChannel(
@@ -969,6 +972,7 @@ export async function handleDisclaimer(
   const slackLobbyMessageParams = {
     parentMessageTs: userInfo[userInfo.activeChannelId],
     channel: userInfo.activeChannelId,
+    isAutomatedMessage: true,
   };
 
   logger.debug(
@@ -1017,8 +1021,8 @@ export async function handleDisclaimer(
     DbApiUtil.populateAutomatedDbMessageEntry(userInfo)
   );
   await SlackApiUtil.sendMessage(
-    `*Automated Message:* ${automatedMessage}`,
-    slackLobbyMessageParams
+    automatedMessage,
+    { ...slackLobbyMessageParams, isAutomatedMessage: true },
   );
 }
 
@@ -1076,8 +1080,8 @@ export async function handleClearedVoter(
       DbApiUtil.populateAutomatedDbMessageEntry(userInfo)
     );
     await SlackApiUtil.sendMessage(
-      `*Automated Message:* ${welcomeBackMessage}`,
-      activeChannelMessageParams
+      welcomeBackMessage,
+      { ...activeChannelMessageParams, isAutomatedMessage: true }
     );
   }
 
