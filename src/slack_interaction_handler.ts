@@ -487,7 +487,7 @@ export async function handleCommandUnclaimed(
       messageTs
     );
     lines.push(
-      `:bust_in_silhouette: ${thread.userId} - age ${prettyTimeInterval(
+      `:bust_in_silhouette: Voter ${thread.userId?.substr(0, 5)} - age ${prettyTimeInterval(
         thread.lastUpdateAge || 0
       )} - <${url}|Open>`
     );
@@ -514,7 +514,7 @@ async function getNeedsAttentionList(userId: string): Promise<string[]> {
       messageTs
     );
     lines.push(
-      `:bust_in_silhouette: ${thread.userId} - age ${prettyTimeInterval(
+      `:bust_in_silhouette: Voter ${thread.userId?.substr(0, 5)} - age ${prettyTimeInterval(
         thread.lastUpdateAge || 0
       )} - <${url}|Open>`
     );
@@ -634,8 +634,8 @@ export async function handleCommandNeedsAttention(
           ? `<@${thread.volunteerSlackUserId}>`
           : 'unassigned';
         lines.push(
-          `:bust_in_silhouette: ${
-            thread.userId
+          `:bust_in_silhouette: Voter ${
+            thread.userId?.substr(0, 5)
           } - ${owner} - age ${prettyTimeInterval(
             thread.lastUpdateAge || 0
           )} - <${url}|Open>`
@@ -728,7 +728,7 @@ export async function handleCommandBroadcast(
               messageTs
             );
             lines.push(
-              `:bust_in_silhouette: ${thread.userId} - age ${prettyTimeInterval(
+              `:bust_in_silhouette: Voter ${thread.userId?.substr(0, 5)} - age ${prettyTimeInterval(
                 thread.lastUpdateAge || 0
               )} - <${url}|Open>`
             );
@@ -759,8 +759,8 @@ export async function handleCommandBroadcast(
               ? `<@${thread.volunteerSlackUserId}>`
               : 'unassigned';
             lines.push(
-              `:bust_in_silhouette: ${
-                thread.userId
+              `:bust_in_silhouette: Voter ${
+                thread.userId?.substr(0, 5)
               } - ${owner} - age ${prettyTimeInterval(
                 thread.lastUpdateAge || 0
               )} - <${url}|Open>`
