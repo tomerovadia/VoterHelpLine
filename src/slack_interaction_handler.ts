@@ -694,20 +694,12 @@ export async function handleCommandBroadcast(
       const channels = [] as string[];
 
       // Gather unclaimed by channel
-      const unclaimed = {} as Record<string, DbApiUtil.ThreadInfo[]>;
-      for (const thread of await DbApiUtil.getUnclaimedVoters(null)) {
-        if (!channels.includes(thread.channelId)) {
-          channels.push(thread.channelId);
-        }
-        if (!(thread.channelId in unclaimed)) {
-          unclaimed[thread.channelId] = [];
-        }
-        unclaimed[thread.channelId].push(thread);
+      for (const stat of await DbApiUtil.getUnclaimedVotersByChannel()) {
+        channels.push(stat.channelId);
       }
 
       // Identify which channels have threads needing attention
       for (const stat of await DbApiUtil.getThreadsNeedingAttentionByChannel()) {
-        logger.info(JSON.stringify(stat));
         if (!channels.includes(stat.channelId)) {
           channels.push(stat.channelId);
         }
@@ -722,9 +714,10 @@ export async function handleCommandBroadcast(
         lines.push(`<!channel> Status Update`);
 
         // unclaimed
-        if (channelId in unclaimed) {
+        let threads = await DbApiUtil.getUnclaimedVoters(channelId);
+        if (threads.length > 0) {
           lines.push('*Unclaimed voters in this channel*');
-          for (const thread of unclaimed[channelId]) {
+          for (const thread of threads) {
             const messageTs =
               (await DbApiUtil.getThreadLatestMessageTs(
                 thread.slackParentMessageTs,
@@ -747,7 +740,7 @@ export async function handleCommandBroadcast(
         }
 
         // needs attention
-        const threads = await DbApiUtil.getThreadsNeedingAttentionForChannel(
+        threads = await DbApiUtil.getThreadsNeedingAttentionForChannel(
           channelId
         );
         if (threads.length > 0) {
