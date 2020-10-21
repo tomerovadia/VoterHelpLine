@@ -439,10 +439,27 @@ export async function handleCommandUnclaimed(
     slackChannelNames[slackChannelIds[name]] = name;
   }
 
+  if (arg === '*') {
+    // summary view
+    let lines = ['Unclaimed voters by channel'];
+    const stats = await DbApiUtil.getThreadsNeedingAttentionByChannel();
+    lines = lines.concat(
+      stats.map(
+        (x) =>
+          `${x.count} in ${SlackApiUtil.linkToSlackChannel(
+            x.channelId,
+            slackChannelNames[x.channelId]
+          )} - oldest ${prettyTimeInterval(x.maxLastUpdateAge)}`
+      )
+    );
+    await SlackApiUtil.sendEphemeralResponse(responseUrl, lines.join('\n'));
+    return;
+  }
+
   // Is arg a channel (either #foo or foo)?  Empty arg means use current channel.
   let showChannelName = channelName;
   let showChannelId = channelId;
-  if (arg && arg != '*') {
+  if (arg) {
     if (arg[0] == '#') {
       arg = arg.substr(1); // strip off the # prefix
     }
@@ -456,13 +473,8 @@ export async function handleCommandUnclaimed(
     showChannelId = slackChannelIds[showChannelName];
   }
 
-  const threads = await DbApiUtil.getUnclaimedVoters(
-    arg === '*' ? null : showChannelId
-  );
-  lines.push(
-    `${threads.length} unclaimed voters` +
-      (arg === '*' ? ' in all channels' : '')
-  );
+  const threads = await DbApiUtil.getUnclaimedVoters(showChannelId);
+  lines.push(`${threads.length} unclaimed voters`);
 
   for (const thread of threads) {
     const messageTs =
@@ -474,26 +486,11 @@ export async function handleCommandUnclaimed(
       thread.channelId,
       messageTs
     );
-    if (arg === '*') {
-      let channelName = thread.channelId;
-      if (slackChannelNames && thread.channelId in slackChannelNames) {
-        channelName = slackChannelNames[thread.channelId];
-      }
-      lines.push(
-        `:bust_in_silhouette: ${thread.userId} - age ${prettyTimeInterval(
-          thread.lastUpdateAge || 0
-        )} - ${SlackApiUtil.linkToSlackChannel(
-          thread.channelId,
-          channelName
-        )} - <${url}|Open>`
-      );
-    } else {
-      lines.push(
-        `:bust_in_silhouette: ${thread.userId} - age ${prettyTimeInterval(
-          thread.lastUpdateAge || 0
-        )} - <${url}|Open>`
-      );
-    }
+    lines.push(
+      `:bust_in_silhouette: ${thread.userId} - age ${prettyTimeInterval(
+        thread.lastUpdateAge || 0
+      )} - <${url}|Open>`
+    );
     if (lines.length >= maxCommandLines) {
       lines.push('... (truncated for brevity) ...');
       break;
