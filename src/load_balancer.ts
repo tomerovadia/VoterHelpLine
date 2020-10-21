@@ -105,7 +105,7 @@ export async function selectSlackChannel(
     0,
     -1 /* max # of pods */
   );
-  if (!openPods) {
+  if (!openPods || openPods.length === 0) {
     logger.error(
       `LOADBALANCER.selectSlackChannel: ERROR finding openPodsKey ${openPodsKey} in Redis: err || !openPods`
     );
