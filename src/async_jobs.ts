@@ -82,14 +82,7 @@ async function slackInteractivityHandler(
   payload: SlackInteractionEventPayload,
   interactivityMetadata: InteractivityHandlerMetadata
 ) {
-  const originatingSlackUserName = await SlackApiUtil.fetchSlackUserName(
-    payload.user.id
-  );
-  if (!originatingSlackUserName) {
-    throw new Error(
-      `Could not get slack user name for slack user ${payload.user.id}`
-    );
-  }
+  const originatingSlackUserName = payload.user.username;
 
   // Global shortcut
   if (payload.type === 'shortcut') {

@@ -54,6 +54,7 @@ export type SlackInteractionEventPayload = {
   actions: SlackBlockUtil.SlackAction[];
   user: {
     id: string;
+    username: string;
   };
   message: {
     ts: string;
