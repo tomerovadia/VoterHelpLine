@@ -86,23 +86,25 @@ export default {
     return userMessage == processedUserMessage ? null : processedUserMessage;
   },
 
+  validateSlackAttachments(files: SlackFile[]): string[] {
+    const errors = [] as string[];
+    for (const file of files) {
+      if (!SUPPORTED_MMS_MIME_TYPES.includes(file.mimetype)) {
+        errors.push(`Attachment of type ${file.mimetype} not supported`);
+      }
+    }
+    return errors;
+  },
+
   getSlackAttachments(files: SlackFile[] | null): string[] {
     if (!files) {
       return [];
     }
-    const supportedFiles = files.filter((file) =>
-      SUPPORTED_MMS_MIME_TYPES.includes(file.mimetype)
-    );
 
-    if (supportedFiles.length === 0) {
-      return [];
-    }
-    const totalSize = supportedFiles
-      .map((file) => file.size)
-      .reduce((a, b) => a + b, 0);
+    const totalSize = files.map((file) => file.size).reduce((a, b) => a + b, 0);
 
     const r = [] as string[];
-    for (const file of supportedFiles) {
+    for (const file of files) {
       const comp = file.permalink_public.split('/');
       const bits = comp[3].split('-');
       const pub_secret = bits[2];

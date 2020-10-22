@@ -1168,8 +1168,27 @@ export async function handleSlackVoterThreadMessage(
   });
   outboundDbMessageEntry.slackFiles = reqBody.event.files;
 
-  // make attachments public
+  // check attachments
   if (outboundDbMessageEntry.slackFiles) {
+    const errors = MessageParser.validateSlackAttachments(
+      outboundDbMessageEntry.slackFiles
+    );
+    if (errors.length) {
+      await SlackApiUtil.sendMessage(
+        'Sorry, there was a problem with one or more of your attachments:\n' +
+          errors.map((x) => `>${x}`).join('\n'),
+        {
+          channel: reqBody.event.channel,
+          parentMessageTs: reqBody.event.thread_ts,
+        }
+      );
+      await SlackApiUtil.addSlackMessageReaction(
+        reqBody.event.channel,
+        reqBody.event.ts,
+        'x'
+      );
+      return;
+    }
     await SlackApiUtil.makeFilesPublic(outboundDbMessageEntry.slackFiles);
   }
 
