@@ -15,9 +15,9 @@ export function isVotedKeyword(userMessage: string): boolean {
     'i voted',
     'already voted',
     'i already voted',
-    "ive already voted",
+    'ive already voted',
     'i voted already',
-    "ive voted already",
+    'ive voted already',
   ].includes(
     userMessage
       .toLowerCase()
