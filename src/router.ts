@@ -16,19 +16,10 @@ import logger from './logger';
 import { EntryPoint, UserInfo } from './types';
 import { PromisifiedRedisClient } from './redis_client';
 import * as Sentry from '@sentry/node';
+import { isVotedKeyword } from './keyword_parser';
 
 const MINS_BEFORE_WELCOME_BACK_MESSAGE = 60 * 24;
 export const NUM_STATE_SELECTION_ATTEMPTS_LIMIT = 2;
-
-const VOTED_KEYWORDS = [
-  'voted',
-  'i voted',
-  'already voted',
-  'i already voted',
-  "i've already voted",
-  'i voted already',
-  "i've voted already",
-];
 
 type UserOptions = {
   userMessage: string;
@@ -40,10 +31,6 @@ type AdminCommandParams = {
   routingSlackUserName: string;
   previousSlackChannelName: string;
 };
-
-export function isVotedMessage(message: string): boolean {
-  return VOTED_KEYWORDS.includes(message.toLowerCase().trim());
-}
 
 // prepareUserInfoForNewVoter is used by functions that handle
 // phone numbers not previously seen.
@@ -103,7 +90,7 @@ export async function welcomePotentialVoter(
   let message = MessageConstants.WELCOME_VOTER();
   if (
     process.env.CLIENT_ORGANIZATION === 'VOTE_AMERICA' &&
-    isVotedMessage(inboundDbMessageEntry.message || '')
+    isVotedKeyword(inboundDbMessageEntry.message || '')
   ) {
     message = MessageConstants.VOTED_WELCOME_RESPONSE();
     await DbApiUtil.logVoterStatusToDb({
