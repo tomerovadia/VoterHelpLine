@@ -72,7 +72,7 @@ export function CLARIFY_HELPLINE_REQUEST(): string {
 
 // Only used by VOTE_AMERICA.
 export function WELCOME_AND_STATE_QUESTION(): string {
-  return "Welcome to the VoteAmerica Helpline! Msg&data rates may apply.\n\nReply VOTED if you've alread voted, STOP to unsubscribe.\n\nIn which U.S. state will you vote?";
+  return "Welcome to the VoteAmerica! Msg&data rates may apply.\n\nReply VOTED if you've already voted, STOP to unsubscribe.\n\nIn which U.S. state are you looking to vote?";
 }
 
 export function VOTED_WELCOME_RESPONSE(): string {
