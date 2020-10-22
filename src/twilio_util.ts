@@ -57,5 +57,5 @@ export function formatAttachments(reqBody: TwilioRequestBody): string {
     .map((url, i) => `<${url}|Attachment ${i + 1}>`)
     .join(' ');
 
-  return `${reqBody.Body} [This message included attachments: ${mediaURLsFormatted}]`;
+  return `${reqBody.Body}\n[${mediaURLsFormatted}]`;
 }
