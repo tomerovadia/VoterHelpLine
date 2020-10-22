@@ -156,7 +156,7 @@ async function slackInteractivityHandler(
           true
         );
         await SlackApiUtil.sendMessage(
-          `*Operator:* Thread marked as *Needs Attention* by <@${payload.user.id}>`,
+          `*Operator:* Thread marked as *Needs Attention* by ${originatingSlackUserName}`,
           {
             parentMessageTs: payload.message.thread_ts || payload.message.ts,
             channel: payload.channel.id,
@@ -173,7 +173,7 @@ async function slackInteractivityHandler(
           false
         );
         await SlackApiUtil.sendMessage(
-          `*Operator:* *Needs Attention* cleared by ${payload.user.id}`,
+          `*Operator:* *Needs Attention* cleared by ${originatingSlackUserName}`,
           {
             parentMessageTs: payload.message.thread_ts || payload.message.ts,
             channel: payload.channel.id,
