@@ -969,7 +969,6 @@ export async function handleDisclaimer(
   const slackLobbyMessageParams = {
     parentMessageTs: userInfo[userInfo.activeChannelId],
     channel: userInfo.activeChannelId,
-    isAutomatedMessage: true,
   };
 
   logger.debug(
