@@ -156,7 +156,7 @@ export async function sendMessage(
       token: process.env.SLACK_BOT_ACCESS_TOKEN,
       thread_ts: options.parentMessageTs,
       blocks: options.blocks,
-      unfurl_media: false,
+      unfurl_media: true,
       unfurl_links: false,
     } as { [key: string]: any };
 
