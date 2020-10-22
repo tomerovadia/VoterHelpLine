@@ -87,20 +87,14 @@ export async function welcomePotentialVoter(
     entryPoint,
   });
 
-  let message = MessageConstants.WELCOME_VOTER();
-  if (
-    process.env.CLIENT_ORGANIZATION === 'VOTE_AMERICA' &&
-    isVotedKeyword(inboundDbMessageEntry.message || '')
-  ) {
-    message = MessageConstants.VOTED_WELCOME_RESPONSE();
+  let messageToVoter = MessageConstants.WELCOME_VOTER();
+  if (isVotedKeyword(userOptions.userMessage)) {
+    messageToVoter = MessageConstants.VOTED_WELCOME_RESPONSE();
     await DbApiUtil.logVoterStatusToDb({
       userId: userInfo.userId,
       userPhoneNumber: userInfo.userPhoneNumber,
       twilioPhoneNumber: twilioPhoneNumber,
-      isDemo: LoadBalancer.phoneNumbersAreDemo(
-        twilioPhoneNumber,
-        userInfo.userPhoneNumber
-      ),
+      isDemo: userInfo.isDemo,
       voterStatus: 'ALREADY_VOTED',
       originatingSlackUserName: null,
       originatingSlackUserId: null,
@@ -111,7 +105,7 @@ export async function welcomePotentialVoter(
     });
   }
   await TwilioApiUtil.sendMessage(
-    message,
+    messageToVoter,
     {
       userPhoneNumber: userOptions.userPhoneNumber,
       twilioPhoneNumber,
