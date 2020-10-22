@@ -7,6 +7,7 @@ import { UserInfo } from './types';
 import { SlackBlock, SlackView } from './slack_block_util';
 import * as RedisApiUtil from './redis_api_util';
 import { PromisifiedRedisClient } from './redis_client';
+import { SlackFile } from './message_parser';
 
 const slackAPI = axios.create({
   baseURL: 'https://slack.com/api/',
@@ -69,6 +70,25 @@ export async function getThreadPermalink(
                   channel: ${channel},
                   message_ts: ${message_ts}`);
     throw error;
+  }
+}
+
+export async function makeFilesPublic(files: SlackFile[]): Promise<void> {
+  for (const file of files) {
+    const response = await axios.post(
+      'https://slack.com/api/files.sharedPublicURL',
+      null,
+      {
+        params: {
+          file: file.id,
+          token: process.env.SLACK_USER_ACCESS_TOKEN,
+        },
+      }
+    );
+    if (!response.data.ok) {
+      logger.error(`SLACKAPIUTIL.makeFilesPublic failed with ${response.data}`);
+    }
+    logger.info('SLACKAPIUTIL: successfully make ${file.id} public');
   }
 }
 

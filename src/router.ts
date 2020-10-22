@@ -18,6 +18,7 @@ import { PromisifiedRedisClient } from './redis_client';
 import * as Sentry from '@sentry/node';
 import { isVotedKeyword } from './keyword_parser';
 import { SlackActionId } from './slack_interaction_ids';
+import { SlackFile } from './message_parser';
 
 const MINS_BEFORE_WELCOME_BACK_MESSAGE = 60 * 24;
 export const NUM_STATE_SELECTION_ATTEMPTS_LIMIT = 2;
@@ -1138,6 +1139,8 @@ export async function handleSlackVoterThreadMessage(
     `Received message from Slack (channel ${reqBody.event.channel} ts ${reqBody.event.ts}): ${unprocessedSlackMessage}`
   );
 
+  logger.info(JSON.stringify(reqBody.event));
+
   // If the message doesn't need processing.
   let messageToSend = unprocessedSlackMessage;
   let unprocessedMessageToLog = null;
@@ -1163,6 +1166,12 @@ export async function handleSlackVoterThreadMessage(
     slackRetryNum: retryCount,
     slackRetryReason: retryReason,
   });
+  outboundDbMessageEntry.slackFiles = reqBody.event.files;
+
+  // make attachments public
+  if (outboundDbMessageEntry.slackFiles) {
+    await SlackApiUtil.makeFilesPublic(outboundDbMessageEntry.slackFiles);
+  }
 
   const userInfo = (await RedisApiUtil.getHash(
     redisClient,
@@ -1216,6 +1225,7 @@ export type SlackEventRequestBody = {
     thread_ts: string;
     user: string;
     channel: string;
+    files?: SlackFile[];
   };
   authed_users: string[];
 };

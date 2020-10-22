@@ -4,6 +4,50 @@ const emoji = new EmojiConvertor();
 emoji.replace_mode = 'unified';
 emoji.allow_native = true;
 
+export type SlackFile = {
+  id: string;
+  created: number;
+  timestamp: number;
+  name: string;
+  title: string;
+  mimetype: string;
+  filetype: string;
+  pretty_type: string;
+  user: string;
+  editable: boolean;
+  size: number;
+  mode: string;
+  is_external: boolean;
+  external_type: string;
+  is_public: boolean;
+  public_url_shared: boolean;
+  display_as_bot: boolean;
+  username: string;
+  url_private: string;
+  url_private_download: string;
+  thumb_64: string;
+  thumb_80: string;
+  thumb_360: string;
+  thumb_360_w: number;
+  thumb_360_h: number;
+  thumb_480: string;
+  thumb_160: string;
+  original_w: number;
+  original_h: number;
+  thumb_tiny: string;
+  permalink: string;
+  permalink_public: string;
+  has_rich_preview: boolean;
+};
+
+// From: https://www.twilio.com/docs/sms/accepted-mime-types#supported-mime-types
+const SUPPORTED_MMS_MIME_TYPES = ['image/jpeg', 'image/gif', 'image/png'];
+
+// Documented size limit is 5MB. To give us a bit of buffer, we assume they
+// calculate MB with 1000 instead of 1024, and we limit to 90% of this
+// hard cap.
+const MMS_MAX_SIZE = 1000 * 1000 * 5 * 0.9;
+
 export default {
   processMessageText(userMessage: string): string | null {
     let processedUserMessage = userMessage;
@@ -40,5 +84,34 @@ export default {
 
     // If nothing was changed, return null. Important for DB logging.
     return userMessage == processedUserMessage ? null : processedUserMessage;
+  },
+
+  getSlackAttachments(files: SlackFile[] | null): string[] {
+    if (!files) {
+      return [];
+    }
+    const supportedFiles = files.filter((file) =>
+      SUPPORTED_MMS_MIME_TYPES.includes(file.mimetype)
+    );
+
+    if (supportedFiles.length === 0) {
+      return [];
+    }
+    const totalSize = supportedFiles
+      .map((file) => file.size)
+      .reduce((a, b) => a + b, 0);
+
+    const r = [] as string[];
+    for (const file of supportedFiles) {
+      const comp = file.permalink_public.split('/');
+      const bits = comp[3].split('-');
+      const pub_secret = bits[2];
+      if (totalSize > MMS_MAX_SIZE) {
+        r.push(file.thumb_480 + '?pub_secret=' + pub_secret);
+      } else {
+        r.push(file.url_private + '?pub_secret=' + pub_secret);
+      }
+    }
+    return r;
   },
 };

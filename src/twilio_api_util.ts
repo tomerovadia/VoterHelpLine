@@ -3,6 +3,7 @@ import * as DbApiUtil from './db_api_util';
 import logger from './logger';
 import twilio from 'twilio';
 import isFirstUseOfKey from './deduplication';
+import MessageParser from './message_parser';
 
 const twilioClient = twilio(
   process.env.TWILIO_ACCOUNT_SID,
@@ -55,11 +56,19 @@ export async function sendMessage(
   }
 
   try {
+    let media = [] as string[];
+    if (databaseMessageEntry.slackFiles) {
+      media = MessageParser.getSlackAttachments(
+        databaseMessageEntry.slackFiles
+      );
+      logger.info(`Including attachments ${JSON.stringify(media)}`);
+    }
     const response = await twilioClient.messages.create({
       body: message,
       from: options.twilioPhoneNumber,
       to: options.userPhoneNumber,
       statusCallback: options.twilioCallbackURL,
+      mediaUrl: media,
     });
 
     logger.info(`TWILIOAPIUTIL.sendMessage: Successfully sent Twilio message,
