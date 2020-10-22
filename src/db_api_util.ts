@@ -7,6 +7,8 @@ import {
   HistoricalMessage,
   SlackThreadInfo,
 } from './types';
+import { phoneNumbersAreDemo } from './load_balancer';
+
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   max: Number(process.env.CONNECTION_POOL_MAX || 20),
@@ -1029,8 +1031,7 @@ export async function logInitialVoterStatusToDb(
   logger.info(`ENTERING DBAPIUTIL.logInitialVoterStatusToDb`);
   const client = await pool.connect();
   try {
-    const isDemo =
-      twilioPhoneNumber === process.env.DEMO_PHONE_NUMBER ? true : null;
+    const isDemo = phoneNumbersAreDemo(twilioPhoneNumber, userPhoneNumber);
     await client.query(
       `INSERT INTO voter_status_updates (user_id, user_phone_number, voter_status, is_demo)
       SELECT $1, $2, 'UNKNOWN', $3
