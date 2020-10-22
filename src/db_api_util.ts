@@ -531,6 +531,32 @@ export async function archiveMessagesForDemoVoter(
   }
 }
 
+export async function clearDemoVoterClaims(
+  userId: string,
+  twilioPhoneNumber: string
+): Promise<void> {
+  logger.info(`ENTERING DBAPIUTIL.clearDemoVoterClaims`);
+
+  const client = await pool.connect();
+
+  try {
+    await client.query(
+      `DELETE FROM volunteer_voter_claims
+      WHERE
+        is_demo = 't'
+        AND user_id = $1
+        AND twilio_phone_number = $2`,
+      [userId, twilioPhoneNumber]
+    );
+
+    logger.info(
+      `DBAPIUTIL.clearDemoVoterClaims: Successfully cleared demo voter claims.`
+    );
+  } finally {
+    client.release();
+  }
+}
+
 export async function logThreadToDb(
   databaseThreadEntry: DatabaseThreadEntry
 ): Promise<void> {
