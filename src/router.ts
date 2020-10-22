@@ -1139,8 +1139,6 @@ export async function handleSlackVoterThreadMessage(
     `Received message from Slack (channel ${reqBody.event.channel} ts ${reqBody.event.ts}): ${unprocessedSlackMessage}`
   );
 
-  logger.info(JSON.stringify(reqBody.event));
-
   // If the message doesn't need processing.
   let messageToSend = unprocessedSlackMessage;
   let unprocessedMessageToLog = null;
