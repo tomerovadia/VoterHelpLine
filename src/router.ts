@@ -17,6 +17,7 @@ import { EntryPoint, UserInfo } from './types';
 import { PromisifiedRedisClient } from './redis_client';
 import * as Sentry from '@sentry/node';
 import { isVotedKeyword } from './keyword_parser';
+import { SlackActionId } from './slack_interaction_ids';
 
 const MINS_BEFORE_WELCOME_BACK_MESSAGE = 60 * 24;
 export const NUM_STATE_SELECTION_ATTEMPTS_LIMIT = 2;
@@ -167,10 +168,11 @@ const introduceNewVoterToSlackChannel = async (
   // already voted?
   const status = await DbApiUtil.getLatestVoterStatus(userInfo.userId);
   if (status === 'ALREADY_VOTED') {
-    slackBlocks[2].elements[0].initial_option =
-      slackBlocks[2].elements[0].options[
-        slackBlocks[2].elements[0].options.length - 1
-      ];
+    SlackBlockUtil.populateDropdownNewInitialValue(
+      slackBlocks,
+      SlackActionId.VOTER_STATUS_DROPDOWN,
+      status
+    );
   }
 
   const response = await SlackApiUtil.sendMessage(operatorMessage, {
