@@ -162,19 +162,15 @@ const introduceNewVoterToSlackChannel = async (
   // In Slack, create entry channel message, followed by voter's message and intro text.
   const operatorMessage = `*User ID:* ${userInfo.userId}\n*Connected via:* ${twilioPhoneNumber} (${entryPoint})`;
 
-  let slackBlocks = SlackBlockUtil.getVoterStatusBlocks(operatorMessage);
+  const slackBlocks = SlackBlockUtil.getVoterStatusBlocks(operatorMessage);
 
   // already voted?
   const status = await DbApiUtil.getLatestVoterStatus(userInfo.userId);
   if (status === 'ALREADY_VOTED') {
-    const votedBlocks = SlackBlockUtil.makeClosedVoterPanelBlocks(
-      'Voter marked *VOTED* because they texted `VOTED` (or similar)',
-      true /* include undo button */
-    );
-    slackBlocks = SlackBlockUtil.replaceVoterPanelBlocks(
-      slackBlocks,
-      votedBlocks
-    );
+    slackBlocks[2].elements[0].initial_option =
+      slackBlocks[2].elements[0].options[
+        slackBlocks[2].elements[0].options.length - 1
+      ];
   }
 
   const response = await SlackApiUtil.sendMessage(operatorMessage, {
