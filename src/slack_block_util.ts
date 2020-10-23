@@ -136,6 +136,17 @@ const volunteerSelectionPanel: SlackBlock = {
         emoji: true,
       },
     },
+    {
+      type: 'button',
+      style: 'primary',
+      text: {
+        type: 'plain_text',
+        text: 'Release claim',
+        emoji: true,
+      },
+      action_id: SlackActionId.VOLUNTEER_RELEASE_CLAIM,
+      value: 'RELEASE_CLAIM',
+    },
   ],
 };
 

@@ -292,13 +292,13 @@ async function slackInteractivityHandler(
       return;
     }
 
-    const selectedVoterStatus = payload.actions[0].selected_option
-      ? payload.actions[0].selected_option.value
-      : payload.actions[0].value;
-    if (selectedVoterStatus) {
+    if (payload.actions[0].action_id === SlackActionId.VOTER_STATUS_DROPDOWN) {
       logger.info(
         `SERVER POST /slack-interactivity: Determined user interaction is a voter status update or undo.`
       );
+      const selectedVoterStatus = payload.actions[0].selected_option
+        ? payload.actions[0].selected_option.value
+        : payload.actions[0].value;
       await SlackInteractionHandler.handleVoterStatusUpdate({
         payload,
         selectedVoterStatus: selectedVoterStatus as SlackInteractionHandler.VoterStatusUpdate,
@@ -308,7 +308,10 @@ async function slackInteractivityHandler(
         twilioPhoneNumber: redisData ? redisData.twilioPhoneNumber : null,
         redisClient,
       });
-    } else if (payload.actions[0].selected_user) {
+    } else if (
+      payload.actions[0].action_id === SlackActionId.VOLUNTEER_DROPDOWN ||
+      payload.actions[0].action_id === SlackActionId.VOLUNTEER_RELEASE_CLAIM
+    ) {
       logger.info(
         `SERVER POST /slack-interactivity: Determined user interaction is a volunteer update.`
       );
