@@ -1041,6 +1041,11 @@ export async function handleResetDemo(
     false
   );
 
+  await DbApiUtil.archiveDemoVolunteerVoterClaims(
+    modalPrivateMetadata.userId,
+    modalPrivateMetadata.twilioPhoneNumber
+  );
+
   modalPrivateMetadata.success = true;
   await DbApiUtil.logCommandToDb(modalPrivateMetadata);
 
