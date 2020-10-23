@@ -61,7 +61,7 @@ export async function sendMessage(
       media = MessageParser.getSlackAttachments(
         databaseMessageEntry.slackFiles
       );
-      logger.info(`Including attachments ${JSON.stringify(media)}`);
+      logger.info(`TWILIOAPIUTIL.sendMessage: Including attachments ${JSON.stringify(media)}`);
     }
     const response = await twilioClient.messages.create({
       body: message,

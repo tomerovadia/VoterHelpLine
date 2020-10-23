@@ -86,9 +86,9 @@ export async function makeFilesPublic(files: SlackFile[]): Promise<void> {
       }
     );
     if (!response.data.ok) {
-      logger.error(`SLACKAPIUTIL.makeFilesPublic failed with ${JSON.stringify(response.data)}`);
+      logger.error(`SLACKAPIUTIL.makeFilesPublic: Failed with ${JSON.stringify(response.data)}`);
     }
-    logger.info('SLACKAPIUTIL: successfully make ${file.id} public');
+    logger.info('SLACKAPIUTIL.makeFilesPublic: successfully make ${file.id} public');
   }
 }
 
