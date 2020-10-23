@@ -1031,15 +1031,23 @@ export async function logInitialVoterStatusToDb(
   logger.info(`ENTERING DBAPIUTIL.logInitialVoterStatusToDb`);
   const client = await pool.connect();
   try {
-    await client.query(
-      `INSERT INTO voter_status_updates (user_id, user_phone_number, voter_status, is_demo)
-      SELECT $1, $2, 'UNKNOWN', $3
-      WHERE NOT EXISTS (
-        SELECT null FROM voter_status_updates
-        WHERE user_id = $1 AND user_phone_number = $2 AND is_demo = $3
-      )`,
-      [userId, userPhoneNumber, isDemo]
-    );
+    if (process.env.CLIENT_ORGANIZATION === 'VOTE_AMERICA') {
+      await client.query(
+        `INSERT INTO voter_status_updates (user_id, user_phone_number, voter_status, is_demo)
+        SELECT $1, $2, 'UNKNOWN', $3
+        WHERE NOT EXISTS (
+          SELECT null FROM voter_status_updates
+          WHERE user_id = $1 AND user_phone_number = $2 AND is_demo = $3
+        )`,
+        [userId, userPhoneNumber, isDemo]
+      );
+    } else {
+      await client.query(
+        `INSERT INTO voter_status_updates (user_id, user_phone_number, voter_status, is_demo)
+        VALUES ($1, $2, 'UNKNOWN', $3)`,
+        [userId, userPhoneNumber, isDemo]
+      );
+    }
     logger.info(
       `DBAPIUTIL.logInitialVoterStatusToDb: Successfully inserted initial voter status into PostgreSQL database.`
     );
