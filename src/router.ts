@@ -1167,9 +1167,9 @@ export async function handleSlackVoterThreadMessage(
   outboundDbMessageEntry.slackFiles = reqBody.event.files;
 
   // check attachments
-  if (outboundDbMessageEntry.slackFiles) {
+  if (reqBody.event.files) {
     const errors = MessageParser.validateSlackAttachments(
-      outboundDbMessageEntry.slackFiles
+      reqBody.event.files
     );
     if (errors.length) {
       await SlackApiUtil.sendMessage(
@@ -1187,7 +1187,7 @@ export async function handleSlackVoterThreadMessage(
       );
       return;
     }
-    await SlackApiUtil.makeFilesPublic(outboundDbMessageEntry.slackFiles);
+    await SlackApiUtil.makeFilesPublic(reqBody.event.files);
   }
 
   const userInfo = (await RedisApiUtil.getHash(
