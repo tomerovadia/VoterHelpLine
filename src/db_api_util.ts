@@ -1074,6 +1074,7 @@ export async function getThreadsNeedingFollowUp(
           , volunteer_slack_user_name
           , row_number () OVER (PARTITION BY user_id ORDER BY created_at DESC) AS rn
         FROM volunteer_voter_claims
+        WHERE archived != true
       ), all_status AS (
         SELECT
           user_id, voter_status
