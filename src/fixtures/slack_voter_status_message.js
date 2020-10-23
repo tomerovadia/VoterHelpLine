@@ -26,7 +26,7 @@ export const makeVoterStatusMessageWithoutActionIds = () => ({
       elements: [
         {
           type: 'users_select',
-          action_id: '0+H2',
+          action_id: 'VOLUNTEER_DROPDOWN',
           initial_user: 'USLACKBOT',
           placeholder: {
             type: 'plain_text',
@@ -42,7 +42,7 @@ export const makeVoterStatusMessageWithoutActionIds = () => ({
       elements: [
         {
           type: 'static_select',
-          action_id: '0+H3',
+          action_id: 'VOTER_STATUS_DROPDOWN',
           initial_option: {
             text: {
               type: 'plain_text',
