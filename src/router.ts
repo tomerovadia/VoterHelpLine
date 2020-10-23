@@ -16,6 +16,8 @@ import logger from './logger';
 import { EntryPoint, UserInfo } from './types';
 import { PromisifiedRedisClient } from './redis_client';
 import * as Sentry from '@sentry/node';
+import { isVotedKeyword } from './keyword_parser';
+import { SlackActionId } from './slack_interaction_ids';
 
 const MINS_BEFORE_WELCOME_BACK_MESSAGE = 60 * 24;
 export const NUM_STATE_SELECTION_ATTEMPTS_LIMIT = 2;
@@ -49,7 +51,7 @@ function prepareUserInfoForNewVoter({
       userOptions.userPhoneNumber
     );
     logger.debug(
-      `ROUTER.handleNewVoter (${userOptions.userId}): Evaluating isDemo based on userPhoneNumber/twilioPhoneNumber: ${isDemo}`
+      `ROUTER.prepareUserInfoForNewVoter (${userOptions.userId}): Evaluating isDemo based on userPhoneNumber/twilioPhoneNumber: ${isDemo}`
     );
     confirmedDisclaimer = false;
     volunteerEngaged = false;
@@ -86,8 +88,25 @@ export async function welcomePotentialVoter(
     entryPoint,
   });
 
+  let messageToVoter = MessageConstants.WELCOME_VOTER();
+  if (isVotedKeyword(userOptions.userMessage)) {
+    messageToVoter = MessageConstants.VOTED_WELCOME_RESPONSE();
+    await DbApiUtil.logVoterStatusToDb({
+      userId: userInfo.userId,
+      userPhoneNumber: userInfo.userPhoneNumber,
+      twilioPhoneNumber: twilioPhoneNumber,
+      isDemo: userInfo.isDemo,
+      voterStatus: 'ALREADY_VOTED',
+      originatingSlackUserName: null,
+      originatingSlackUserId: null,
+      slackChannelName: null,
+      slackChannelId: null,
+      slackParentMessageTs: null,
+      actionTs: null,
+    });
+  }
   await TwilioApiUtil.sendMessage(
-    MessageConstants.WELCOME_VOTER(),
+    messageToVoter,
     {
       userPhoneNumber: userOptions.userPhoneNumber,
       twilioPhoneNumber,
@@ -145,6 +164,16 @@ const introduceNewVoterToSlackChannel = async (
   const operatorMessage = `*User ID:* ${userInfo.userId}\n*Connected via:* ${twilioPhoneNumber} (${entryPoint})`;
 
   const slackBlocks = SlackBlockUtil.getVoterStatusBlocks(operatorMessage);
+
+  // already voted?
+  const status = await DbApiUtil.getLatestVoterStatus(userInfo.userId);
+  if (status === 'ALREADY_VOTED') {
+    SlackBlockUtil.populateDropdownNewInitialValue(
+      slackBlocks,
+      SlackActionId.VOTER_STATUS_DROPDOWN,
+      status
+    );
+  }
 
   const response = await SlackApiUtil.sendMessage(operatorMessage, {
     channel: slackChannelName,
@@ -326,18 +355,12 @@ export async function handleNewVoter(
     entryPoint,
   });
 
-  await DbApiUtil.logVoterStatusToDb({
-    userId: userInfo.userId!,
-    userPhoneNumber: userOptions.userPhoneNumber,
+  await DbApiUtil.logInitialVoterStatusToDb(
+    userInfo.userId,
+    userOptions.userPhoneNumber,
     twilioPhoneNumber,
-    voterStatus: 'UNKNOWN',
-    originatingSlackUserName: null,
-    originatingSlackUserId: null,
-    slackChannelName: null,
-    slackChannelId: null,
-    slackParentMessageTs: null,
-    isDemo: userInfo.isDemo || null,
-  });
+    userInfo.isDemo
+  );
 
   let slackChannelName = userInfo.isDemo ? 'demo-lobby' : 'lobby';
   if (entryPoint === LoadBalancer.PULL_ENTRY_POINT) {

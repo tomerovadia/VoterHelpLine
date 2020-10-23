@@ -188,6 +188,14 @@ export const voterStatusPanel: SlackBlock = {
           },
           value: 'IN_PERSON',
         },
+        {
+          text: {
+            type: 'plain_text',
+            text: 'Already voted',
+            emoji: true,
+          },
+          value: 'ALREADY_VOTED',
+        },
       ],
     },
     {

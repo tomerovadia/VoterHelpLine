@@ -7,6 +7,7 @@ import {
   HistoricalMessage,
   SlackThreadInfo,
 } from './types';
+
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   max: Number(process.env.CONNECTION_POOL_MAX || 20),
@@ -1053,6 +1054,41 @@ export async function logVoterStatusToDb(
   }
 }
 
+export async function logInitialVoterStatusToDb(
+  userId: string,
+  userPhoneNumber: string,
+  twilioPhoneNumber: string,
+  isDemo: boolean
+): Promise<void> {
+  logger.info(`ENTERING DBAPIUTIL.logInitialVoterStatusToDb`);
+  const client = await pool.connect();
+  try {
+    if (process.env.CLIENT_ORGANIZATION === 'VOTE_AMERICA') {
+      // Only insert the UNKNOWN status if there is no existing (ALREADY_VOTED) status
+      await client.query(
+        `INSERT INTO voter_status_updates (user_id, user_phone_number, voter_status, is_demo)
+        SELECT $1, $2, 'UNKNOWN', $3
+        WHERE NOT EXISTS (
+          SELECT null FROM voter_status_updates
+          WHERE user_id = $1 AND user_phone_number = $2 AND is_demo = $3
+        )`,
+        [userId, userPhoneNumber, isDemo]
+      );
+    } else {
+      await client.query(
+        `INSERT INTO voter_status_updates (user_id, user_phone_number, voter_status, is_demo)
+        VALUES ($1, $2, 'UNKNOWN', $3)`,
+        [userId, userPhoneNumber, isDemo]
+      );
+    }
+    logger.info(
+      `DBAPIUTIL.logInitialVoterStatusToDb: Successfully inserted initial voter status into PostgreSQL database.`
+    );
+  } finally {
+    client.release();
+  }
+}
+
 const LAST_VOTER_STATUS_SQL_SCRIPT = `SELECT voter_status
                                         FROM voter_status_updates
                                         WHERE user_id = $1
@@ -1064,7 +1100,7 @@ const LAST_VOTER_STATUS_SQL_SCRIPT = `SELECT voter_status
 // the block initial_option on the front-end, and is copied over with the blocks during the move.
 export async function getLatestVoterStatus(
   userId: string
-): Promise<DatabaseVoterStatusEntry | null> {
+): Promise<string | null> {
   logger.info(`ENTERING DBAPIUTIL.getLatest`);
   logger.info(
     `DBAPIUTIL.getLatestVoterStatus: Looking up last voter status for userId: ${userId}.`

@@ -35,11 +35,13 @@ const requireModules = () => {
   RedisApiUtil.setHash = jest.fn();
   DbApiUtil.getMessageHistoryFor = jest.fn();
   DbApiUtil.logVoterStatusToDb = jest.fn();
+  DbApiUtil.logInitialVoterStatusToDb = jest.fn();
   DbApiUtil.logThreadToDb = jest.fn();
   DbApiUtil.setThreadNeedsAttentionToDb = jest.fn();
   DbApiUtil.getThreadNeedsAttentionFor = jest.fn();
   DbApiUtil.setThreadHistoryTs = jest.fn();
   DbApiUtil.updateThreadStatusFromMessage = jest.fn();
+  DbApiUtil.getLatestVoterStatus = jest.fn();
 
   SlackBlockUtil.populateDropdownWithLatestVoterStatus = jest.fn();
 };
