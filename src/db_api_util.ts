@@ -158,7 +158,7 @@ export async function logMessageToDb(
         databaseMessageEntry.stateName,
 
         // We can't just pass the array as-is because this is a JSON column,
-        // an node-pg serializes arrays as PG arrays rather than JSON arrays.
+        // and node-pg serializes arrays as PG arrays rather than JSON arrays.
         databaseMessageEntry.slackFiles
           ? JSON.stringify(databaseMessageEntry.slackFiles)
           : null,
