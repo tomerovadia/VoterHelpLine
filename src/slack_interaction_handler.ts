@@ -1041,7 +1041,7 @@ export async function handleResetDemo(
     false
   );
 
-  await DbApiUtil.clearDemoVoterClaims(
+  await DbApiUtil.archiveDemoVoterClaims(
     modalPrivateMetadata.userId,
     modalPrivateMetadata.twilioPhoneNumber
   );

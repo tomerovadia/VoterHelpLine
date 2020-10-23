@@ -531,7 +531,7 @@ export async function archiveMessagesForDemoVoter(
   }
 }
 
-export async function clearDemoVoterClaims(
+export async function archiveDemoVoterClaims(
   userId: string,
   twilioPhoneNumber: string
 ): Promise<void> {
@@ -541,9 +541,10 @@ export async function clearDemoVoterClaims(
 
   try {
     await client.query(
-      `DELETE FROM volunteer_voter_claims
+      `UPDATE volunteer_voter_claims
+      SET archived = true
       WHERE
-        is_demo = 't'
+        is_demo = true
         AND user_id = $1
         AND twilio_phone_number = $2`,
       [userId, twilioPhoneNumber]
@@ -747,6 +748,7 @@ export async function getUnclaimedVoters(
         AND NOT EXISTS (
           SELECT FROM volunteer_voter_claims c
           WHERE t.user_id=c.user_id
+          AND c.archived != true
         )
         AND s.voter_status NOT IN ('REFUSED', 'SPAM')
       ORDER BY t.updated_at`,
@@ -793,6 +795,7 @@ export async function getUnclaimedVotersByChannel(): Promise<ChannelStat[]> {
         AND NOT EXISTS (
           SELECT FROM volunteer_voter_claims c
           WHERE t.user_id=c.user_id
+          AND c.archived != true
         )
       GROUP BY slack_channel_id
       ORDER BY max_last_update_age DESC`
@@ -860,6 +863,7 @@ export async function getThreadsNeedingAttentionByVolunteer(): Promise<
           , volunteer_slack_user_name
           , row_number () OVER (PARTITION BY user_id ORDER BY created_at DESC) AS rn
         FROM volunteer_voter_claims
+        WHERE archived != true
       )
       SELECT
         count(*)
@@ -905,6 +909,7 @@ export async function getThreadsNeedingAttentionForChannel(
           , volunteer_slack_user_name
           , row_number () OVER (PARTITION BY user_id ORDER BY created_at DESC) AS rn
         FROM volunteer_voter_claims
+        WHERE archived != true
       )
       SELECT
         slack_parent_message_ts
@@ -953,6 +958,7 @@ export async function getThreadsNeedingAttentionFor(
           , volunteer_slack_user_name
           , row_number () OVER (PARTITION BY user_id ORDER BY created_at DESC) AS rn
         FROM volunteer_voter_claims
+        WHERE archived != true
       )
       SELECT
         slack_parent_message_ts
@@ -1091,7 +1097,7 @@ export async function logVolunteerVoterClaimToDb(
 
   try {
     await client.query(
-      'INSERT INTO volunteer_voter_claims (user_id, user_phone_number, twilio_phone_number, is_demo, volunteer_slack_user_name, volunteer_slack_user_id, originating_slack_user_name, originating_slack_user_id, slack_channel_name, slack_channel_id, slack_parent_message_ts, action_ts) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12);',
+      'INSERT INTO volunteer_voter_claims (user_id, user_phone_number, twilio_phone_number, is_demo, volunteer_slack_user_name, volunteer_slack_user_id, originating_slack_user_name, originating_slack_user_id, slack_channel_name, slack_channel_id, slack_parent_message_ts, action_ts, archived) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, false);',
       [
         databaseVolunteerVoterClaimEntry.userId,
         databaseVolunteerVoterClaimEntry.userPhoneNumber,
@@ -1120,7 +1126,7 @@ export async function getVoterHasVolunteer(userId: string): Promise<boolean> {
   const client = await pool.connect();
   try {
     const result = await client.query(
-      'SELECT EXISTS(SELECT 1 FROM volunteer_voter_claims WHERE user_id = $1) AS exists',
+      'SELECT EXISTS(SELECT 1 FROM volunteer_voter_claims WHERE user_id = $1 AND archived != true) AS exists',
       [userId]
     );
     return result.rows.length > 0 && result.rows[0]['exists'];
