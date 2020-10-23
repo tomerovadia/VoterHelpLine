@@ -302,7 +302,16 @@ async function slackInteractivityHandler(
       return;
     }
 
-    if (payload.actions[0].action_id === SlackActionId.VOTER_STATUS_DROPDOWN) {
+    if (
+      payload.actions[0].action_id === SlackActionId.VOTER_STATUS_DROPDOWN ||
+      payload.actions[0].action_id ===
+        SlackActionId.VOTER_STATUS_VOTED_BUTTON ||
+      payload.actions[0].action_id ===
+        SlackActionId.VOTER_STATUS_REFUSED_BUTTON ||
+      payload.actions[0].action_id === SlackActionId.VOTER_STATUS_SPAM_BUTTON ||
+      payload.actions[0].action_id ===
+        SlackActionId.CLOSED_VOTER_PANEL_UNDO_BUTTON
+    ) {
       logger.info(
         `SERVER POST /slack-interactivity: Determined user interaction is a voter status update or undo.`
       );
@@ -332,6 +341,8 @@ async function slackInteractivityHandler(
         userPhoneNumber: redisData ? redisData.userPhoneNumber : null,
         twilioPhoneNumber: redisData ? redisData.twilioPhoneNumber : null,
       });
+    } else {
+      throw Error(`Unrecognized action_id ${payload.actions[0].action_id}`);
     }
     return;
   }
