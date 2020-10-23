@@ -107,6 +107,7 @@ export type ThreadInfo = {
   lastUpdateAge: number | null;
   volunteerSlackUserId: string | null;
   volunteerSlackUserName: string | null;
+  voterStatus?: string;
 };
 
 export type ChannelStat = {
@@ -1058,6 +1059,61 @@ export async function getThreadNeedsAttentionFor(
   }
 }
 
+// Return a list of ThreadInfo's for all threads needing followup
+export async function getThreadsNeedingFollowUp(
+  slackUserId: string,
+  days: number
+): Promise<ThreadInfo[]> {
+  const client = await pool.connect();
+  try {
+    const result = await client.query(
+      `WITH claims AS (
+        SELECT
+          user_id
+          , volunteer_slack_user_id
+          , volunteer_slack_user_name
+          , row_number () OVER (PARTITION BY user_id ORDER BY created_at DESC) AS rn
+        FROM volunteer_voter_claims
+      ), all_status AS (
+        SELECT
+          user_id, voter_status
+          , row_number() OVER (PARTITION BY user_id ORDER BY created_at DESC) AS rn
+        FROM voter_status_updates
+      ), latest_status AS (
+        SELECT user_id, voter_status FROM all_status WHERE rn=1
+      )
+      SELECT
+        t.slack_parent_message_ts
+        , t.slack_channel_id
+        , t.user_id
+        , EXTRACT(EPOCH FROM now() - updated_at) as last_update_age
+        , c.volunteer_slack_user_name
+        , s.voter_status
+        FROM threads t, claims c, latest_status s
+        WHERE
+          needs_attention = false
+          AND routed = false
+          AND updated_at <= NOW() - interval '${days} days'
+          AND t.user_id=c.user_id
+          AND c.rn=1
+          AND c.volunteer_slack_user_id=$1
+          AND s.user_id = t.user_id
+        ORDER BY updated_at`,
+      [slackUserId]
+    );
+    return result.rows.map((x) => ({
+      slackParentMessageTs: x['slack_parent_message_ts'],
+      channelId: x['slack_channel_id'],
+      userId: x['user_id'],
+      lastUpdateAge: x['last_update_age'],
+      volunteerSlackUserId: slackUserId,
+      volunteerSlackUserName: x['volunteer_slack_user_name'],
+      voterStatus: x['voter_status'],
+    }));
+  } finally {
+    client.release();
+  }
+}
 export async function logVoterStatusToDb(
   databaseVoterStatusEntry: DatabaseVoterStatusEntry
 ): Promise<void> {
