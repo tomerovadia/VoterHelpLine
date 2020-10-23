@@ -256,9 +256,7 @@ export async function handleVoterStatusUpdate({
       if (
         !SlackBlockUtil.populateDropdownNewInitialValue(
           payload.message.blocks,
-          payload.actions && payload.actions[0].action_id
-            ? payload.actions[0].action_id
-            : SlackActionId.VOTER_STATUS_DROPDOWN,
+          SlackActionId.VOTER_STATUS_DROPDOWN,
           selectedVoterStatus as VoterStatus
         )
       ) {
