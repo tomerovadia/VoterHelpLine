@@ -531,11 +531,11 @@ export async function archiveMessagesForDemoVoter(
   }
 }
 
-export async function archiveDemoVoterClaims(
+export async function archiveDemoVolunteerVoterClaims(
   userId: string,
   twilioPhoneNumber: string
 ): Promise<void> {
-  logger.info(`ENTERING DBAPIUTIL.clearDemoVoterClaims`);
+  logger.info(`ENTERING DBAPIUTIL.archiveDemoVolunteerVoterClaims`);
 
   const client = await pool.connect();
 
@@ -551,7 +551,7 @@ export async function archiveDemoVoterClaims(
     );
 
     logger.info(
-      `DBAPIUTIL.clearDemoVoterClaims: Successfully cleared demo voter claims.`
+      `DBAPIUTIL.archiveDemoVolunteerVoterClaims: Successfully cleared demo voter claims.`
     );
   } finally {
     client.release();
