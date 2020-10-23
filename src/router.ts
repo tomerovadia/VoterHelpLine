@@ -355,7 +355,8 @@ export async function handleNewVoter(
   await DbApiUtil.logInitialVoterStatusToDb(
     userInfo.userId,
     userOptions.userPhoneNumber,
-    twilioPhoneNumber
+    twilioPhoneNumber,
+    userInfo.isDemo
   );
 
   let slackChannelName = userInfo.isDemo ? 'demo-lobby' : 'lobby';
