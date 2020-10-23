@@ -97,6 +97,7 @@ export type DatabaseThreadEntry = {
   userId: string | null;
   userPhoneNumber: string | null;
   needsAttention: boolean | null;
+  isDemo: boolean;
 };
 
 export type ThreadInfo = {
@@ -578,13 +579,14 @@ export async function logThreadToDb(
   const client = await pool.connect();
   try {
     await client.query(
-      'INSERT INTO threads (slack_parent_message_ts, slack_channel_id, user_id, user_phone_number, needs_attention, updated_at) VALUES ($1, $2, $3, $4, $5, NOW())',
+      'INSERT INTO threads (slack_parent_message_ts, slack_channel_id, user_id, user_phone_number, needs_attention, is_demo, updated_at, routed) VALUES ($1, $2, $3, $4, $5, $6, NOW(), false)',
       [
         databaseThreadEntry.slackParentMessageTs,
         databaseThreadEntry.channelId,
         databaseThreadEntry.userId,
         databaseThreadEntry.userPhoneNumber,
         databaseThreadEntry.needsAttention,
+        databaseThreadEntry.isDemo,
       ]
     );
     logger.info('DBAPIUTIL.logThreadToDb: Successfully created thread');
@@ -677,6 +679,24 @@ export async function setThreadNeedsAttentionToDb(
     );
   } catch (error) {
     logger.info('Failed to update threads; ignoring for now!');
+  } finally {
+    client.release();
+  }
+}
+
+export async function setThreadRoutedToDb(
+  slackParentMessageTs: string,
+  slackChannelId: string
+): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query(
+      'UPDATE threads SET needs_attention = false, routed = true WHERE slack_parent_message_ts = $1 AND slack_channel_id = $2;',
+      [slackParentMessageTs, slackChannelId]
+    );
+    logger.info(
+      `DBAPIUTIL.setThreadRoutedToDb: Set thread ${slackParentMessageTs} routed=true, need_attention=false`
+    );
   } finally {
     client.release();
   }

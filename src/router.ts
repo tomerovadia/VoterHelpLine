@@ -262,6 +262,7 @@ const introduceNewVoterToSlackChannel = async (
       userId: userInfo.userId,
       userPhoneNumber: userInfo.userPhoneNumber,
       needsAttention: true,
+      isDemo: userInfo.isDemo,
     });
   }
 
@@ -663,10 +664,9 @@ const routeVoterToSlackChannel = async (
     userInfo[userInfo.activeChannelId],
     userInfo.activeChannelId
   );
-  await DbApiUtil.setThreadNeedsAttentionToDb(
+  await DbApiUtil.setThreadRoutedToDb(
     userInfo[userInfo.activeChannelId],
-    userInfo.activeChannelId,
-    false
+    userInfo.activeChannelId
   );
 
   let previousParentMessageBlocks;
@@ -780,6 +780,7 @@ const routeVoterToSlackChannel = async (
       userId: userInfo.userId,
       userPhoneNumber: userInfo.userPhoneNumber,
       needsAttention: needsAttention,
+      isDemo: userInfo.isDemo,
     });
 
     return;
