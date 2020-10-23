@@ -330,15 +330,24 @@ export async function handleVolunteerUpdate({
   if (
     !payload.actions ||
     !payload.actions[0] ||
-    !payload.actions[0].selected_user
+    !(
+      payload.actions[0].selected_user ||
+      payload.actions[0].action_id == SlackActionId.VOLUNTEER_RELEASE_CLAIM
+    )
   ) {
     throw new Error(
-      'Expected selected_user in SLACKINTERACTIONHANDLER.handleVolunteerUpdate'
+      'Expected selected_user or release claim in SLACKINTERACTIONHANDLER.handleVolunteerUpdate'
     );
   }
-  const selectedVolunteerSlackUserName = await SlackApiUtil.fetchSlackUserName(
-    payload.actions && payload.actions[0].selected_user
-  );
+
+  let selectedVolunteerSlackUserName = null as string | null;
+  let selectedVolunteerSlackUserId = null;
+  if (payload.actions && payload.actions[0].selected_user) {
+    selectedVolunteerSlackUserId = payload.actions[0].selected_user;
+    selectedVolunteerSlackUserName = await SlackApiUtil.fetchSlackUserName(
+      selectedVolunteerSlackUserId
+    );
+  }
   const MD5 = new Hashes.MD5();
   const userId = MD5.hex(userPhoneNumber);
 
@@ -348,7 +357,9 @@ export async function handleVolunteerUpdate({
 
   // Post a message in the voter thread recording this status change.
   await SlackApiUtil.sendMessage(
-    `*Operator:* Volunteer changed to *${selectedVolunteerSlackUserName}* by *${originatingSlackUserName}* at *${specialSlackTimestamp}*.`,
+    selectedVolunteerSlackUserName
+      ? `*Operator:* Volunteer changed to *${selectedVolunteerSlackUserName}* by *${originatingSlackUserName}* at *${specialSlackTimestamp}*.`
+      : `*Operator:* Volunteer claim released by *${originatingSlackUserName}* at *${specialSlackTimestamp}*.`,
     {
       parentMessageTs: payload.container.thread_ts,
       channel: payload.channel.id,
@@ -356,7 +367,7 @@ export async function handleVolunteerUpdate({
   );
 
   logger.info(
-    `SLACKINTERACTIONHANDLER.handleVoterStatusUpdate: Successfully sent message recording voter status change`
+    `SLACKINTERACTIONHANDLER.handleVolunteerUpdate: Successfully sent message recording volunteer status change`
   );
 
   await DbApiUtil.logVolunteerVoterClaimToDb({
@@ -368,9 +379,7 @@ export async function handleVolunteerUpdate({
       userPhoneNumber
     ),
     volunteerSlackUserName: selectedVolunteerSlackUserName,
-    volunteerSlackUserId: payload.actions
-      ? payload.actions[0].selected_user
-      : null,
+    volunteerSlackUserId: selectedVolunteerSlackUserId,
     originatingSlackUserName,
     originatingSlackUserId: payload.user.id,
     slackChannelName,
@@ -384,10 +393,8 @@ export async function handleVolunteerUpdate({
   if (
     !SlackBlockUtil.populateDropdownNewInitialValue(
       payload.message.blocks,
-      payload.actions && payload.actions[0].action_id
-        ? payload.actions[0].action_id
-        : SlackActionId.VOLUNTEER_DROPDOWN,
-      payload.actions ? payload.actions[0].selected_user : null
+      SlackActionId.VOLUNTEER_DROPDOWN,
+      selectedVolunteerSlackUserId
     )
   ) {
     logger.error(
