@@ -10,7 +10,7 @@ import * as RedisApiUtil from './redis_api_util';
 import * as LoadBalancer from './load_balancer';
 import * as SlackMessageFormatter from './slack_message_formatter';
 import * as CommandUtil from './command_util';
-import MessageParser from './message_parser';
+import * as MessageParser from './message_parser';
 import * as SlackInteractionApiUtil from './slack_interaction_api_util';
 import logger from './logger';
 import { EntryPoint, UserInfo } from './types';
@@ -18,6 +18,7 @@ import { PromisifiedRedisClient } from './redis_client';
 import * as Sentry from '@sentry/node';
 import { isVotedKeyword } from './keyword_parser';
 import { SlackActionId } from './slack_interaction_ids';
+import { SlackFile } from './message_parser';
 
 const MINS_BEFORE_WELCOME_BACK_MESSAGE = 60 * 24;
 export const NUM_STATE_SELECTION_ATTEMPTS_LIMIT = 2;
@@ -1163,6 +1164,29 @@ export async function handleSlackVoterThreadMessage(
     slackRetryNum: retryCount,
     slackRetryReason: retryReason,
   });
+  outboundDbMessageEntry.slackFiles = reqBody.event.files;
+
+  // check attachments
+  if (reqBody.event.files) {
+    const errors = MessageParser.validateSlackAttachments(reqBody.event.files);
+    if (errors.length) {
+      await SlackApiUtil.sendMessage(
+        'Sorry, there was a problem with one or more of your attachments:\n' +
+          errors.map((x) => `>${x}`).join('\n'),
+        {
+          channel: reqBody.event.channel,
+          parentMessageTs: reqBody.event.thread_ts,
+        }
+      );
+      await SlackApiUtil.addSlackMessageReaction(
+        reqBody.event.channel,
+        reqBody.event.ts,
+        'x'
+      );
+      return;
+    }
+    await SlackApiUtil.makeFilesPublic(reqBody.event.files);
+  }
 
   const userInfo = (await RedisApiUtil.getHash(
     redisClient,
@@ -1216,6 +1240,7 @@ export type SlackEventRequestBody = {
     thread_ts: string;
     user: string;
     channel: string;
+    files?: SlackFile[];
   };
   authed_users: string[];
 };

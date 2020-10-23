@@ -100,6 +100,12 @@ HMSET stateRegionConfig "Alabama" "Central" "Alaska" "Pacific" "Arizona" "Arizon
 
 ### OAuth & Permissions
 
+#### OAuth Tokens & Redirect URLs
+
+Create an **OAuth Access Token** and put it in `.env` as `SLACK_USER_ACCESS_TOKEN`.  It should start with `xoxp-`.
+
+Create a **Bot User OAuth Access Token** and put it in `.env` as `SLACK_BOT_ACCESS_TOKEN`.  It should start with `xoxb-`.
+
 #### Scopes
 
 ##### Bot Token Scopes
@@ -115,6 +121,10 @@ HMSET stateRegionConfig "Alabama" "Central" "Alaska" "Pacific" "Arizona" "Arizon
 - groups:read
 - reactions:write
 - users:read
+
+##### User Token Scopes
+
+- files:write
 
 ### Event Subscriptions
 

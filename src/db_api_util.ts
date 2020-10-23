@@ -12,6 +12,7 @@ const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   max: Number(process.env.CONNECTION_POOL_MAX || 20),
 });
+import { SlackFile } from './message_parser';
 
 export type DatabaseMessageEntry = {
   message?: string | null;
@@ -42,6 +43,7 @@ export type DatabaseMessageEntry = {
   entryPoint: EntryPoint | null;
   archived?: boolean | null;
   stateName?: string | null;
+  slackFiles?: SlackFile[] | null;
 };
 
 export type DatabaseVoterStatusEntry = {
@@ -124,7 +126,7 @@ export async function logMessageToDb(
   const client = await pool.connect();
   try {
     await client.query(
-      'INSERT INTO messages (message, direction, automated, successfully_sent, from_phone_number, user_id, to_phone_number, originating_slack_user_id, slack_channel, slack_parent_message_ts, twilio_message_sid, slack_message_ts, slack_error, twilio_error, twilio_send_timestamp, twilio_receive_timestamp, slack_send_timestamp, slack_receive_timestamp, confirmed_disclaimer, is_demo, last_voter_message_secs_from_epoch, unprocessed_message, slack_retry_num, slack_retry_reason, originating_slack_user_name, entry_point, archived, state_name) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28);',
+      'INSERT INTO messages (message, direction, automated, successfully_sent, from_phone_number, user_id, to_phone_number, originating_slack_user_id, slack_channel, slack_parent_message_ts, twilio_message_sid, slack_message_ts, slack_error, twilio_error, twilio_send_timestamp, twilio_receive_timestamp, slack_send_timestamp, slack_receive_timestamp, confirmed_disclaimer, is_demo, last_voter_message_secs_from_epoch, unprocessed_message, slack_retry_num, slack_retry_reason, originating_slack_user_name, entry_point, archived, state_name, slack_attachments) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29);',
       [
         databaseMessageEntry.message,
         databaseMessageEntry.direction,
@@ -154,6 +156,12 @@ export async function logMessageToDb(
         databaseMessageEntry.entryPoint,
         databaseMessageEntry.archived,
         databaseMessageEntry.stateName,
+
+        // We can't just pass the array as-is because this is a JSON column,
+        // and node-pg serializes arrays as PG arrays rather than JSON arrays.
+        databaseMessageEntry.slackFiles
+          ? JSON.stringify(databaseMessageEntry.slackFiles)
+          : null,
       ]
     );
     logger.info(

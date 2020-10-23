@@ -5,8 +5,13 @@ import { Request } from './types';
 
 // Twilio statuses that represent the final state of a message. The value
 // in this map is the emoji reaction to add to the Slack message.
-const FINAL_STATUSES: { [status: string]: string } = {
+const SMS_FINAL_STATUSES: { [status: string]: string } = {
   delivered: 'white_check_mark',
+  undelivered: 'x',
+  failed: 'x',
+};
+const MMS_FINAL_STATUSES: { [status: string]: string } = {
+  sent: 'white_check_mark',
   undelivered: 'x',
   failed: 'x',
 };
@@ -21,9 +26,19 @@ export async function handleTwilioStatusCallback(req: Request): Promise<void> {
   // Twilio delivers callbacks for lots of intermediate states (queued, sent
   // to carrier, etc.). We just care about the final status of the message,
   // so we don't update Postgres for those intermediate statuses.
-  if (!(messageStatus in FINAL_STATUSES)) {
-    logger.info(`Twilio status is non-final; not processing`);
-    return;
+  let reaction = null;
+  if (messageSid.substr(0, 2) === 'MM') {
+    if (!(messageStatus in MMS_FINAL_STATUSES)) {
+      logger.info(`Twilio MMS status is non-final; not processing`);
+      return;
+    }
+    reaction = MMS_FINAL_STATUSES[messageStatus];
+  } else {
+    if (!(messageStatus in SMS_FINAL_STATUSES)) {
+      logger.info(`Twilio SMS status is non-final; not processing`);
+      return;
+    }
+    reaction = SMS_FINAL_STATUSES[messageStatus];
   }
 
   // Update the Postgres DB with the message status and current timestamp
@@ -46,6 +61,6 @@ export async function handleTwilioStatusCallback(req: Request): Promise<void> {
   await addSlackMessageReaction(
     slackMessageInfo.slackChannel,
     slackMessageInfo.slackMessageTs,
-    FINAL_STATUSES[messageStatus]
+    reaction
   );
 }
