@@ -487,9 +487,10 @@ export async function handleCommandUnclaimed(
       messageTs
     );
     lines.push(
-      `:bust_in_silhouette: ${thread.userId} - age ${prettyTimeInterval(
-        thread.lastUpdateAge || 0
-      )} - <${url}|Open>`
+      `:bust_in_silhouette: Voter ${thread.userId?.substr(
+        0,
+        5
+      )} - age ${prettyTimeInterval(thread.lastUpdateAge || 0)} - <${url}|Open>`
     );
     if (lines.length >= maxCommandLines) {
       lines.push('... (truncated for brevity) ...');
@@ -514,9 +515,10 @@ async function getNeedsAttentionList(userId: string): Promise<string[]> {
       messageTs
     );
     lines.push(
-      `:bust_in_silhouette: ${thread.userId} - age ${prettyTimeInterval(
-        thread.lastUpdateAge || 0
-      )} - <${url}|Open>`
+      `:bust_in_silhouette: Voter ${thread.userId?.substr(
+        0,
+        5
+      )} - age ${prettyTimeInterval(thread.lastUpdateAge || 0)} - <${url}|Open>`
     );
     if (lines.length >= maxCommandLines) {
       lines.push('... (truncated for brevity) ...');
@@ -634,9 +636,10 @@ export async function handleCommandNeedsAttention(
           ? `<@${thread.volunteerSlackUserId}>`
           : 'unassigned';
         lines.push(
-          `:bust_in_silhouette: ${
-            thread.userId
-          } - ${owner} - age ${prettyTimeInterval(
+          `:bust_in_silhouette: Voter ${thread.userId?.substr(
+            0,
+            5
+          )} - ${owner} - age ${prettyTimeInterval(
             thread.lastUpdateAge || 0
           )} - <${url}|Open>`
         );
@@ -734,7 +737,10 @@ export async function handleCommandBroadcast(
               messageTs
             );
             lines.push(
-              `:bust_in_silhouette: ${thread.userId} - age ${prettyTimeInterval(
+              `:bust_in_silhouette: Voter ${thread.userId?.substr(
+                0,
+                5
+              )} - age ${prettyTimeInterval(
                 thread.lastUpdateAge || 0
               )} - <${url}|Open>`
             );
@@ -765,9 +771,10 @@ export async function handleCommandBroadcast(
               ? `<@${thread.volunteerSlackUserId}>`
               : 'unassigned';
             lines.push(
-              `:bust_in_silhouette: ${
-                thread.userId
-              } - ${owner} - age ${prettyTimeInterval(
+              `:bust_in_silhouette: Voter ${thread.userId?.substr(
+                0,
+                5
+              )} - ${owner} - age ${prettyTimeInterval(
                 thread.lastUpdateAge || 0
               )} - <${url}|Open>`
             );

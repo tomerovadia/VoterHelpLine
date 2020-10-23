@@ -279,9 +279,10 @@ const introduceNewVoterToSlackChannel = async (
     logger.debug(
       `ROUTER.introduceNewVoterToSlackChannel: Passing automated welcome message to Slack, slackChannelName: ${slackChannelName}, parentMessageTs: ${response.data.channel}.`
     );
-    await SlackApiUtil.sendMessage(`*Automated Message:* ${messageToVoter}`, {
+    await SlackApiUtil.sendMessage(messageToVoter, {
       parentMessageTs: response.data.ts,
       channel: response.data.channel,
+      isAutomatedMessage: true,
     });
   }
 
@@ -840,13 +841,11 @@ export async function determineVoterState(
         { userPhoneNumber, twilioPhoneNumber, twilioCallbackURL },
         DbApiUtil.populateAutomatedDbMessageEntry(userInfo)
       );
-      await SlackApiUtil.sendMessage(
-        `*Automated Message:* ${MessageConstants.CLARIFY_STATE()}`,
-        {
-          parentMessageTs: lobbyParentMessageTs,
-          channel: lobbyChannelId,
-        }
-      );
+      await SlackApiUtil.sendMessage(MessageConstants.CLARIFY_STATE(), {
+        parentMessageTs: lobbyParentMessageTs,
+        channel: lobbyChannelId,
+        isAutomatedMessage: true,
+      });
 
       logger.debug(
         `ROUTER.determineVoterState: Writing updated userInfo to Redis.`
@@ -878,9 +877,10 @@ export async function determineVoterState(
     { userPhoneNumber, twilioPhoneNumber, twilioCallbackURL },
     DbApiUtil.populateAutomatedDbMessageEntry(userInfo)
   );
-  await SlackApiUtil.sendMessage(`*Automated Message:* ${messageToVoter}`, {
+  await SlackApiUtil.sendMessage(messageToVoter, {
     parentMessageTs: lobbyParentMessageTs,
     channel: lobbyChannelId,
+    isAutomatedMessage: true,
   });
 
   let selectedStateChannelName = await LoadBalancer.selectSlackChannel(
@@ -1016,10 +1016,10 @@ export async function handleDisclaimer(
     },
     DbApiUtil.populateAutomatedDbMessageEntry(userInfo)
   );
-  await SlackApiUtil.sendMessage(
-    `*Automated Message:* ${automatedMessage}`,
-    slackLobbyMessageParams
-  );
+  await SlackApiUtil.sendMessage(automatedMessage, {
+    ...slackLobbyMessageParams,
+    isAutomatedMessage: true,
+  });
 }
 
 export async function handleClearedVoter(
@@ -1075,10 +1075,10 @@ export async function handleClearedVoter(
       },
       DbApiUtil.populateAutomatedDbMessageEntry(userInfo)
     );
-    await SlackApiUtil.sendMessage(
-      `*Automated Message:* ${welcomeBackMessage}`,
-      activeChannelMessageParams
-    );
+    await SlackApiUtil.sendMessage(welcomeBackMessage, {
+      ...activeChannelMessageParams,
+      isAutomatedMessage: true,
+    });
   }
 
   logger.debug(`ROUTER.handleClearedVoter: Writing updated userInfo to Redis.`);
