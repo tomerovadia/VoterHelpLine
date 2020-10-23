@@ -48,72 +48,70 @@ const SUPPORTED_MMS_MIME_TYPES = ['image/jpeg', 'image/gif', 'image/png'];
 // hard cap.
 const MMS_MAX_SIZE = 1000 * 1000 * 5 * 0.9;
 
-export default {
-  processMessageText(userMessage: string): string | null {
-    let processedUserMessage = userMessage;
+export function processMessageText(userMessage: string): string | null {
+  let processedUserMessage = userMessage;
 
-    const doubleTelephoneNumbers = userMessage.matchAll(/<tel:(.*?)\|\1>/g);
-    const arrayOfDoubleTelephoneNumbers = Array.from(doubleTelephoneNumbers);
-    for (const i in arrayOfDoubleTelephoneNumbers) {
-      const oldTelephoneNumber = arrayOfDoubleTelephoneNumbers[i][0];
-      const newTelephoneNumber = arrayOfDoubleTelephoneNumbers[i][1];
-      processedUserMessage = processedUserMessage.replace(
-        oldTelephoneNumber,
-        newTelephoneNumber
-      );
+  const doubleTelephoneNumbers = userMessage.matchAll(/<tel:(.*?)\|\1>/g);
+  const arrayOfDoubleTelephoneNumbers = Array.from(doubleTelephoneNumbers);
+  for (const i in arrayOfDoubleTelephoneNumbers) {
+    const oldTelephoneNumber = arrayOfDoubleTelephoneNumbers[i][0];
+    const newTelephoneNumber = arrayOfDoubleTelephoneNumbers[i][1];
+    processedUserMessage = processedUserMessage.replace(
+      oldTelephoneNumber,
+      newTelephoneNumber
+    );
+  }
+
+  const doubleLinks = userMessage.matchAll(/<(.*?)\|\1>/g);
+  const arrayOfDoubleLinks = Array.from(doubleLinks);
+  for (const i in arrayOfDoubleLinks) {
+    const oldLink = arrayOfDoubleLinks[i][0];
+    const newLink = arrayOfDoubleLinks[i][1];
+    processedUserMessage = processedUserMessage.replace(oldLink, newLink);
+  }
+
+  const singleLinks = userMessage.matchAll(/<(.*?)>/g);
+  const arrayOfSingleLinks = Array.from(singleLinks);
+  for (const i in arrayOfSingleLinks) {
+    const oldLink = arrayOfSingleLinks[i][0];
+    const newLink = arrayOfSingleLinks[i][1];
+    processedUserMessage = processedUserMessage.replace(oldLink, newLink);
+  }
+
+  // Replace emoji with unicode
+  processedUserMessage = emoji.replace_colons(processedUserMessage);
+
+  // If nothing was changed, return null. Important for DB logging.
+  return userMessage == processedUserMessage ? null : processedUserMessage;
+}
+
+export function validateSlackAttachments(files: SlackFile[]): string[] {
+  const errors = [] as string[];
+  for (const file of files) {
+    if (!SUPPORTED_MMS_MIME_TYPES.includes(file.mimetype)) {
+      errors.push(`Attachment of type ${file.mimetype} not supported`);
     }
+  }
+  return errors;
+}
 
-    const doubleLinks = userMessage.matchAll(/<(.*?)\|\1>/g);
-    const arrayOfDoubleLinks = Array.from(doubleLinks);
-    for (const i in arrayOfDoubleLinks) {
-      const oldLink = arrayOfDoubleLinks[i][0];
-      const newLink = arrayOfDoubleLinks[i][1];
-      processedUserMessage = processedUserMessage.replace(oldLink, newLink);
+export function getSlackAttachments(files: SlackFile[] | null): string[] {
+  if (!files) {
+    return [];
+  }
+
+  const totalSize = files.map((file) => file.size).reduce((a, b) => a + b, 0);
+
+  const r = [] as string[];
+  for (const file of files) {
+    const comp = file.permalink_public.split('/');
+    const bits = comp[3].split('-');
+    const pub_secret = bits[2];
+    if (totalSize > MMS_MAX_SIZE) {
+      r.push(file.thumb_480 + '?pub_secret=' + pub_secret);
+    } else {
+      r.push(file.url_private + '?pub_secret=' + pub_secret);
     }
-
-    const singleLinks = userMessage.matchAll(/<(.*?)>/g);
-    const arrayOfSingleLinks = Array.from(singleLinks);
-    for (const i in arrayOfSingleLinks) {
-      const oldLink = arrayOfSingleLinks[i][0];
-      const newLink = arrayOfSingleLinks[i][1];
-      processedUserMessage = processedUserMessage.replace(oldLink, newLink);
-    }
-
-    // Replace emoji with unicode
-    processedUserMessage = emoji.replace_colons(processedUserMessage);
-
-    // If nothing was changed, return null. Important for DB logging.
-    return userMessage == processedUserMessage ? null : processedUserMessage;
-  },
-
-  validateSlackAttachments(files: SlackFile[]): string[] {
-    const errors = [] as string[];
-    for (const file of files) {
-      if (!SUPPORTED_MMS_MIME_TYPES.includes(file.mimetype)) {
-        errors.push(`Attachment of type ${file.mimetype} not supported`);
-      }
-    }
-    return errors;
-  },
-
-  getSlackAttachments(files: SlackFile[] | null): string[] {
-    if (!files) {
-      return [];
-    }
-
-    const totalSize = files.map((file) => file.size).reduce((a, b) => a + b, 0);
-
-    const r = [] as string[];
-    for (const file of files) {
-      const comp = file.permalink_public.split('/');
-      const bits = comp[3].split('-');
-      const pub_secret = bits[2];
-      if (totalSize > MMS_MAX_SIZE) {
-        r.push(file.thumb_480 + '?pub_secret=' + pub_secret);
-      } else {
-        r.push(file.url_private + '?pub_secret=' + pub_secret);
-      }
-    }
-    return r;
-  },
-};
+  }
+  return r;
+}

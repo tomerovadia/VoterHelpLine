@@ -1,4 +1,4 @@
-import MessageParser from './message_parser';
+import * as MessageParser from './message_parser';
 import { PromisifiedRedisClient } from './redis_client';
 
 export type AdminCommand =

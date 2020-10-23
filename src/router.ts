@@ -10,7 +10,7 @@ import * as RedisApiUtil from './redis_api_util';
 import * as LoadBalancer from './load_balancer';
 import * as SlackMessageFormatter from './slack_message_formatter';
 import * as CommandUtil from './command_util';
-import MessageParser from './message_parser';
+import * as MessageParser from './message_parser';
 import * as SlackInteractionApiUtil from './slack_interaction_api_util';
 import logger from './logger';
 import { EntryPoint, UserInfo } from './types';
@@ -1168,9 +1168,7 @@ export async function handleSlackVoterThreadMessage(
 
   // check attachments
   if (reqBody.event.files) {
-    const errors = MessageParser.validateSlackAttachments(
-      reqBody.event.files
-    );
+    const errors = MessageParser.validateSlackAttachments(reqBody.event.files);
     if (errors.length) {
       await SlackApiUtil.sendMessage(
         'Sorry, there was a problem with one or more of your attachments:\n' +

@@ -1,4 +1,4 @@
-const MessageParser = require('./message_parser').default;
+const MessageParser = require('./message_parser');
 
 describe('processMessageText', () => {
   test('Returns null to messages without links.', () => {
