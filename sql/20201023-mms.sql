@@ -2,4 +2,4 @@
 -- a text array because they have similar performance, but JSON is easier to
 -- sync to a Redshift data warehouse (e.g. Civis)
 ALTER TABLE messages
-ADD COLUMN slack_files jsonb;
+ADD COLUMN slack_attachments jsonb;
