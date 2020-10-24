@@ -1067,7 +1067,7 @@ export async function getThreadsNeedingFollowUp(
   const client = await pool.connect();
   try {
     const result = await client.query(
-      `WITH claims AS (
+      `WITH all_claims AS (
         SELECT
           user_id
           , volunteer_slack_user_id
@@ -1075,13 +1075,19 @@ export async function getThreadsNeedingFollowUp(
           , row_number () OVER (PARTITION BY user_id ORDER BY created_at DESC) AS rn
         FROM volunteer_voter_claims
         WHERE archived != true
+      ), latest_claims AS (
+        SELECT user_id, volunteer_slack_user_id, volunteer_slack_user_name
+        FROM all_claims
+        WHERE rn = 1
       ), all_status AS (
         SELECT
           user_id, voter_status
           , row_number() OVER (PARTITION BY user_id ORDER BY created_at DESC) AS rn
         FROM voter_status_updates
       ), latest_status AS (
-        SELECT user_id, voter_status FROM all_status WHERE rn=1
+        SELECT user_id, voter_status
+        FROM all_status
+        WHERE rn = 1
       )
       SELECT
         t.slack_parent_message_ts
@@ -1090,13 +1096,12 @@ export async function getThreadsNeedingFollowUp(
         , EXTRACT(EPOCH FROM now() - updated_at) as last_update_age
         , c.volunteer_slack_user_name
         , s.voter_status
-        FROM threads t, claims c, latest_status s
+        FROM threads t, latest_claims c, latest_status s
         WHERE
           needs_attention = false
           AND routed = false
           AND updated_at <= NOW() - interval '${days} days'
           AND t.user_id=c.user_id
-          AND c.rn=1
           AND c.volunteer_slack_user_id=$1
           AND s.user_id = t.user_id
         ORDER BY updated_at`,
