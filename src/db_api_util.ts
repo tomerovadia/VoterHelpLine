@@ -1067,27 +1067,15 @@ export async function getThreadsNeedingFollowUp(
   const client = await pool.connect();
   try {
     const result = await client.query(
-      `WITH all_claims AS (
-        SELECT
-          user_id
-          , volunteer_slack_user_id
-          , volunteer_slack_user_name
-          , row_number () OVER (PARTITION BY user_id ORDER BY created_at DESC) AS rn
+      `WITH latest_claims AS (
+        SELECT DISTINCT ON (user_id) user_id, volunteer_slack_user_id, volunteer_slack_user_name
         FROM volunteer_voter_claims
         WHERE archived != true
-      ), latest_claims AS (
-        SELECT user_id, volunteer_slack_user_id, volunteer_slack_user_name
-        FROM all_claims
-        WHERE rn = 1
-      ), all_status AS (
-        SELECT
-          user_id, voter_status
-          , row_number() OVER (PARTITION BY user_id ORDER BY created_at DESC) AS rn
+        ORDER BY user_id, created_at DESC
+      ), latest_statuses AS (
+        SELECT DISTINCT ON (user_id) user_id, voter_status
         FROM voter_status_updates
-      ), latest_status AS (
-        SELECT user_id, voter_status
-        FROM all_status
-        WHERE rn = 1
+        ORDER BY user_id, created_at DESC
       )
       SELECT
         t.slack_parent_message_ts
@@ -1096,7 +1084,7 @@ export async function getThreadsNeedingFollowUp(
         , EXTRACT(EPOCH FROM now() - updated_at) as last_update_age
         , c.volunteer_slack_user_name
         , s.voter_status
-        FROM threads t, latest_claims c, latest_status s
+        FROM threads t, latest_claims c, latest_statuses s
         WHERE
           needs_attention = false
           AND routed = false
