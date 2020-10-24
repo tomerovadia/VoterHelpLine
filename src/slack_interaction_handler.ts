@@ -857,7 +857,9 @@ export async function handleCommandFollowUp(
   }
 
   const threads = await DbApiUtil.getThreadsNeedingFollowUp(userId, days);
-  const lines = [`You have *${threads.length}* voters idle for >= ${days} days`];
+  const lines = [
+    `You have *${threads.length}* voters idle for >= ${days} days`,
+  ];
   for (const thread of threads) {
     const messageTs =
       (await DbApiUtil.getThreadLatestMessageTs(
