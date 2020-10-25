@@ -73,9 +73,28 @@ export async function getThreadPermalink(
   }
 }
 
-export async function makeFilesPublic(files: SlackFile[]): Promise<void> {
+export async function makeFilesPublic(files: SlackFile[]): Promise<boolean> {
   for (const file of files) {
-    const response = await axios.post(
+    // first post a permalink in a public channel so that anyone (namely,
+    // the bot) can make the file public
+    let response = await slackAPI.post('chat.postMessage', {
+      channel: process.env.ATTACHMENTS_SLACK_CHANNEL_ID || '',
+      text: file.permalink,
+      token: process.env.SLACK_BOT_ACCESS_TOKEN,
+      unfurl_media: true,
+      unfurl_links: true,
+    });
+    if (!response.data.ok) {
+      logger.error(
+        `SLACKAPIUTIL.makeFilesPublic: unable to post permalink to channel: ${JSON.stringify(
+          response.data
+        )}`
+      );
+      return false;
+    }
+
+    // then make it public
+    response = await axios.post(
       'https://slack.com/api/files.sharedPublicURL',
       null,
       {
@@ -91,11 +110,14 @@ export async function makeFilesPublic(files: SlackFile[]): Promise<void> {
           response.data
         )}`
       );
+      return false;
+    } else {
+      logger.info(
+        `SLACKAPIUTIL.makeFilesPublic: successfully made ${file.id} public`
+      );
     }
-    logger.info(
-      'SLACKAPIUTIL.makeFilesPublic: successfully make ${file.id} public'
-    );
   }
+  return true;
 }
 
 export async function sendEphemeralResponse(

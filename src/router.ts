@@ -1188,6 +1188,14 @@ export async function handleSlackVoterThreadMessage(
   // check attachments
   if (reqBody.event.files) {
     const errors = MessageParser.validateSlackAttachments(reqBody.event.files);
+    if (
+      !errors.length &&
+      !(await SlackApiUtil.makeFilesPublic(reqBody.event.files))
+    ) {
+      errors.push(
+        'Unable to post attachment permalink(s) to attachments channel'
+      );
+    }
     if (errors.length) {
       await SlackApiUtil.sendMessage(
         'Sorry, there was a problem with one or more of your attachments:\n' +
@@ -1204,7 +1212,6 @@ export async function handleSlackVoterThreadMessage(
       );
       return;
     }
-    await SlackApiUtil.makeFilesPublic(reqBody.event.files);
   }
 
   const userInfo = (await RedisApiUtil.getHash(
