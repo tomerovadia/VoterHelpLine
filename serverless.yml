@@ -34,6 +34,7 @@ provider:
     # Voter Helpline parameters
     SLACK_BOT_USER_ID: ${ssm:helpline.${self:custom.stage}.slack_bot_user_id~true}
     SLACK_BOT_ACCESS_TOKEN: ${ssm:helpline.${self:custom.stage}.slack_bot_access_token~true}
+    SLACK_USER_ACCESS_TOKEN: ${ssm:helpline.${self:custom.stage}.slack_user_access_token~true}
     SLACK_AUTH_TOKEN_HASH: ${ssm:helpline.${self:custom.stage}.slack_auth_token_hash~true}
     SLACK_SIGNING_SECRET: ${ssm:helpline.${self:custom.stage}.slack_signing_secret~true}
     ADMIN_CONTROL_ROOM_SLACK_CHANNEL_ID: ${ssm:helpline.${self:custom.stage}.admin_control_room_slack_channel_id~true}
