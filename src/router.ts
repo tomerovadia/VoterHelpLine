@@ -1187,14 +1187,9 @@ export async function handleSlackVoterThreadMessage(
 
   // check attachments
   if (reqBody.event.files) {
-    const errors = MessageParser.validateSlackAttachments(reqBody.event.files);
-    if (
-      !errors.length &&
-      !(await SlackApiUtil.makeFilesPublic(reqBody.event.files))
-    ) {
-      errors.push(
-        'Unable to post attachment permalink(s) to attachments channel'
-      );
+    let errors = MessageParser.validateSlackAttachments(reqBody.event.files);
+    if (!errors.length) {
+      errors = await SlackApiUtil.makeFilesPublic(reqBody.event.files);
     }
     if (errors.length) {
       await SlackApiUtil.sendMessage(
