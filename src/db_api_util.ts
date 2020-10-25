@@ -515,11 +515,11 @@ export async function getSlackThreadsForVoter(
   }
 }
 
-export async function archiveMessagesForDemoVoter(
+export async function archiveDemoVoter(
   userId: string,
   twilioPhoneNumber: string
 ): Promise<void> {
-  logger.info(`ENTERING DBAPIUTIL.getSlackThreadsForVoter`);
+  logger.info(`ENTERING DBAPIUTIL.archiveDemoVoter`);
 
   const client = await pool.connect();
 
@@ -531,24 +531,16 @@ export async function archiveMessagesForDemoVoter(
         AND (to_phone_number = $2 OR from_phone_number = $2);`,
       [userId, twilioPhoneNumber]
     );
-
-    logger.info(
-      `DBAPIUTIL.getSlackThreadsForVoter: Successfully fetched Slack threads for voter.`
+    // NOTE: we don't include twilio_phone_number in WHERE clause below because it
+    // is not always set; is_demo is.
+    await client.query(
+      `UPDATE voter_status_updates
+      SET archived = true
+      WHERE
+        is_demo = true
+        AND user_id = $1`,
+      [userId]
     );
-  } finally {
-    client.release();
-  }
-}
-
-export async function archiveDemoVolunteerVoterClaims(
-  userId: string,
-  twilioPhoneNumber: string
-): Promise<void> {
-  logger.info(`ENTERING DBAPIUTIL.archiveDemoVolunteerVoterClaims`);
-
-  const client = await pool.connect();
-
-  try {
     await client.query(
       `UPDATE volunteer_voter_claims
       SET archived = true
@@ -560,7 +552,7 @@ export async function archiveDemoVolunteerVoterClaims(
     );
 
     logger.info(
-      `DBAPIUTIL.archiveDemoVolunteerVoterClaims: Successfully cleared demo voter claims.`
+      `DBAPIUTIL.archiveDemoVoter: Successfully archived demo voter.`
     );
   } finally {
     client.release();
@@ -741,6 +733,7 @@ export async function getUnclaimedVoters(
           user_id, voter_status
           , row_number() OVER (PARTITION BY user_id ORDER BY created_at DESC) AS rn
         FROM voter_status_updates
+        WHERE archived != true
       ), latest_status AS (
         SELECT user_id, voter_status FROM all_status WHERE rn=1
       )
@@ -789,6 +782,7 @@ export async function getUnclaimedVotersByChannel(): Promise<ChannelStat[]> {
           user_id, voter_status
           , row_number() OVER (PARTITION BY user_id ORDER BY created_at DESC) AS rn
         FROM voter_status_updates
+        WHERE archived != true
       ), latest_status AS (
         SELECT user_id, voter_status FROM all_status WHERE rn=1
       )
@@ -1078,7 +1072,7 @@ export async function logInitialVoterStatusToDb(
         SELECT $1, $2, 'UNKNOWN', $3
         WHERE NOT EXISTS (
           SELECT null FROM voter_status_updates
-          WHERE user_id = $1 AND user_phone_number = $2 AND is_demo = $3
+          WHERE user_id = $1 AND user_phone_number = $2 AND is_demo = $3 AND archived != true
         )`,
         [userId, userPhoneNumber, isDemo]
       );
@@ -1099,7 +1093,7 @@ export async function logInitialVoterStatusToDb(
 
 const LAST_VOTER_STATUS_SQL_SCRIPT = `SELECT voter_status
                                         FROM voter_status_updates
-                                        WHERE user_id = $1
+                                        WHERE user_id = $1 AND archived != true
                                         ORDER BY created_at DESC
                                         LIMIT 1;`;
 

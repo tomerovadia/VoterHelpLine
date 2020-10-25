@@ -1030,7 +1030,7 @@ export async function handleResetDemo(
     newBlocks: newParentMessageBlocks,
   });
 
-  await DbApiUtil.archiveMessagesForDemoVoter(
+  await DbApiUtil.archiveDemoVoter(
     modalPrivateMetadata.userId,
     modalPrivateMetadata.twilioPhoneNumber
   );
@@ -1039,11 +1039,6 @@ export async function handleResetDemo(
     modalPrivateMetadata.slackParentMessageTs,
     modalPrivateMetadata.slackChannelId,
     false
-  );
-
-  await DbApiUtil.archiveDemoVolunteerVoterClaims(
-    modalPrivateMetadata.userId,
-    modalPrivateMetadata.twilioPhoneNumber
   );
 
   modalPrivateMetadata.success = true;
