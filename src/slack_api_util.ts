@@ -1,4 +1,5 @@
 import axios from 'axios';
+import axiosRetry from 'axios-retry';
 import Hashes from 'jshashes';
 import * as Sentry from '@sentry/node';
 import * as DbApiUtil from './db_api_util';
@@ -16,6 +17,13 @@ slackAPI.defaults.headers.post['Content-Type'] = 'application/json';
 slackAPI.defaults.headers.post[
   'Authorization'
 ] = `Bearer ${process.env.SLACK_BOT_ACCESS_TOKEN}`;
+
+axiosRetry(slackAPI, {
+  // This function is passed a retryCount which can be used to
+  // define custom retry delays.
+  retryDelay: () => 1000 /* millisecs between retries*/,
+  retries: 3,
+});
 
 type SlackSendMessageResponse = {
   data: {

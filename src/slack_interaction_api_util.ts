@@ -1,10 +1,18 @@
 import axios from 'axios';
+import axiosRetry from 'axios-retry';
 import { voterStatusPanel, SlackBlock } from './slack_block_util';
 import logger from './logger';
 import { UserInfo } from './types';
 import * as SlackApiUtil from './slack_api_util';
 import * as SlackInteractionHandler from './slack_interaction_handler';
 import { PromisifiedRedisClient } from './redis_client';
+
+axiosRetry(axios, {
+  // This function is passed a retryCount which can be used to
+  // define custom retry delays.
+  retryDelay: () => 1000 /* millisecs between retries*/,
+  retries: 3,
+});
 
 export async function replaceSlackMessageBlocks({
   slackChannelId,
