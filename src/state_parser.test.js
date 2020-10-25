@@ -158,9 +158,7 @@ test('Adds extra scrutiny to "in", "me", "ok", "or" and "hi", not considering th
     StateParser.determineState('I need to make sure that my ballot is ok')
   ).toBe(null);
 
-  expect(
-    StateParser.determineState('Hi can you help me vote?')
-  ).toBe(null);
+  expect(StateParser.determineState('Hi can you help me vote?')).toBe(null);
 
   expect(StateParser.determineState('Can you help me vote?')).toBe(null);
 });
@@ -186,5 +184,7 @@ test('Does recognize "Indiana", "Oklahoma", "Maine", "Oregon" and "Hawaii" norma
 
   expect(StateParser.determineState('Ok Oregon')).toBe('Oregon');
 
-  expect(StateParser.determineState('Hi I need help with Hawaii please')).toBe('Hawaii');
+  expect(StateParser.determineState('Hi I need help with Hawaii please')).toBe(
+    'Hawaii'
+  );
 });
