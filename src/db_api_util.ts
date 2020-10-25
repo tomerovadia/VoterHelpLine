@@ -1068,12 +1068,12 @@ export async function getThreadsNeedingFollowUp(
   try {
     const result = await client.query(
       `WITH latest_claims AS (
-        SELECT DISTINCT ON (user_id) user_id, volunteer_slack_user_id, volunteer_slack_user_name
+        SELECT DISTINCT ON (user_id) user_id, volunteer_slack_user_id, volunteer_slack_user_name, is_demo
         FROM volunteer_voter_claims
         WHERE archived != true
         ORDER BY user_id, created_at DESC
       ), latest_statuses AS (
-        SELECT DISTINCT ON (user_id) user_id, voter_status
+        SELECT DISTINCT ON (user_id) user_id, voter_status, is_demo
         FROM voter_status_updates
         ORDER BY user_id, created_at DESC
       )
@@ -1089,9 +1089,11 @@ export async function getThreadsNeedingFollowUp(
           needs_attention = false
           AND routed = false
           AND updated_at <= NOW() - interval '${days} days'
-          AND t.user_id=c.user_id
-          AND c.volunteer_slack_user_id=$1
+          AND t.user_id = c.user_id
+          AND t.is_demo = c.is_demo
+          AND c.volunteer_slack_user_id = $1
           AND s.user_id = t.user_id
+          AND s.is_demo = t.is_demo
         ORDER BY updated_at`,
       [slackUserId]
     );
