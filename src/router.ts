@@ -945,8 +945,27 @@ export async function clarifyHelplineRequest(
   const userInfo = userOptions.userInfo;
   userInfo.lastVoterMessageSecsFromEpoch = Math.round(Date.now() / 1000);
 
+  let messageToVoter = MessageConstants.CLARIFY_HELPLINE_REQUEST();
+
+  if (isVotedKeyword(userOptions.userMessage)) {
+    messageToVoter = MessageConstants.VOTED_WELCOME_RESPONSE();
+    await DbApiUtil.logVoterStatusToDb({
+      userId: userInfo.userId,
+      userPhoneNumber: userInfo.userPhoneNumber,
+      twilioPhoneNumber: twilioPhoneNumber,
+      isDemo: userInfo.isDemo,
+      voterStatus: 'ALREADY_VOTED',
+      originatingSlackUserName: null,
+      originatingSlackUserId: null,
+      slackChannelName: null,
+      slackChannelId: null,
+      slackParentMessageTs: null,
+      actionTs: null,
+    });
+  }
+
   await TwilioApiUtil.sendMessage(
-    MessageConstants.CLARIFY_HELPLINE_REQUEST(),
+    messageToVoter,
     {
       userPhoneNumber: userOptions.userPhoneNumber,
       twilioPhoneNumber,
