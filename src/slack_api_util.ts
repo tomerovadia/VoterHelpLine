@@ -76,7 +76,7 @@ function delay(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 export async function makeFilesPublic(files: SlackFile[]): Promise<string[]> {
-  let errors = [] as string[];
+  const errors = [] as string[];
   for (const file of files) {
     // first post a permalink in a public channel so that anyone (namely,
     // the bot) can make the file public
