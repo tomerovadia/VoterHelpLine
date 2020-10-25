@@ -6,22 +6,23 @@ export function isHelplineKeyword(userMessage: string): boolean {
 }
 
 export function containsStopKeyword(userMessage: string): boolean {
-  const userMessageTrimmedNoPunctuation = userMessage.trim().replace(/[^a-zA-Z\s]/g, '');
-
-  const userMessageLowercaseNoPunctuationOrSpaces = userMessageTrimmedNoPunctuation
-    .toLowerCase()
-    .replace(/\s/g, '');
+  const userMessageTrimmedNoPunctuation = userMessage
+    .trim()
+    .replace(/[^a-zA-Z\s]/g, '');
 
   // Catches a one-word message that is simply STOP (including any case, catching e.g. Stop),
   // and disregarding punctuation (catching e.g. STOP!!!).
-  const isStopAnyCase = userMessageLowercaseNoPunctuationOrSpaces === 'stop';
+  const isStopAnyCase =
+    userMessageTrimmedNoPunctuation.toLowerCase().replace(/\s/g, '') === 'stop';
 
-  // Important: Unlike the above parsing. This one does not remove spaces.
-  // It also preserves case.    
+  // Important: Unlike the above parsing, this one does not remove spaces.
+  // It also preserves case.
   // Catches a message that contains STOP in all uppercase even in the context
   // of a longer message.
-  const containsStopUppercase = userMessageTrimmedNoPunctuation.split(" ").includes('STOP');
-  
+  const containsStopUppercase = userMessageTrimmedNoPunctuation
+    .split(' ')
+    .includes('STOP');
+
   return isStopAnyCase || containsStopUppercase;
 }
 
