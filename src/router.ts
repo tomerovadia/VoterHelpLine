@@ -948,7 +948,7 @@ export async function clarifyHelplineRequest(
   let messageToVoter = MessageConstants.CLARIFY_HELPLINE_REQUEST();
 
   if (isVotedKeyword(userOptions.userMessage)) {
-    messageToVoter = MessageConstants.VOTED_RESPONSE();
+    messageToVoter = MessageConstants.VOTED_WELCOME_RESPONSE();
     await DbApiUtil.logVoterStatusToDb({
       userId: userInfo.userId,
       userPhoneNumber: userInfo.userPhoneNumber,
