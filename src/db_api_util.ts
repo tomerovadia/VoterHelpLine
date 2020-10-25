@@ -1086,8 +1086,7 @@ export async function getThreadsNeedingFollowUp(
         , s.voter_status
         FROM threads t, latest_claims c, latest_statuses s
         WHERE
-          needs_attention = false
-          AND routed = false
+          routed = false
           AND updated_at <= NOW() - interval '${days} days'
           AND t.user_id = c.user_id
           AND t.is_demo = c.is_demo
