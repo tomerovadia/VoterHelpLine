@@ -121,6 +121,7 @@ Create a **Bot User OAuth Access Token** and put it in `.env` as `SLACK_BOT_ACCE
 - groups:read
 - reactions:write
 - users:read
+- files:write
 
 ##### User Token Scopes
 
