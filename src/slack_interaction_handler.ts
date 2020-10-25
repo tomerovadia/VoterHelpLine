@@ -720,7 +720,7 @@ export async function handleCommandBroadcast(
           lines.push(preamble);
           lines.push('');
         }
-        lines.push(`<!channel> Status Update`);
+        lines.push(`<!channel> Status Update by ${userName}`);
 
         // unclaimed
         let threads = await DbApiUtil.getUnclaimedVoters(channelId);
