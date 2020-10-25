@@ -13,9 +13,9 @@ test('Detects STOP keyword with spaces on either side.', () => {
 });
 
 test('Does not detect STOP keyword with spaces within the word.', () => {
-  expect(
-    KeywordParser.isStopKeyword('VOTING IS TOP OF MIND FOR ME YAY')
-  ).toBe(false);
+  expect(KeywordParser.isStopKeyword('VOTING IS TOP OF MIND FOR ME YAY')).toBe(
+    false
+  );
 });
 
 test('Detects STOP keyword with punctuation.', () => {
@@ -40,4 +40,3 @@ test('Does not detect lowercase stop in the context of a longer message if lower
     )
   ).toBe(false);
 });
-
