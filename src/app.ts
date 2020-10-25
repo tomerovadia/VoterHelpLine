@@ -410,7 +410,7 @@ const handleIncomingTwilioMessage = async (
       `SERVER.handleIncomingTwilioMessage (${userId}): Voter is new to us (Redis returned no userInfo for redisHashKey ${redisHashKey})`
     );
 
-    if (KeywordParser.isStopKeyword(userMessage)) {
+    if (KeywordParser.containsStopKeyword(userMessage)) {
       logger.info(
         `SERVER.handleIncomingTwilioMessage: Received STOP text from phone number: ${userPhoneNumber}.`
       );
