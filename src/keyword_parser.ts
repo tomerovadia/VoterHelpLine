@@ -1,12 +1,29 @@
 export function isHelplineKeyword(userMessage: string): boolean {
-  const userMessageNoPunctuation = userMessage
+  const userMessageSanitized = userMessage
     .toLowerCase()
     .replace(/[^a-zA-Z]/g, '');
-  return userMessageNoPunctuation.startsWith('helpline');
+  return userMessageSanitized.startsWith('helpline');
 }
 
-export function isStopKeyword(userMessage: string): boolean {
-  return userMessage.toLowerCase().trim() === 'stop';
+export function containsStopKeyword(userMessage: string): boolean {
+  const userMessageTrimmedNoPunctuation = userMessage
+    .trim()
+    .replace(/[^a-zA-Z\s]/g, '');
+
+  // Catches a one-word message that is simply STOP (including any case, catching e.g. Stop),
+  // and disregarding punctuation (catching e.g. STOP!!!).
+  const isStopAnyCase =
+    userMessageTrimmedNoPunctuation.toLowerCase().replace(/\s/g, '') === 'stop';
+
+  // Important: Unlike the above parsing, this one does not remove spaces.
+  // It also preserves case.
+  // Catches a message that contains STOP in all uppercase even in the context
+  // of a longer message.
+  const containsStopUppercase = userMessageTrimmedNoPunctuation
+    .split(' ')
+    .includes('STOP');
+
+  return isStopAnyCase || containsStopUppercase;
 }
 
 export function isVotedKeyword(userMessage: string): boolean {
