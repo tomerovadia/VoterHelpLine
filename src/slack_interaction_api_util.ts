@@ -16,7 +16,7 @@ export async function replaceSlackMessageBlocks({
 }): Promise<void> {
   logger.info('ENTERING SLACKINTERACTIONAPIUTIL.replaceSlackMessageBlocks');
   // Replace voter status panel with message.
-  const response = await SlackApiUtil.slackAPI.get('chat.update', {
+  const response = await SlackApiUtil.slackAPI.post('chat.update', {
     params: {
       channel: slackChannelId,
       token: process.env.SLACK_BOT_ACCESS_TOKEN,
