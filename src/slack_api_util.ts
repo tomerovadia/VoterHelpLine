@@ -84,7 +84,7 @@ export async function getThreadPermalink(
 
 export async function makeFilesPublic(files: SlackFile[]): Promise<void> {
   for (const file of files) {
-    const response = await slackAPI.get('files.sharedPublicURL', {
+    const response = await slackAPI.post('files.sharedPublicURL', {
       params: {
         file: file.id,
           token: process.env.SLACK_USER_ACCESS_TOKEN,
