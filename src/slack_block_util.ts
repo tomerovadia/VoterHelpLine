@@ -188,14 +188,6 @@ export const voterStatusPanel: SlackBlock = {
           },
           value: 'IN_PERSON',
         },
-        {
-          text: {
-            type: 'plain_text',
-            text: 'Already voted',
-            emoji: true,
-          },
-          value: 'ALREADY_VOTED',
-        },
       ],
     },
     {
@@ -290,6 +282,17 @@ export const voterStatusPanel: SlackBlock = {
     },
   ],
 };
+
+if (process.env.CLIENT_ORGANIZATION === 'VOTE_AMERICA') {
+  voterStatusPanel.elements[0].options.push({
+    text: {
+      type: 'plain_text',
+      text: 'Already voted',
+      emoji: true,
+    },
+    value: 'ALREADY_VOTED',
+  });
+}
 
 export function loadingSlackView(): SlackView {
   return {
