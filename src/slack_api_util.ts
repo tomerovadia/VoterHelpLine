@@ -1,4 +1,5 @@
 import axios from 'axios';
+import axiosRetry from 'axios-retry';
 import Hashes from 'jshashes';
 import * as Sentry from '@sentry/node';
 import * as DbApiUtil from './db_api_util';
@@ -9,13 +10,21 @@ import * as RedisApiUtil from './redis_api_util';
 import { PromisifiedRedisClient } from './redis_client';
 import { SlackFile } from './message_parser';
 
-const slackAPI = axios.create({
+export const slackAPI = axios.create({
   baseURL: 'https://slack.com/api/',
 });
+
 slackAPI.defaults.headers.post['Content-Type'] = 'application/json';
 slackAPI.defaults.headers.post[
   'Authorization'
 ] = `Bearer ${process.env.SLACK_BOT_ACCESS_TOKEN}`;
+
+axiosRetry(slackAPI, {
+  // This function is passed a retryCount which can be used to
+  // define custom retry delays.
+  retryDelay: () => 2000 /* millisecs between retries*/,
+  retries: 3,
+});
 
 type SlackSendMessageResponse = {
   data: {
@@ -72,6 +81,7 @@ export async function getThreadPermalink(
     throw error;
   }
 }
+
 function delay(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }

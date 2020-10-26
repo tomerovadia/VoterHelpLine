@@ -1,4 +1,3 @@
-import axios from 'axios';
 import { voterStatusPanel, SlackBlock } from './slack_block_util';
 import logger from './logger';
 import { UserInfo } from './types';
@@ -17,21 +16,14 @@ export async function replaceSlackMessageBlocks({
 }): Promise<void> {
   logger.info('ENTERING SLACKINTERACTIONAPIUTIL.replaceSlackMessageBlocks');
   // Replace voter status panel with message.
-  const response = await axios.post(
-    'https://slack.com/api/chat.update',
-    {
-      'Content-Type': 'application/json',
+  const response = await SlackApiUtil.slackAPI.post('chat.update', {
+    params: {
       channel: slackChannelId,
       token: process.env.SLACK_BOT_ACCESS_TOKEN,
       ts: slackParentMessageTs,
       blocks: newBlocks,
     },
-    {
-      headers: {
-        Authorization: `Bearer ${process.env.SLACK_BOT_ACCESS_TOKEN}`,
-      },
-    }
-  );
+  });
 
   if (response.data.ok) {
     logger.info(
