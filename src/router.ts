@@ -480,6 +480,24 @@ const routeVoterToSlackChannelHelper = async (
                 destinationSlackParentMessageTs: ${destinationSlackParentMessageTs},
                 destinationSlackChannelName: ${destinationSlackChannelName}`);
 
+  logger.debug(
+    "ROUTER.routeVoterToSlackChannelHelper: Changing voter's active channel."
+  );
+  // Reassign the active channel so that the next voter messages go to the
+  // new active channel.
+  userInfo.activeChannelId = destinationSlackChannelId;
+  userInfo.activeChannelName = destinationSlackChannelName;
+
+  // Update userInfo in Redis (remember state channel thread identifying info and new activeChannel).
+  logger.debug(
+    `ROUTER.routeVoterToSlackChannelHelper: Writing updated userInfo to Redis.`
+  );
+  await RedisApiUtil.setHash(
+    redisClient,
+    `${userInfo.userId}:${twilioPhoneNumber}`,
+    userInfo
+  );
+
   let messageHistoryContextText =
     'Below are our messages with the voter since they left this thread.';
   // If voter is new to a channel/thread, retrieve all message history. If a
@@ -497,25 +515,6 @@ const routeVoterToSlackChannelHelper = async (
       'ROUTER.routeVoterToSlackChannelHelper: Voter HAS been to this channel before.'
     );
   }
-
-  logger.debug(
-    "ROUTER.routeVoterToSlackChannelHelper: Changing voter's active channel."
-  );
-  // Reassign the active channel so that the next voter messages go to the
-  // new active channel.
-  userInfo.activeChannelId = destinationSlackChannelId;
-  userInfo.activeChannelName = destinationSlackChannelName;
-
-  // Update userInfo in Redis (remember state channel thread identifying info and new activeChannel).
-  logger.debug(
-    `ROUTER.routeVoterToSlackChannelHelper: Writing updated userInfo to Redis.`
-  );
-
-  await RedisApiUtil.setHash(
-    redisClient,
-    `${userInfo.userId}:${twilioPhoneNumber}`,
-    userInfo
-  );
 
   // Populate state channel thread with message history so far.
   await postUserMessageHistoryToSlack(
@@ -701,15 +700,6 @@ const routeVoterToSlackChannel = async (
     // Remember the voter's thread in this channel.
     userInfo[response.data.channel] = response.data.ts;
 
-    // Create the thread with the origin thread's need_attention status
-    await DbApiUtil.logThreadToDb({
-      slackParentMessageTs: response.data.ts,
-      channelId: response.data.channel,
-      userId: userInfo.userId,
-      userPhoneNumber: userInfo.userPhoneNumber,
-      needsAttention: needsAttention,
-    });
-
     // Be able to identify phone number using NEW Slack channel identifying info.
     await RedisApiUtil.setHash(
       redisClient,
@@ -730,6 +720,15 @@ const routeVoterToSlackChannel = async (
         destinationSlackParentMessageTs: response.data.ts,
       }
     );
+
+    // Create the thread with the origin thread's need_attention status
+    await DbApiUtil.logThreadToDb({
+      slackParentMessageTs: response.data.ts,
+      channelId: response.data.channel,
+      userId: userInfo.userId,
+      userPhoneNumber: userInfo.userPhoneNumber,
+      needsAttention: needsAttention,
+    });
 
     return;
   }
@@ -1187,7 +1186,10 @@ export async function handleSlackVoterThreadMessage(
 
   // check attachments
   if (reqBody.event.files) {
-    const errors = MessageParser.validateSlackAttachments(reqBody.event.files);
+    let errors = MessageParser.validateSlackAttachments(reqBody.event.files);
+    if (!errors.length) {
+      errors = await SlackApiUtil.makeFilesPublic(reqBody.event.files);
+    }
     if (errors.length) {
       await SlackApiUtil.sendMessage(
         'Sorry, there was a problem with one or more of your attachments:\n' +
@@ -1204,7 +1206,6 @@ export async function handleSlackVoterThreadMessage(
       );
       return;
     }
-    await SlackApiUtil.makeFilesPublic(reqBody.event.files);
   }
 
   const userInfo = (await RedisApiUtil.getHash(

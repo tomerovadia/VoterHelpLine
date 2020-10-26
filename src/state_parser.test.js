@@ -145,7 +145,7 @@ test('Handles abbreviation of only name part, with period.', () => {
   );
 });
 
-test('Adds extra scrutiny to "in", "me", "ok" and "or", not considering them to be U.S. state mentions in the context of longer messages', () => {
+test('Adds extra scrutiny to "in", "me", "ok", "or" and "hi", not considering them to be U.S. state mentions in the context of longer messages', () => {
   expect(StateParser.determineState('Mail-in ballot')).toBe(null);
 
   expect(
@@ -158,10 +158,12 @@ test('Adds extra scrutiny to "in", "me", "ok" and "or", not considering them to 
     StateParser.determineState('I need to make sure that my ballot is ok')
   ).toBe(null);
 
+  expect(StateParser.determineState('Hi can you help me vote?')).toBe(null);
+
   expect(StateParser.determineState('Can you help me vote?')).toBe(null);
 });
 
-test('Does recognize "in", "ok", "me" and "or" as U.S. state preferences when alone in a message, excluding spaces', () => {
+test('Does recognize "in", "ok", "me", "or" and "hi" as U.S. state preferences when alone in a message, excluding spaces', () => {
   expect(StateParser.determineState('in ')).toBe('Indiana');
 
   expect(StateParser.determineState('O.K. ')).toBe('Oklahoma');
@@ -169,9 +171,11 @@ test('Does recognize "in", "ok", "me" and "or" as U.S. state preferences when al
   expect(StateParser.determineState(' ME ')).toBe('Maine');
 
   expect(StateParser.determineState(' Or    ')).toBe('Oregon');
+
+  expect(StateParser.determineState('Hi    ')).toBe('Hawaii');
 });
 
-test('Does recognize "Indiana", "Oklahoma", "Maine" and "Oregon" normally, even in the context of a longer message', () => {
+test('Does recognize "Indiana", "Oklahoma", "Maine", "Oregon" and "Hawaii" normally, even in the context of a longer message', () => {
   expect(StateParser.determineState('Send me to Oklahoma')).toBe('Oklahoma');
 
   expect(StateParser.determineState("I'm in Maine")).toBe('Maine');
@@ -179,4 +183,8 @@ test('Does recognize "Indiana", "Oklahoma", "Maine" and "Oregon" normally, even 
   expect(StateParser.determineState("Ok let's do Indiana")).toBe('Indiana');
 
   expect(StateParser.determineState('Ok Oregon')).toBe('Oregon');
+
+  expect(StateParser.determineState('Hi I need help with Hawaii please')).toBe(
+    'Hawaii'
+  );
 });

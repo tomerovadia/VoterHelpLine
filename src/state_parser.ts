@@ -39,14 +39,14 @@ export function determineState(userMessage: string): string | null {
       return stateName;
     }
 
-    // Handle IN, OK, ME and OR as special edge cases given they are common English words.
+    // Handle IN, OK, ME, OR and HI as special edge cases given they are common English words.
     // Err on the side of NOT recognizing a U.S. state selection so that admins can correct
     // instead of incorrectly recognizing a U.S. state, which calls for an apology.
     // Require that for these states, the U.S. state abbreviation NOT be in the context
     // of a longer message (e.g. "I hope my ballot is O.K." != Oklahoma).
     // Note: This check occurs if a state name isn't found and before a state abbreviation is
     // sought.
-    if (['IN', 'OK', 'ME', 'OR'].includes(abbrev)) {
+    if (['IN', 'OK', 'ME', 'OR', 'HI'].includes(abbrev)) {
       // Remove spaces in case message is state abbreviation plus spaces and punctuation (e.g. "O.K. ")
       const userMessageNoPunctuationOrSpaces = userMessageNoPunctuation.replace(
         /\s/g,

@@ -82,26 +82,58 @@ export async function getThreadPermalink(
   }
 }
 
-export async function makeFilesPublic(files: SlackFile[]): Promise<void> {
+function delay(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+export async function makeFilesPublic(files: SlackFile[]): Promise<string[]> {
+  const errors = [] as string[];
   for (const file of files) {
-    const response = await slackAPI.post('files.sharedPublicURL', {
-      params: {
-        file: file.id,
-          token: process.env.SLACK_USER_ACCESS_TOKEN,
-      },
+    // first post a permalink in a public channel so that anyone (namely,
+    // the bot) can make the file public
+    let response = await slackAPI.post('chat.postMessage', {
+      channel: process.env.ATTACHMENTS_SLACK_CHANNEL_ID || '',
+      text: file.permalink,
+      token: process.env.SLACK_BOT_ACCESS_TOKEN,
+      unfurl_media: true,
+      unfurl_links: true,
     });
-
     if (!response.data.ok) {
+      errors.push(`Unable to post permalink to attachments channel`);
+      logger.error(
+        `SLACKAPIUTIL.makeFilesPublic: unable to post permalink to channel: ${JSON.stringify(
+          response.data
+        )}`
+      );
+      continue;
+    }
+
+    await delay(2000);
+
+    // then make it public
+    response = await axios.post(
+      'https://slack.com/api/files.sharedPublicURL',
+      null,
+      {
+        params: {
+          file: file.id,
+          token: process.env.SLACK_USER_ACCESS_TOKEN,
+        },
+      }
+    );
+    if (!response.data.ok) {
+      errors.push('Unable to make attachment public');
       logger.error(
         `SLACKAPIUTIL.makeFilesPublic: Failed with ${JSON.stringify(
           response.data
         )}`
       );
+    } else {
+      logger.info(
+        `SLACKAPIUTIL.makeFilesPublic: successfully made ${file.id} public`
+      );
     }
-    logger.info(
-      'SLACKAPIUTIL.makeFilesPublic: successfully make ${file.id} public'
-    );
   }
+  return errors;
 }
 
 export async function sendEphemeralResponse(

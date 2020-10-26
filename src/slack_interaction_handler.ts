@@ -720,7 +720,7 @@ export async function handleCommandBroadcast(
           lines.push(preamble);
           lines.push('');
         }
-        lines.push(`<!channel> Status Update`);
+        lines.push(`<!channel> Status Update by ${userName}`);
 
         // unclaimed
         let threads = await DbApiUtil.getUnclaimedVoters(channelId);
@@ -1030,7 +1030,7 @@ export async function handleResetDemo(
     newBlocks: newParentMessageBlocks,
   });
 
-  await DbApiUtil.archiveMessagesForDemoVoter(
+  await DbApiUtil.archiveDemoVoter(
     modalPrivateMetadata.userId,
     modalPrivateMetadata.twilioPhoneNumber
   );
@@ -1039,11 +1039,6 @@ export async function handleResetDemo(
     modalPrivateMetadata.slackParentMessageTs,
     modalPrivateMetadata.slackChannelId,
     false
-  );
-
-  await DbApiUtil.archiveDemoVolunteerVoterClaims(
-    modalPrivateMetadata.userId,
-    modalPrivateMetadata.twilioPhoneNumber
   );
 
   modalPrivateMetadata.success = true;

@@ -515,11 +515,11 @@ export async function getSlackThreadsForVoter(
   }
 }
 
-export async function archiveMessagesForDemoVoter(
+export async function archiveDemoVoter(
   userId: string,
   twilioPhoneNumber: string
 ): Promise<void> {
-  logger.info(`ENTERING DBAPIUTIL.getSlackThreadsForVoter`);
+  logger.info(`ENTERING DBAPIUTIL.archiveDemoVoter`);
 
   const client = await pool.connect();
 
@@ -531,24 +531,15 @@ export async function archiveMessagesForDemoVoter(
         AND (to_phone_number = $2 OR from_phone_number = $2);`,
       [userId, twilioPhoneNumber]
     );
-
-    logger.info(
-      `DBAPIUTIL.getSlackThreadsForVoter: Successfully fetched Slack threads for voter.`
+    await client.query(
+      `UPDATE voter_status_updates
+      SET archived = true
+      WHERE
+        is_demo = true
+        AND user_id = $1
+        AND twilio_phone_number = $2`,
+      [userId, twilioPhoneNumber]
     );
-  } finally {
-    client.release();
-  }
-}
-
-export async function archiveDemoVolunteerVoterClaims(
-  userId: string,
-  twilioPhoneNumber: string
-): Promise<void> {
-  logger.info(`ENTERING DBAPIUTIL.archiveDemoVolunteerVoterClaims`);
-
-  const client = await pool.connect();
-
-  try {
     await client.query(
       `UPDATE volunteer_voter_claims
       SET archived = true
@@ -560,7 +551,7 @@ export async function archiveDemoVolunteerVoterClaims(
     );
 
     logger.info(
-      `DBAPIUTIL.archiveDemoVolunteerVoterClaims: Successfully cleared demo voter claims.`
+      `DBAPIUTIL.archiveDemoVoter: Successfully archived demo voter.`
     );
   } finally {
     client.release();
@@ -741,6 +732,7 @@ export async function getUnclaimedVoters(
           user_id, voter_status
           , row_number() OVER (PARTITION BY user_id ORDER BY created_at DESC) AS rn
         FROM voter_status_updates
+        WHERE archived != true
       ), latest_status AS (
         SELECT user_id, voter_status FROM all_status WHERE rn=1
       )
@@ -789,6 +781,7 @@ export async function getUnclaimedVotersByChannel(): Promise<ChannelStat[]> {
           user_id, voter_status
           , row_number() OVER (PARTITION BY user_id ORDER BY created_at DESC) AS rn
         FROM voter_status_updates
+        WHERE archived != true
       ), latest_status AS (
         SELECT user_id, voter_status FROM all_status WHERE rn=1
       )
@@ -1074,19 +1067,19 @@ export async function logInitialVoterStatusToDb(
     if (process.env.CLIENT_ORGANIZATION === 'VOTE_AMERICA') {
       // Only insert the UNKNOWN status if there is no existing (ALREADY_VOTED) status
       await client.query(
-        `INSERT INTO voter_status_updates (user_id, user_phone_number, voter_status, is_demo)
-        SELECT $1, $2, 'UNKNOWN', $3
+        `INSERT INTO voter_status_updates (user_id, user_phone_number, twilio_phone_number, voter_status, is_demo)
+        SELECT $1, $2, $3, 'UNKNOWN', $4
         WHERE NOT EXISTS (
           SELECT null FROM voter_status_updates
-          WHERE user_id = $1 AND user_phone_number = $2 AND is_demo = $3
+          WHERE user_id = $1 AND user_phone_number = $2 AND twilio_phone_number = $3 AND is_demo = $4 AND archived != true
         )`,
-        [userId, userPhoneNumber, isDemo]
+        [userId, userPhoneNumber, twilioPhoneNumber, isDemo]
       );
     } else {
       await client.query(
-        `INSERT INTO voter_status_updates (user_id, user_phone_number, voter_status, is_demo)
-        VALUES ($1, $2, 'UNKNOWN', $3)`,
-        [userId, userPhoneNumber, isDemo]
+        `INSERT INTO voter_status_updates (user_id, user_phone_number, twilio_phone_number, voter_status, is_demo)
+        VALUES ($1, $2, $3, 'UNKNOWN', $4)`,
+        [userId, userPhoneNumber, twilioPhoneNumber, isDemo]
       );
     }
     logger.info(
@@ -1099,7 +1092,7 @@ export async function logInitialVoterStatusToDb(
 
 const LAST_VOTER_STATUS_SQL_SCRIPT = `SELECT voter_status
                                         FROM voter_status_updates
-                                        WHERE user_id = $1
+                                        WHERE user_id = $1 AND archived != true
                                         ORDER BY created_at DESC
                                         LIMIT 1;`;
 
