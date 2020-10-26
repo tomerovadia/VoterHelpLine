@@ -1,18 +1,9 @@
-import axios from 'axios';
-import axiosRetry from 'axios-retry';
 import { voterStatusPanel, SlackBlock } from './slack_block_util';
 import logger from './logger';
 import { UserInfo } from './types';
 import * as SlackApiUtil from './slack_api_util';
 import * as SlackInteractionHandler from './slack_interaction_handler';
 import { PromisifiedRedisClient } from './redis_client';
-
-axiosRetry(axios, {
-  // This function is passed a retryCount which can be used to
-  // define custom retry delays.
-  retryDelay: () => 1000 /* millisecs between retries*/,
-  retries: 3,
-});
 
 export async function replaceSlackMessageBlocks({
   slackChannelId,
@@ -25,21 +16,14 @@ export async function replaceSlackMessageBlocks({
 }): Promise<void> {
   logger.info('ENTERING SLACKINTERACTIONAPIUTIL.replaceSlackMessageBlocks');
   // Replace voter status panel with message.
-  const response = await axios.post(
-    'https://slack.com/api/chat.update',
-    {
-      'Content-Type': 'application/json',
+  const response = await SlackApiUtil.slackAPI.get('chat.update', {
+    params: {
       channel: slackChannelId,
       token: process.env.SLACK_BOT_ACCESS_TOKEN,
       ts: slackParentMessageTs,
       blocks: newBlocks,
     },
-    {
-      headers: {
-        Authorization: `Bearer ${process.env.SLACK_BOT_ACCESS_TOKEN}`,
-      },
-    }
-  );
+  });
 
   if (response.data.ok) {
     logger.info(

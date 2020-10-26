@@ -10,9 +10,10 @@ import * as RedisApiUtil from './redis_api_util';
 import { PromisifiedRedisClient } from './redis_client';
 import { SlackFile } from './message_parser';
 
-const slackAPI = axios.create({
+export const slackAPI = axios.create({
   baseURL: 'https://slack.com/api/',
 });
+
 slackAPI.defaults.headers.post['Content-Type'] = 'application/json';
 slackAPI.defaults.headers.post[
   'Authorization'
@@ -21,7 +22,7 @@ slackAPI.defaults.headers.post[
 axiosRetry(slackAPI, {
   // This function is passed a retryCount which can be used to
   // define custom retry delays.
-  retryDelay: () => 1000 /* millisecs between retries*/,
+  retryDelay: () => 2000 /* millisecs between retries*/,
   retries: 3,
 });
 
@@ -83,16 +84,13 @@ export async function getThreadPermalink(
 
 export async function makeFilesPublic(files: SlackFile[]): Promise<void> {
   for (const file of files) {
-    const response = await axios.post(
-      'https://slack.com/api/files.sharedPublicURL',
-      null,
-      {
-        params: {
-          file: file.id,
+    const response = await slackAPI.get('files.sharedPublicURL', {
+      params: {
+        file: file.id,
           token: process.env.SLACK_USER_ACCESS_TOKEN,
-        },
-      }
-    );
+      },
+    });
+
     if (!response.data.ok) {
       logger.error(
         `SLACKAPIUTIL.makeFilesPublic: Failed with ${JSON.stringify(
