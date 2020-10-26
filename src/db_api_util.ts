@@ -1068,19 +1068,19 @@ export async function logInitialVoterStatusToDb(
     if (process.env.CLIENT_ORGANIZATION === 'VOTE_AMERICA') {
       // Only insert the UNKNOWN status if there is no existing (ALREADY_VOTED) status
       await client.query(
-        `INSERT INTO voter_status_updates (user_id, user_phone_number, voter_status, is_demo)
-        SELECT $1, $2, 'UNKNOWN', $3
+        `INSERT INTO voter_status_updates (user_id, user_phone_number, twilio_phone_number, voter_status, is_demo)
+        SELECT $1, $2, $3, 'UNKNOWN', $4
         WHERE NOT EXISTS (
           SELECT null FROM voter_status_updates
-          WHERE user_id = $1 AND user_phone_number = $2 AND is_demo = $3 AND archived != true
+          WHERE user_id = $1 AND user_phone_number = $2 AND twilio_phone_number = $3 AND is_demo = $4 AND archived != true
         )`,
-        [userId, userPhoneNumber, isDemo]
+        [userId, userPhoneNumber, twilioPhoneNumber, isDemo]
       );
     } else {
       await client.query(
-        `INSERT INTO voter_status_updates (user_id, user_phone_number, voter_status, is_demo)
-        VALUES ($1, $2, 'UNKNOWN', $3)`,
-        [userId, userPhoneNumber, isDemo]
+        `INSERT INTO voter_status_updates (user_id, user_phone_number, twilio_phone_number, voter_status, is_demo)
+        VALUES ($1, $2, $3, 'UNKNOWN', $4)`,
+        [userId, userPhoneNumber, twilioPhoneNumber, isDemo]
       );
     }
     logger.info(
