@@ -531,15 +531,14 @@ export async function archiveDemoVoter(
         AND (to_phone_number = $2 OR from_phone_number = $2);`,
       [userId, twilioPhoneNumber]
     );
-    // NOTE: we don't include twilio_phone_number in WHERE clause below because it
-    // is not always set; is_demo is.
     await client.query(
       `UPDATE voter_status_updates
       SET archived = true
       WHERE
         is_demo = true
-        AND user_id = $1`,
-      [userId]
+        AND user_id = $1
+        AND twilio_phone_number = $2`,
+      [userId, twilioPhoneNumber]
     );
     await client.query(
       `UPDATE volunteer_voter_claims
