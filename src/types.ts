@@ -12,7 +12,8 @@ export type VoterStatus =
   | 'IN_PERSON'
   | 'VOTED'
   | 'REFUSED'
-  | 'SPAM';
+  | 'SPAM'
+  | 'ALREADY_VOTED';
 
 type UserInfoCore = {
   userId: string;

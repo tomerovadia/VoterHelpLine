@@ -59,7 +59,7 @@ export type SlackView = {
   type: 'modal';
 };
 
-export function getVoterStatusOptions(): { [key in VoterStatus]: string } {
+export function getVoterStatusOptions(): { [key in VoterStatus]?: string } {
   switch (process.env.CLIENT_ORGANIZATION) {
     case 'VOTER_HELP_LINE':
       return {
@@ -84,6 +84,19 @@ export function getVoterStatusOptions(): { [key in VoterStatus]: string } {
         VOTED: 'Voted',
         SPAM: 'Spam',
         REFUSED: 'Refused',
+      };
+    case 'VOTE_AMERICA':
+      return {
+        UNKNOWN: 'Unknown',
+        UNREGISTERED: 'Unregistered',
+        REGISTERED: 'Registered',
+        REQUESTED_BALLOT: 'Requested ballot',
+        RECEIVED_BALLOT: 'Received ballot',
+        IN_PERSON: 'Will vote in-person',
+        VOTED: 'Voted',
+        SPAM: 'Spam',
+        REFUSED: 'Refused',
+        ALREADY_VOTED: 'Already voted',
       };
     default:
       return {
