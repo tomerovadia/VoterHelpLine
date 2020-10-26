@@ -50,6 +50,12 @@ Important: The Slack bot must be given access to each of these channels.
 - north-carolina-0
 - demo-north-carolina-0
 
+You must also create these channels and note their channel IDs (use Copy Link and get the `Cxxxxxx` part).  Set the appropriate values in .env:
+
+- admin-control-room  (ADMIN_CONTROL_ROOM_SLACK_CHANNEL_ID)
+- attachments  (ATTACHMENTS_SLACK_CHANNEL_ID)
+
+
 #### Redis
 
 - RPUSH openPodsPullDemoNational demo-national-0
