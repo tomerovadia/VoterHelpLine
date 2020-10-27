@@ -845,7 +845,14 @@ export async function handleCommandFollowUp(
     );
     return;
   }
-  const days = Number(args[0]);
+  const days = parseInt(args[0], 10);
+  if (isNaN(days) || days < 0) {
+    await SlackApiUtil.sendEphemeralResponse(
+      responseUrl,
+      `Usage: \`/follow-up <days>`
+    );
+    return;
+  }
 
   const slackChannelIds = await RedisApiUtil.getHash(
     redisClient,
