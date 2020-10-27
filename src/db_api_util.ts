@@ -400,17 +400,19 @@ const MESSAGE_HISTORY_SQL_SCRIPT = `
   FROM messages
   WHERE user_id = $1
     AND NOT archived
+    AND is_demo = $2
     AND (
       CASE
       WHEN twilio_receive_timestamp IS NOT NULL THEN twilio_receive_timestamp
       WHEN slack_receive_timestamp IS NOT NULL THEN slack_receive_timestamp
       ELSE twilio_send_timestamp
       END
-    ) > $2
+    ) > $3
   ORDER BY timestamp ASC;`;
 
 export async function getMessageHistoryFor(
   userId: string,
+  isDemo: boolean,
   timestampSince: string
 ): Promise<HistoricalMessage[]> {
   logger.info(`ENTERING DBAPIUTIL.getMessageHistoryFor`);
@@ -422,6 +424,7 @@ export async function getMessageHistoryFor(
   try {
     const result = await client.query(MESSAGE_HISTORY_SQL_SCRIPT, [
       userId,
+      isDemo,
       timestampSince,
     ]);
     logger.info(
