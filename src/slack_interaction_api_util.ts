@@ -17,14 +17,11 @@ export async function replaceSlackMessageBlocks({
   logger.info('ENTERING SLACKINTERACTIONAPIUTIL.replaceSlackMessageBlocks');
   // Replace voter status panel with message.
   const response = await SlackApiUtil.slackAPI.post('chat.update', {
-    params: {
-      channel: slackChannelId,
-      token: process.env.SLACK_BOT_ACCESS_TOKEN,
-      ts: slackParentMessageTs,
-      blocks: newBlocks,
-    },
+    channel: slackChannelId,
+    token: process.env.SLACK_BOT_ACCESS_TOKEN,
+    ts: slackParentMessageTs,
+    blocks: newBlocks,
   });
-
   if (response.data.ok) {
     logger.info(
       `SLACKINTERACTIONAPIUTIL.replaceSlackMessageBlock: Successfully replaced Slack message block`
