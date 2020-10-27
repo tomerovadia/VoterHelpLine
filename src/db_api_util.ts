@@ -732,7 +732,7 @@ export async function getUnclaimedVoters(
           user_id, voter_status
           , row_number() OVER (PARTITION BY user_id ORDER BY created_at DESC) AS rn
         FROM voter_status_updates
-        WHERE archived != true
+        WHERE archived IS NOT TRUE
       ), latest_status AS (
         SELECT user_id, voter_status FROM all_status WHERE rn=1
       )
@@ -749,7 +749,7 @@ export async function getUnclaimedVoters(
         AND NOT EXISTS (
           SELECT FROM volunteer_voter_claims c
           WHERE t.user_id=c.user_id
-          AND c.archived != true
+          AND c.archived IS NOT TRUE
         )
         AND s.voter_status NOT IN ('REFUSED', 'SPAM')
       ORDER BY t.updated_at`,
@@ -781,7 +781,7 @@ export async function getUnclaimedVotersByChannel(): Promise<ChannelStat[]> {
           user_id, voter_status
           , row_number() OVER (PARTITION BY user_id ORDER BY created_at DESC) AS rn
         FROM voter_status_updates
-        WHERE archived != true
+        WHERE archived IS NOT TRUE
       ), latest_status AS (
         SELECT user_id, voter_status FROM all_status WHERE rn=1
       )
@@ -797,7 +797,7 @@ export async function getUnclaimedVotersByChannel(): Promise<ChannelStat[]> {
         AND NOT EXISTS (
           SELECT FROM volunteer_voter_claims c
           WHERE t.user_id=c.user_id
-          AND c.archived != true
+          AND c.archived IS NOT TRUE
         )
       GROUP BY slack_channel_id
       ORDER BY max_last_update_age DESC`
@@ -865,7 +865,7 @@ export async function getThreadsNeedingAttentionByVolunteer(): Promise<
           , volunteer_slack_user_name
           , row_number () OVER (PARTITION BY user_id ORDER BY created_at DESC) AS rn
         FROM volunteer_voter_claims
-        WHERE archived != true
+        WHERE archived IS NOT TRUE
       )
       SELECT
         count(*)
@@ -911,7 +911,7 @@ export async function getThreadsNeedingAttentionForChannel(
           , volunteer_slack_user_name
           , row_number () OVER (PARTITION BY user_id ORDER BY created_at DESC) AS rn
         FROM volunteer_voter_claims
-        WHERE archived != true
+        WHERE archived IS NOT TRUE
       )
       SELECT
         slack_parent_message_ts
@@ -960,7 +960,7 @@ export async function getThreadsNeedingAttentionFor(
           , volunteer_slack_user_name
           , row_number () OVER (PARTITION BY user_id ORDER BY created_at DESC) AS rn
         FROM volunteer_voter_claims
-        WHERE archived != true
+        WHERE archived IS NOT TRUE
       )
       SELECT
         slack_parent_message_ts
@@ -1071,7 +1071,12 @@ export async function logInitialVoterStatusToDb(
         SELECT $1, $2, $3, 'UNKNOWN', $4
         WHERE NOT EXISTS (
           SELECT null FROM voter_status_updates
-          WHERE user_id = $1 AND user_phone_number = $2 AND twilio_phone_number = $3 AND is_demo = $4 AND archived != true
+          WHERE
+            user_id = $1
+            AND user_phone_number = $2
+            AND twilio_phone_number = $3
+            AND is_demo = $4
+            AND archived IS NOT TRUE
         )`,
         [userId, userPhoneNumber, twilioPhoneNumber, isDemo]
       );
@@ -1092,7 +1097,8 @@ export async function logInitialVoterStatusToDb(
 
 const LAST_VOTER_STATUS_SQL_SCRIPT = `SELECT voter_status
                                         FROM voter_status_updates
-                                        WHERE user_id = $1 AND archived != true
+                                        WHERE user_id = $1
+                                        AND archived IS NOT TRUE
                                         ORDER BY created_at DESC
                                         LIMIT 1;`;
 
@@ -1110,14 +1116,15 @@ export async function getLatestVoterStatus(
 
   try {
     const result = await client.query(LAST_VOTER_STATUS_SQL_SCRIPT, [userId]);
-
-    logger.info(
-      `DBAPIUTIL.getLatestVoterStatus: Successfully looked up last voter status.`
-    );
     if (result.rows.length > 0) {
+      logger.info(
+        `DBAPIUTIL.getLatestVoterStatus: Successfully looked up last voter status.`
+      );
       return result.rows[0].voter_status;
     } else {
-      logger.error(`DBAPIUTIL.getLatestVoterStatus: No voter status for user`);
+      logger.error(
+        `DBAPIUTIL.getLatestVoterStatus: No voter status for user ${userId}`
+      );
       return null;
     }
   } finally {
@@ -1163,7 +1170,7 @@ export async function getVoterHasVolunteer(userId: string): Promise<boolean> {
   const client = await pool.connect();
   try {
     const result = await client.query(
-      'SELECT EXISTS(SELECT 1 FROM volunteer_voter_claims WHERE user_id = $1 AND archived != true) AS exists',
+      'SELECT EXISTS(SELECT 1 FROM volunteer_voter_claims WHERE user_id = $1 AND archived IS NOT TRUE) AS exists',
       [userId]
     );
     return result.rows.length > 0 && result.rows[0]['exists'];
