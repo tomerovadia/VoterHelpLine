@@ -42,6 +42,8 @@ export type HistoricalMessage = {
   automated: boolean;
   direction: MessageDirection;
   originating_slack_user_name: string;
+  slack_attachments: { id: string; permalink: string }[] | null;
+  twilio_attachments: string[] | null;
 };
 
 export type SlackThreadInfo = {
