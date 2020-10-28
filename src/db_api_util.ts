@@ -1098,15 +1098,18 @@ export async function logInitialVoterStatusToDb(
 const LAST_VOTER_STATUS_SQL_SCRIPT = `SELECT voter_status
                                         FROM voter_status_updates
                                         WHERE user_id = $1
-                                        AND archived IS NOT TRUE
+                                          AND twilio_phone_number = $2
+                                          AND archived IS NOT TRUE
                                         ORDER BY created_at DESC
                                         LIMIT 1;`;
 
-// This used to be used to look up the latest voter status when moving a voter
+// This function is used for the "Already Voted" functionality.
+// History: This used to be used to look up the latest voter status when moving a voter
 // from channel to channel, but now instead the voter status is coded into
 // the block initial_option on the front-end, and is copied over with the blocks during the move.
 export async function getLatestVoterStatus(
-  userId: string
+  userId: string,
+  twilioPhoneNumber: string
 ): Promise<string | null> {
   logger.info(`ENTERING DBAPIUTIL.getLatest`);
   logger.info(
@@ -1115,7 +1118,10 @@ export async function getLatestVoterStatus(
   const client = await pool.connect();
 
   try {
-    const result = await client.query(LAST_VOTER_STATUS_SQL_SCRIPT, [userId]);
+    const result = await client.query(LAST_VOTER_STATUS_SQL_SCRIPT, [
+      userId,
+      twilioPhoneNumber,
+    ]);
     if (result.rows.length > 0) {
       logger.info(
         `DBAPIUTIL.getLatestVoterStatus: Successfully looked up last voter status.`
@@ -1123,7 +1129,7 @@ export async function getLatestVoterStatus(
       return result.rows[0].voter_status;
     } else {
       logger.error(
-        `DBAPIUTIL.getLatestVoterStatus: No voter status for user ${userId}`
+        `DBAPIUTIL.getLatestVoterStatus: No voter status for user: userId: ${userId}, twilioPhoneNumber: ${twilioPhoneNumber}`
       );
       return null;
     }
