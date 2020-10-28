@@ -37,15 +37,14 @@ export type TwilioRequestBody = {
   [mediaKey: string]: string | undefined;
 };
 
-/** Returns list of URLs for MMS attachments */
+// Returns list of URLs for MMS attachments
 export function getAttachments(reqBody: TwilioRequestBody): string[] {
-  const numMedia = Number(reqBody.NumMedia);
-
-  if (numMedia === 0) {
+  if (reqBody.NumMedia === '0') {
     // no media to handle
     return [];
   }
 
+  const numMedia = Number(reqBody.NumMedia);
   const mediaURLs: string[] = [];
   for (let i = 0; i < numMedia; i++) {
     const mediaKey = `MediaUrl${i}`;
