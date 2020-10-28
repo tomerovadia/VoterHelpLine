@@ -168,7 +168,10 @@ const introduceNewVoterToSlackChannel = async (
 
   // If the voter has previously communicated that they already voted, we have them
   // enter the helpline with "Already Voted" prepopulated as their status.
-  const status = await DbApiUtil.getLatestVoterStatus(userInfo.userId, twilioPhoneNumber);
+  const status = await DbApiUtil.getLatestVoterStatus(
+    userInfo.userId,
+    twilioPhoneNumber
+  );
   if (status === 'ALREADY_VOTED') {
     SlackBlockUtil.populateDropdownNewInitialValue(
       slackBlocks,

@@ -1109,7 +1109,7 @@ const LAST_VOTER_STATUS_SQL_SCRIPT = `SELECT voter_status
 // the block initial_option on the front-end, and is copied over with the blocks during the move.
 export async function getLatestVoterStatus(
   userId: string,
-  twilioPhoneNumber: string,
+  twilioPhoneNumber: string
 ): Promise<string | null> {
   logger.info(`ENTERING DBAPIUTIL.getLatest`);
   logger.info(
@@ -1118,7 +1118,10 @@ export async function getLatestVoterStatus(
   const client = await pool.connect();
 
   try {
-    const result = await client.query(LAST_VOTER_STATUS_SQL_SCRIPT, [userId, twilioPhoneNumber]);
+    const result = await client.query(LAST_VOTER_STATUS_SQL_SCRIPT, [
+      userId,
+      twilioPhoneNumber,
+    ]);
     if (result.rows.length > 0) {
       logger.info(
         `DBAPIUTIL.getLatestVoterStatus: Successfully looked up last voter status.`
