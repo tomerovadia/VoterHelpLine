@@ -25,6 +25,7 @@ export const NUM_STATE_SELECTION_ATTEMPTS_LIMIT = 2;
 
 type UserOptions = {
   userMessage: string;
+  userAttachments: string[];
   userPhoneNumber: string;
 };
 
@@ -143,7 +144,11 @@ export async function welcomePotentialVoter(
 }
 
 const introduceNewVoterToSlackChannel = async (
-  { userInfo, userMessage }: { userInfo: UserInfo; userMessage: string },
+  {
+    userInfo,
+    userMessage,
+    userAttachments,
+  }: { userInfo: UserInfo; userMessage: string; userAttachments: string[] },
   redisClient: PromisifiedRedisClient,
   twilioPhoneNumber: string,
   inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry,
@@ -299,10 +304,15 @@ const introduceNewVoterToSlackChannel = async (
     logger.debug(
       `ROUTER.introduceNewVoterToSlackChannel: Passing voter message to Slack, slackChannelName: ${slackChannelName}, parentMessageTs: ${response.data.ts}.`
     );
+    const blocks = SlackBlockUtil.formatMessageWithAttachmentLinks(
+      userMessage,
+      userAttachments
+    );
     await SlackApiUtil.sendMessage(
-      `${userMessage}`,
+      '',
       {
         parentMessageTs: response.data.ts,
+        blocks,
         channel: response.data.channel,
         isVoterMessage: true,
       },
@@ -400,7 +410,11 @@ export async function handleNewVoter(
   }
 
   await introduceNewVoterToSlackChannel(
-    { userInfo: userInfo as UserInfo, userMessage },
+    {
+      userInfo: userInfo as UserInfo,
+      userMessage,
+      userAttachments: userOptions.userAttachments,
+    },
     redisClient,
     twilioPhoneNumber,
     inboundDbMessageEntry,
@@ -839,10 +853,15 @@ export async function determineVoterState(
   logger.debug(
     `ROUTER.determineVoterState: Passing voter message to Slack, slackChannelName: ${lobbyChannelId}, parentMessageTs: ${lobbyParentMessageTs}.`
   );
+  const blocks = SlackBlockUtil.formatMessageWithAttachmentLinks(
+    userMessage,
+    userOptions.userAttachments
+  );
   await SlackApiUtil.sendMessage(
-    `${userMessage}`,
+    '',
     {
       parentMessageTs: lobbyParentMessageTs,
+      blocks,
       channel: lobbyChannelId,
       isVoterMessage: true,
     },
@@ -1022,9 +1041,13 @@ export async function handleDisclaimer(
   );
   userInfo.lastVoterMessageSecsFromEpoch = Math.round(Date.now() / 1000);
 
+  const blocks = SlackBlockUtil.formatMessageWithAttachmentLinks(
+    userMessage,
+    userOptions.userAttachments
+  );
   await SlackApiUtil.sendMessage(
-    `${userMessage}`,
-    { ...slackLobbyMessageParams, isVoterMessage: true },
+    '',
+    { ...slackLobbyMessageParams, blocks, isVoterMessage: true },
     inboundDbMessageEntry,
     userInfo
   );
@@ -1089,9 +1112,18 @@ export async function handleClearedVoter(
   // Update the lastVoterMessageSecsFromEpoch, for use in DB write below.
   userInfo.lastVoterMessageSecsFromEpoch = nowSecondsEpoch;
 
+  const blocks = SlackBlockUtil.formatMessageWithAttachmentLinks(
+    userOptions.userMessage,
+    userOptions.userAttachments
+  );
+
   await SlackApiUtil.sendMessage(
-    `${userOptions.userMessage}`,
-    { ...activeChannelMessageParams, isVoterMessage: true },
+    '',
+    {
+      ...activeChannelMessageParams,
+      blocks,
+      isVoterMessage: true,
+    },
     inboundDbMessageEntry,
     userInfo
   );
