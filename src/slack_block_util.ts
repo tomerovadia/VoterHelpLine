@@ -2,6 +2,7 @@ import logger from './logger';
 import { SlackActionId } from './slack_interaction_ids';
 import type { VoterStatus } from './types';
 import { SlackModalPrivateMetadata } from './slack_interaction_handler';
+import { cloneDeep } from 'lodash';
 
 export type SlackBlock = {
   type: string;
@@ -379,11 +380,11 @@ export function getErrorSlackView(
 }
 
 export function getVoterStatusBlocks(messageText: string): SlackBlock[] {
-  return [
+  return cloneDeep([
     voterInfoSection(messageText),
     volunteerSelectionPanel,
     voterStatusPanel,
-  ];
+  ]);
 }
 
 export function makeClosedVoterPanelBlocks(
