@@ -248,6 +248,11 @@ export async function handleVoterStatusUpdate({
             { [userPhoneNumber]: '1' }
           );
         }
+        await DbApiUtil.setThreadNeedsAttentionToDb(
+          payload.container.thread_ts,
+          payload.channel.id,
+          false
+        );
       }
       // Steps to take if the dropdown was changed.
     } else {

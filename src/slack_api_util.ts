@@ -40,6 +40,7 @@ type SlackSendMessageOptions = {
   blocks?: SlackBlock[];
   isVoterMessage?: boolean;
   isAutomatedMessage?: boolean;
+  isBlocked?: boolean;
 };
 
 type SlackChannelNamesAndIds = {
@@ -239,7 +240,9 @@ export async function sendMessage(
 
       try {
         await DbApiUtil.logMessageToDb(databaseMessageEntry);
-        await DbApiUtil.updateThreadStatusFromMessage(databaseMessageEntry);
+        if (!options.isBlocked) {
+          await DbApiUtil.updateThreadStatusFromMessage(databaseMessageEntry);
+        }
       } catch (error) {
         logger.info(
           `SLACKAPIUTIL.sendMessage: failed to log message send success to DB`

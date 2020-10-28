@@ -196,6 +196,7 @@ export async function handleKnownVoterBlockLogic(
           parentMessageTs: userInfo[userInfo.activeChannelId],
           channel: userInfo.activeChannelId,
           isVoterMessage: true,
+          isBlocked: true,
         },
         inboundDbMessageEntry,
         userInfo
