@@ -44,6 +44,7 @@ export type DatabaseMessageEntry = {
   archived?: boolean | null;
   stateName?: string | null;
   slackFiles?: SlackFile[] | null;
+  twilioAttachments?: string[] | null;
 };
 
 export type DatabaseVoterStatusEntry = {
@@ -126,7 +127,7 @@ export async function logMessageToDb(
   const client = await pool.connect();
   try {
     await client.query(
-      'INSERT INTO messages (message, direction, automated, successfully_sent, from_phone_number, user_id, to_phone_number, originating_slack_user_id, slack_channel, slack_parent_message_ts, twilio_message_sid, slack_message_ts, slack_error, twilio_error, twilio_send_timestamp, twilio_receive_timestamp, slack_send_timestamp, slack_receive_timestamp, confirmed_disclaimer, is_demo, last_voter_message_secs_from_epoch, unprocessed_message, slack_retry_num, slack_retry_reason, originating_slack_user_name, entry_point, archived, state_name, slack_attachments) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29);',
+      'INSERT INTO messages (message, direction, automated, successfully_sent, from_phone_number, user_id, to_phone_number, originating_slack_user_id, slack_channel, slack_parent_message_ts, twilio_message_sid, slack_message_ts, slack_error, twilio_error, twilio_send_timestamp, twilio_receive_timestamp, slack_send_timestamp, slack_receive_timestamp, confirmed_disclaimer, is_demo, last_voter_message_secs_from_epoch, unprocessed_message, slack_retry_num, slack_retry_reason, originating_slack_user_name, entry_point, archived, state_name, slack_attachments, twilio_attachments) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30);',
       [
         databaseMessageEntry.message,
         databaseMessageEntry.direction,
@@ -157,10 +158,13 @@ export async function logMessageToDb(
         databaseMessageEntry.archived,
         databaseMessageEntry.stateName,
 
-        // We can't just pass the array as-is because this is a JSON column,
+        // We can't just pass these arrays as-is because this are JSON columns,
         // and node-pg serializes arrays as PG arrays rather than JSON arrays.
         databaseMessageEntry.slackFiles
           ? JSON.stringify(databaseMessageEntry.slackFiles)
+          : null,
+        databaseMessageEntry.twilioAttachments
+          ? JSON.stringify(databaseMessageEntry.twilioAttachments)
           : null,
       ]
     );
@@ -180,12 +184,14 @@ export function populateIncomingDbMessageTwilioEntry({
   userPhoneNumber,
   twilioPhoneNumber,
   twilioMessageSid,
+  twilioAttachments,
   entryPoint,
 }: {
   userMessage: string;
   userPhoneNumber: string;
   twilioPhoneNumber: string;
   twilioMessageSid: string;
+  twilioAttachments: string[];
   entryPoint: EntryPoint;
 }): DatabaseMessageEntry {
   return {
@@ -214,6 +220,9 @@ export function populateIncomingDbMessageTwilioEntry({
     // To be maybe filled later
     slackError: null,
     twilioError: null,
+
+    // Array of attached media to MMS
+    twilioAttachments,
 
     twilioSendTimestamp: null,
     twilioReceiveTimestamp: new Date(),
@@ -396,7 +405,9 @@ const MESSAGE_HISTORY_SQL_SCRIPT = `
     message,
     automated,
     direction,
-    originating_slack_user_name
+    originating_slack_user_name,
+    slack_attachments,
+    twilio_attachments
   FROM messages
   WHERE user_id = $1
     AND NOT archived
@@ -488,8 +499,8 @@ export async function getSlackThreadsForVoter(
   try {
     const result = await client.query(
       `SELECT slack_channel, slack_parent_message_ts
-        FROM messages 
-        WHERE user_id = $1 
+        FROM messages
+        WHERE user_id = $1
           AND (to_phone_number = $2 OR from_phone_number = $2)
           AND slack_parent_message_ts IS NOT NULL
           AND NOT archived
