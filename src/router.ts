@@ -290,6 +290,7 @@ const introduceNewVoterToSlackChannel = async (
       "Below is the voter's message history so far.";
     await postUserMessageHistoryToSlack(
       userInfo.userId,
+      twilioPhoneNumber,
       '1990-01-01 10:00:00.000',
       messageHistoryContextText,
       {
@@ -427,6 +428,7 @@ export async function handleNewVoter(
 
 const postUserMessageHistoryToSlack = async (
   userId: string,
+  twilioPhoneNumber: string,
   timestampOfLastMessageInThread: string,
   messageHistoryContextText: string,
   {
@@ -440,6 +442,7 @@ const postUserMessageHistoryToSlack = async (
   logger.debug('ENTERING ROUTER.postUserMessageHistoryToSlack');
   const messageHistory = await DbApiUtil.getMessageHistoryFor(
     userId,
+    twilioPhoneNumber,
     timestampOfLastMessageInThread
   );
 
@@ -537,6 +540,7 @@ const routeVoterToSlackChannelHelper = async (
   // Populate state channel thread with message history so far.
   await postUserMessageHistoryToSlack(
     userInfo.userId,
+    userInfo.twilioPhoneNumber,
     timestampOfLastMessageInThread,
     messageHistoryContextText,
     { destinationSlackParentMessageTs, destinationSlackChannelId }
