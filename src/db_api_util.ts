@@ -1070,7 +1070,7 @@ export async function getThreadsNeedingFollowUp(
       `WITH latest_claims AS (
         SELECT DISTINCT ON (user_id) user_id, volunteer_slack_user_id, volunteer_slack_user_name, is_demo
         FROM volunteer_voter_claims
-        WHERE archived != true
+        WHERE archived IS NOT TRUE
         ORDER BY user_id, created_at DESC
       ), latest_statuses AS (
         SELECT DISTINCT ON (user_id) user_id, voter_status, is_demo
