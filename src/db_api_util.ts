@@ -565,7 +565,14 @@ export async function archiveDemoVoter(
         AND twilio_phone_number = $2`,
       [userId, twilioPhoneNumber]
     );
-
+    await client.query(
+      `UPDATE threads
+      SET archived = true
+      WHERE
+        is_demo = true
+        AND user_id = $1`,
+      [userId]
+    );
     logger.info(
       `DBAPIUTIL.archiveDemoVoter: Successfully archived demo voter.`
     );
