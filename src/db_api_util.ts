@@ -580,7 +580,7 @@ export async function logThreadToDb(
   const client = await pool.connect();
   try {
     await client.query(
-      'INSERT INTO threads (slack_parent_message_ts, slack_channel_id, user_id, user_phone_number, needs_attention, is_demo, updated_at, routed) VALUES ($1, $2, $3, $4, $5, $6, NOW(), false)',
+      'INSERT INTO threads (slack_parent_message_ts, slack_channel_id, user_id, user_phone_number, needs_attention, is_demo, updated_at, active) VALUES ($1, $2, $3, $4, $5, $6, NOW(), true)',
       [
         databaseThreadEntry.slackParentMessageTs,
         databaseThreadEntry.channelId,
@@ -685,18 +685,18 @@ export async function setThreadNeedsAttentionToDb(
   }
 }
 
-export async function setThreadRoutedToDb(
+export async function setThreadInactive(
   slackParentMessageTs: string,
   slackChannelId: string
 ): Promise<void> {
   const client = await pool.connect();
   try {
     await client.query(
-      'UPDATE threads SET needs_attention = false, routed = true WHERE slack_parent_message_ts = $1 AND slack_channel_id = $2;',
+      'UPDATE threads SET needs_attention = false, active = false WHERE slack_parent_message_ts = $1 AND slack_channel_id = $2;',
       [slackParentMessageTs, slackChannelId]
     );
     logger.info(
-      `DBAPIUTIL.setThreadRoutedToDb: Set thread ${slackParentMessageTs} routed=true, need_attention=false`
+      `DBAPIUTIL.setThreadInactive: Set thread ${slackParentMessageTs} active=false, need_attention=false`
     );
   } finally {
     client.release();
@@ -1086,7 +1086,7 @@ export async function getThreadsNeedingFollowUp(
         , s.voter_status
         FROM threads t, latest_claims c, latest_statuses s
         WHERE
-          NOT routed
+          active
           AND updated_at <= NOW() - interval '${days} days'
           AND t.user_id = c.user_id
           AND t.is_demo = c.is_demo

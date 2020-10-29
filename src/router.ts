@@ -856,7 +856,7 @@ const routeVoterToSlackChannel = async (
     );
   }
 
-  await DbApiUtil.setThreadRoutedToDb(
+  await DbApiUtil.setThreadInactive(
     userInfo[userInfo.activeChannelId],
     userInfo.activeChannelId
   );
