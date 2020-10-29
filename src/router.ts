@@ -540,7 +540,7 @@ const routeVoterToSlackChannelHelper = async (
   // Populate state channel thread with message history so far.
   await postUserMessageHistoryToSlack(
     userInfo.userId,
-    userInfo.twilioPhoneNumber,
+    twilioPhoneNumber,
     timestampOfLastMessageInThread,
     messageHistoryContextText,
     { destinationSlackParentMessageTs, destinationSlackChannelId }
