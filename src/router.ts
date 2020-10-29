@@ -831,7 +831,7 @@ const routeVoterToSlackChannel = async (
     );
 
     // Set destination thread to have same needs_attention status as origin thread
-    await DbApiUtil.setThreadNeedsAttentionToDb(
+    await DbApiUtil.reactivateThread(
       userInfo[destinationSlackChannelId],
       destinationSlackChannelId,
       needsAttention

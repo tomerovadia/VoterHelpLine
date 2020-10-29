@@ -692,6 +692,25 @@ export async function setThreadNeedsAttentionToDb(
   }
 }
 
+export async function reactivateThread(
+  slackParentMessageTs: string,
+  slackChannelId: string,
+  needsAttention: boolean
+): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query(
+      'UPDATE threads SET needs_attention = $1, active = true WHERE slack_parent_message_ts = $2 AND slack_channel_id = $3;',
+      [needsAttention, slackParentMessageTs, slackChannelId]
+    );
+    logger.info(
+      `DBAPIUTIL.reactivateThread: Set thread ${slackParentMessageTs} needs_attention=${needsAttention}`
+    );
+  } finally {
+    client.release();
+  }
+}
+
 export async function setThreadInactive(
   slackParentMessageTs: string,
   slackChannelId: string
