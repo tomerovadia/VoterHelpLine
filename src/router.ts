@@ -664,10 +664,6 @@ const routeVoterToSlackChannel = async (
     userInfo[userInfo.activeChannelId],
     userInfo.activeChannelId
   );
-  await DbApiUtil.setThreadRoutedToDb(
-    userInfo[userInfo.activeChannelId],
-    userInfo.activeChannelId
-  );
 
   let previousParentMessageBlocks;
   if (userInfo.activeChannelId === 'NONEXISTENT_LOBBY') {
@@ -859,6 +855,11 @@ const routeVoterToSlackChannel = async (
       timestampOfLastMessageInThread
     );
   }
+
+  await DbApiUtil.setThreadRoutedToDb(
+    userInfo[userInfo.activeChannelId],
+    userInfo.activeChannelId
+  );
 };
 
 export async function determineVoterState(
