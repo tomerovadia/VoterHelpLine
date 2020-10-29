@@ -779,7 +779,7 @@ const routeVoterToSlackChannel = async (
       isDemo: userInfo.isDemo,
     });
   } else {
-  // If this user HAS been to the destination channel, use the same thread info.
+    // If this user HAS been to the destination channel, use the same thread info.
 
     if (!adminCommandParams) {
       throw new Error('Missing adminCommandParams');
