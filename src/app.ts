@@ -239,7 +239,8 @@ const handleIncomingTwilioMessage = async (
   }
 
   const twilioPhoneNumber = reqBody.To;
-  const userMessage = TwilioUtil.formatAttachments(reqBody);
+  const userMessage = reqBody.Body;
+  const userAttachments = TwilioUtil.getAttachments(reqBody);
   const MD5 = new Hashes.MD5();
   const userId = MD5.hex(userPhoneNumber);
   logger.info(`SERVER.handleIncomingTwilioMessage: Receiving Twilio message from ${entryPoint} entry point voter,
@@ -253,6 +254,7 @@ const handleIncomingTwilioMessage = async (
     userPhoneNumber,
     twilioPhoneNumber,
     twilioMessageSid: reqBody.SmsMessageSid,
+    twilioAttachments: userAttachments,
     entryPoint: LoadBalancer.PUSH_ENTRY_POINT,
   });
 
@@ -303,7 +305,7 @@ const handleIncomingTwilioMessage = async (
           .replace(/[^a-zA-Z]/g, '');
         if (userMessageNoPunctuation.startsWith('helpline')) {
           await Router.handleNewVoter(
-            { userPhoneNumber, userMessage, userId },
+            { userPhoneNumber, userMessage, userAttachments, userId },
             redisClient,
             twilioPhoneNumber,
             inboundDbMessageEntry,
@@ -314,7 +316,7 @@ const handleIncomingTwilioMessage = async (
           return;
         } else {
           await Router.clarifyHelplineRequest(
-            { userInfo, userPhoneNumber, userMessage },
+            { userInfo, userPhoneNumber, userAttachments, userMessage },
             redisClient,
             twilioPhoneNumber,
             inboundDbMessageEntry,
@@ -337,7 +339,7 @@ const handleIncomingTwilioMessage = async (
       );
       // Don't do dislcaimer or U.S. state checks for push voters.
       await Router.handleClearedVoter(
-        { userInfo, userPhoneNumber, userMessage },
+        { userInfo, userAttachments, userPhoneNumber, userMessage },
         redisClient,
         twilioPhoneNumber,
         inboundDbMessageEntry,
@@ -370,7 +372,7 @@ const handleIncomingTwilioMessage = async (
           `SERVER.handleIncomingTwilioMessage (${userId}): Known U.S. state for voter (${userInfo.stateName}) or volunteer has engaged (${userInfo.volunteerEngaged}). Automated system no longer active.`
         );
         await Router.handleClearedVoter(
-          { userInfo, userPhoneNumber, userMessage },
+          { userInfo, userPhoneNumber, userMessage, userAttachments },
           redisClient,
           twilioPhoneNumber,
           inboundDbMessageEntry,
@@ -382,7 +384,7 @@ const handleIncomingTwilioMessage = async (
           `SERVER.handleIncomingTwilioMessage (${userId}): U.S. state for voter is not known. Automated system will attempt to determine.`
         );
         await Router.determineVoterState(
-          { userInfo, userPhoneNumber, userMessage },
+          { userInfo, userPhoneNumber, userMessage, userAttachments },
           redisClient,
           twilioPhoneNumber,
           inboundDbMessageEntry,
@@ -397,7 +399,7 @@ const handleIncomingTwilioMessage = async (
         `SERVER.handleIncomingTwilioMessage (${userId}): Voter has NOT previously confirmed the disclaimer. Automated system will attempt to confirm.`
       );
       await Router.handleDisclaimer(
-        { userInfo, userPhoneNumber, userMessage },
+        { userInfo, userPhoneNumber, userMessage, userAttachments },
         redisClient,
         twilioPhoneNumber,
         inboundDbMessageEntry,
@@ -431,7 +433,7 @@ const handleIncomingTwilioMessage = async (
     if (process.env.CLIENT_ORGANIZATION === 'VOTE_AMERICA') {
       if (KeywordParser.isHelplineKeyword(userMessage)) {
         await Router.handleNewVoter(
-          { userPhoneNumber, userMessage, userId },
+          { userPhoneNumber, userMessage, userAttachments, userId },
           redisClient,
           twilioPhoneNumber,
           inboundDbMessageEntry,
@@ -441,7 +443,7 @@ const handleIncomingTwilioMessage = async (
         );
       } else {
         await Router.welcomePotentialVoter(
-          { userPhoneNumber, userMessage, userId },
+          { userPhoneNumber, userMessage, userAttachments, userId },
           redisClient,
           twilioPhoneNumber,
           inboundDbMessageEntry,
@@ -451,7 +453,7 @@ const handleIncomingTwilioMessage = async (
       }
     } else {
       await Router.handleNewVoter(
-        { userPhoneNumber, userMessage, userId },
+        { userPhoneNumber, userMessage, userAttachments, userId },
         redisClient,
         twilioPhoneNumber,
         inboundDbMessageEntry,

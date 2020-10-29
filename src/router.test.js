@@ -74,10 +74,15 @@ const expectNthSlackMessageToChannel = (
       channelMessageNum++;
       if (channelMessageNum == n) {
         const slackMessage = SlackApiUtil.sendMessage.mock.calls[i][0];
+        const slackOpts = SlackApiUtil.sendMessage.mock.calls[i][1];
         for (let j = 0; j < messageParts.length; j++) {
-          expect(slackMessage).toEqual(
-            expect.stringContaining(messageParts[j])
-          );
+          if (typeof messageParts[j] === 'string') {
+            expect(slackMessage).toEqual(
+              expect.stringContaining(messageParts[j])
+            );
+          } else {
+            expect(slackOpts).toEqual(expect.objectContaining(messageParts[j]));
+          }
         }
         if (parentMessageTs) {
           expect(slackMessageParams).toEqual(
@@ -179,8 +184,16 @@ describe('handleNewVoter', () => {
   });
 
   test('Relays voter message in subsequent message to Slack', () => {
-    expect(SlackApiUtil.sendMessage.mock.calls[1][0]).toEqual(
-      expect.stringContaining('can you help me vote')
+    expect(SlackApiUtil.sendMessage.mock.calls[1][1]).toEqual(
+      expect.objectContaining({
+        blocks: [
+          expect.objectContaining({
+            text: expect.objectContaining({
+              text: 'can you help me vote',
+            }),
+          }),
+        ],
+      })
     );
     expect(SlackApiUtil.sendMessage.mock.calls[1][1]).toEqual(
       expect.objectContaining({
@@ -471,8 +484,16 @@ describe('determineVoterState', () => {
       );
     });
     test('Passes voter message to Slack', () => {
-      expect(SlackApiUtil.sendMessage.mock.calls[0][0]).toContain(
-        'nonsensical statement'
+      expect(SlackApiUtil.sendMessage.mock.calls[0][1]).toEqual(
+        expect.objectContaining({
+          blocks: [
+            expect.objectContaining({
+              text: expect.objectContaining({
+                text: 'nonsensical statement',
+              }),
+            }),
+          ],
+        })
       );
     });
 
@@ -782,7 +803,17 @@ describe('determineVoterState', () => {
         expectNthSlackMessageToChannel(
           'CTHELOBBYID',
           0,
-          ['NC'],
+          [
+            {
+              blocks: [
+                expect.objectContaining({
+                  text: expect.objectContaining({
+                    text: 'NC',
+                  }),
+                }),
+              ],
+            },
+          ],
           '293874928374'
         );
       });
@@ -1145,11 +1176,15 @@ describe('handleDisclaimer', () => {
     });
 
     test('Passes voter message to Slack lobby channel', () => {
-      expect(SlackApiUtil.sendMessage.mock.calls[0][0]).toContain(
-        'response to state question'
-      );
       expect(SlackApiUtil.sendMessage.mock.calls[0][1]).toEqual(
         expect.objectContaining({
+          blocks: [
+            expect.objectContaining({
+              text: expect.objectContaining({
+                text: 'response to state question',
+              }),
+            }),
+          ],
           parentMessageTs: '293874928374',
           channel: 'CTHELOBBYID',
         })
@@ -1478,8 +1513,16 @@ describe('handleClearedVoter', () => {
       twilioPhoneNumber,
       inboundDbMessageEntry
     ).then(() => {
-      expect(SlackApiUtil.sendMessage.mock.calls[0][0]).toContain(
-        'subsequent message'
+      expect(SlackApiUtil.sendMessage.mock.calls[0][1]).toEqual(
+        expect.objectContaining({
+          blocks: [
+            expect.objectContaining({
+              text: expect.objectContaining({
+                text: 'subsequent message',
+              }),
+            }),
+          ],
+        })
       );
     });
   });

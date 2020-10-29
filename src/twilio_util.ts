@@ -37,25 +37,22 @@ export type TwilioRequestBody = {
   [mediaKey: string]: string | undefined;
 };
 
-export function formatAttachments(reqBody: TwilioRequestBody): string {
-  const numMedia = Number(reqBody.NumMedia);
-
-  if (numMedia === 0) {
+// Returns list of URLs for MMS attachments
+export function getAttachments(reqBody: TwilioRequestBody): string[] {
+  if (reqBody.NumMedia === '0') {
     // no media to handle
-    return reqBody.Body;
+    return [];
   }
 
-  const mediaURLs = [];
+  const numMedia = Number(reqBody.NumMedia);
+  const mediaURLs: string[] = [];
   for (let i = 0; i < numMedia; i++) {
     const mediaKey = `MediaUrl${i}`;
-    if (reqBody[mediaKey]) {
-      mediaURLs.push(reqBody[mediaKey]);
+    const url = reqBody[mediaKey];
+    if (url) {
+      mediaURLs.push(url);
     }
   }
 
-  const mediaURLsFormatted = mediaURLs
-    .map((url, i) => `<${url}|Attachment ${i + 1}>`)
-    .join(' ');
-
-  return `${reqBody.Body}\n[Attachments: ${mediaURLsFormatted}]`;
+  return mediaURLs;
 }

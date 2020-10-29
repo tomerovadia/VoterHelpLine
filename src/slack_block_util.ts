@@ -458,6 +458,48 @@ export function replaceVoterPanelBlocks(
   return newBlocks;
 }
 
+export function formatMessageWithAttachmentLinks(
+  text: string,
+  links: string[] = []
+): SlackBlock[] {
+  const ret: SlackBlock[] = [];
+  if (text) {
+    ret.push({
+      type: 'section',
+      text: {
+        // SMS-inputted text, don't apply Slack formatting
+        type: 'plain_text',
+        text,
+        emoji: false,
+      },
+    });
+  }
+
+  // Format links as a set of buttons
+  let currentActionBlock: SlackBlock | undefined;
+  links?.forEach((link, i) => {
+    // Max 5 buttons per actions block
+    if (!currentActionBlock || currentActionBlock.elements?.length >= 5) {
+      currentActionBlock = {
+        type: 'actions',
+        elements: [],
+      };
+      ret.push(currentActionBlock);
+    }
+    currentActionBlock.elements.push({
+      type: 'button',
+      text: {
+        type: 'plain_text',
+        text: `:paperclip: Attachment ${i + 1}`,
+        emoji: true,
+      },
+      url: link,
+    });
+  });
+
+  return ret;
+}
+
 // This function finds the element for a given action ID in a set of blocks
 export function findElementWithActionId(
   blocks: SlackBlock[],
