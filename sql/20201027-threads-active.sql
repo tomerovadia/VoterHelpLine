@@ -22,7 +22,7 @@ WHERE EXISTS (
 ;
 --- active threads.  there will only be one of these per user.
 WITH threads_with_rank AS (
-    SELECT *, row_number() OVER (PARTITION BY user_id ORDER BY updated_at DESC) AS rn
+    SELECT *, row_number() OVER (PARTITION BY user_id, is_demo ORDER BY updated_at DESC) AS rn
     FROM threads
 )
 UPDATE threads
