@@ -1100,6 +1100,7 @@ export async function getThreadsNeedingFollowUp(
           AND c.volunteer_slack_user_id = $1
           AND s.user_id = t.user_id
           AND s.is_demo = t.is_demo
+          AND t.archived IS NOT TRUE
         ORDER BY updated_at`,
       [slackUserId]
     );
