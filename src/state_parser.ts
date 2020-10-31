@@ -17,13 +17,19 @@ export function determineState(userMessage: string): string | null {
     // If the state name has two words, match against that name whether or not
     // there is a space between the words (e.g. northcarolina), and also match
     // against the first letter abbreviated (n. carolina).
-    if (stateWords.length > 1) {
+    if (stateWords.length === 2) {
       const firstWord = stateWords[0];
       const firstLetter = firstWord[0];
       const secondWord = stateWords[1];
 
       abbrevNameRegEx = new RegExp(`${firstLetter}\\s*${secondWord}`, 'i');
       nameRegEx = new RegExp(`${firstWord}\\s*${secondWord}`, 'i');
+      // Only applies to District of Columbia
+    } else if (stateWords.length === 3) {
+      nameRegEx = new RegExp(
+        `${stateWords[0]}\\s*${stateWords[1]}\\s*${stateWords[2]}`,
+        'i'
+      );
     } else {
       nameRegEx = new RegExp(stateName, 'i');
     }

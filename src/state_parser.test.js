@@ -55,7 +55,6 @@ test('Identifies state abbreviation at end of a sentence, ignores case and spaci
 });
 
 test('Returns null for message without state intent.', () => {
-  // "wi" is inside of "with"
   expect(StateParser.determineState("I'm not sure.")).toBe(null);
 });
 
@@ -103,6 +102,12 @@ test('Identifies state name within a sentence, ignores case and spacing.', () =>
   ).toBe('North Carolina');
 });
 
+test('Identifies three-worded state name within a sentence, ignores case and spacing.', () => {
+  expect(
+    StateParser.determineState('I want to vote in districtof   columbia please')
+  ).toBe('District of Columbia');
+});
+
 test('Identifies state name at start of a sentence.', () => {
   expect(StateParser.determineState('North Carolina please')).toBe(
     'North Carolina'
@@ -143,6 +148,22 @@ test('Handles abbreviation of only name part, with period.', () => {
   expect(StateParser.determineState('I want to vote in N.Carolina')).toBe(
     'North Carolina'
   );
+});
+
+test('Does not consider abbreviations for District of Columbia.', () => {
+  expect(
+    // Contains "d of" in "instead of a ballot"
+    StateParser.determineState(
+      'i received an application today instead of a ballot'
+    )
+  ).toBe(null);
+});
+
+test('If a U.S. state name is within another U.S. state name, prioritize the full name.', () => {
+  expect(
+    // "West Virginia" contains "Virginia"
+    StateParser.determineState('West Virginia')
+  ).toBe('West Virginia');
 });
 
 test('Adds extra scrutiny to "in", "me", "ok", "or" and "hi", not considering them to be U.S. state mentions in the context of longer messages', () => {
