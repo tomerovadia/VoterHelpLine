@@ -153,7 +153,9 @@ test('Handles abbreviation of only name part, with period.', () => {
 test('Does not consider abbreviations for District of Columbia.', () => {
   expect(
     // Contains "d of" in "instead of a ballot"
-    StateParser.determineState('i received an application today instead of a ballot')
+    StateParser.determineState(
+      'i received an application today instead of a ballot'
+    )
   ).toBe(null);
 });
 
