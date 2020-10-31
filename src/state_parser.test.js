@@ -102,6 +102,12 @@ test('Identifies state name within a sentence, ignores case and spacing.', () =>
   ).toBe('North Carolina');
 });
 
+test('Identifies three-worded state name within a sentence, ignores case and spacing.', () => {
+  expect(
+    StateParser.determineState('I want to vote in districtof   columbia please')
+  ).toBe('District of Columbia');
+});
+
 test('Identifies state name at start of a sentence.', () => {
   expect(StateParser.determineState('North Carolina please')).toBe(
     'North Carolina'

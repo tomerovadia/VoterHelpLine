@@ -24,6 +24,9 @@ export function determineState(userMessage: string): string | null {
 
       abbrevNameRegEx = new RegExp(`${firstLetter}\\s*${secondWord}`, 'i');
       nameRegEx = new RegExp(`${firstWord}\\s*${secondWord}`, 'i');
+    // Only applies to District of Columbia
+    } else if (stateWords.length === 3) {
+      nameRegEx = new RegExp(`${stateWords[0]}\\s*${stateWords[1]}\\s*${stateWords[2]}`, 'i');
     } else {
       nameRegEx = new RegExp(stateName, 'i');
     }
