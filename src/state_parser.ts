@@ -17,7 +17,7 @@ export function determineState(userMessage: string): string | null {
     // If the state name has two words, match against that name whether or not
     // there is a space between the words (e.g. northcarolina), and also match
     // against the first letter abbreviated (n. carolina).
-    if (stateWords.length > 1) {
+    if (stateWords.length === 2) {
       const firstWord = stateWords[0];
       const firstLetter = firstWord[0];
       const secondWord = stateWords[1];
