@@ -464,9 +464,10 @@ export async function handleCommandUnclaimed(
       arg = arg.substr(1); // strip off the # prefix
     }
     if (!(arg in slackChannelIds)) {
-      await SlackApiUtil.sendMessage(`Channel #${arg} not found`, {
-        channel: channelId,
-      });
+      await SlackApiUtil.sendEphemeralResponse(
+        responseUrl,
+        `Channel #${arg} not found`
+      );
       return;
     }
     showChannelName = arg;
