@@ -805,7 +805,7 @@ export async function handleCommandBroadcast(
         const ulines = await getNeedsAttentionList(v.volunteerSlackUserId);
         await SlackApiUtil.sendMessage(
           preamble +
-            '*Current threads needing attention*:\n' +
+            `*Current threads needing attention* (sent by ${userName}):\n` +
             ulines.join('\n'),
           {
             channel: v.volunteerSlackUserId,
