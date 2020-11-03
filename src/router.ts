@@ -185,13 +185,14 @@ const introduceNewVoterToSlackChannel = async (
     );
   }
 
-  const skipLobby = await RedisApiUtil.getKey(redisClient, 'skipLobby') === 'true';
+  const skipLobby =
+    (await RedisApiUtil.getKey(redisClient, 'skipLobby')) === 'true';
 
   let response = {
     data: {
       channel: 'NONEXISTENT_LOBBY',
       ts: 'NONEXISTENT_LOBBY_TS',
-    }
+    },
   } as SlackApiUtil.SlackSendMessageResponse | null;
 
   if (slackChannelName !== 'lobby' || !skipLobby) {
@@ -576,7 +577,8 @@ const routeVoterToSlackChannel = async (
   },
   adminCommandParams?: AdminCommandParams /* only for admin re-routes (not automated)*/
 ) => {
-  const skipLobby = await RedisApiUtil.getKey(redisClient, 'skipLobby') === 'true';
+  const skipLobby =
+    (await RedisApiUtil.getKey(redisClient, 'skipLobby')) === 'true';
 
   logger.debug('ENTERING ROUTER.routeVoterToSlackChannel');
   const userPhoneNumber = userInfo.userPhoneNumber;
@@ -669,7 +671,9 @@ const routeVoterToSlackChannel = async (
   if (userInfo.activeChannelId === 'NONEXISTENT_LOBBY') {
     // In Slack, create entry channel message, followed by voter's message and intro text.
     const operatorMessage = `*User ID:* ${userInfo.userId}\n*Connected via:* ${twilioPhoneNumber} (PULL)`;
-    previousParentMessageBlocks = SlackBlockUtil.getVoterStatusBlocks(operatorMessage);
+    previousParentMessageBlocks = SlackBlockUtil.getVoterStatusBlocks(
+      operatorMessage
+    );
   } else {
     // Remove the voter status panel from the old thread, in which the voter is no longer active.
     // Note: First we need to fetch the old thread parent message blocks, for both 1. the
@@ -875,7 +879,8 @@ export async function determineVoterState(
     `ROUTER.determineVoterState: Updating lastVoterMessageSecsFromEpoch to ${userInfo.lastVoterMessageSecsFromEpoch}`
   );
 
-  const skipLobby = await RedisApiUtil.getKey(redisClient, 'skipLobby') === 'true'
+  const skipLobby =
+    (await RedisApiUtil.getKey(redisClient, 'skipLobby')) === 'true';
 
   const lobbyChannelId = skipLobby ? '' : userInfo.activeChannelId;
   const lobbyParentMessageTs = skipLobby ? '' : userInfo[lobbyChannelId];
