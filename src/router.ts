@@ -255,13 +255,15 @@ const introduceNewVoterToSlackChannel = async (
   userInfo[response.data.channel] = response.data.ts;
 
   // Create the thread
-  await DbApiUtil.logThreadToDb({
-    slackParentMessageTs: response.data.ts,
-    channelId: response.data.channel,
-    userId: userInfo.userId,
-    userPhoneNumber: userInfo.userPhoneNumber,
-    needsAttention: true,
-  });
+  if (!skipLobby) {
+    await DbApiUtil.logThreadToDb({
+      slackParentMessageTs: response.data.ts,
+      channelId: response.data.channel,
+      userId: userInfo.userId,
+      userPhoneNumber: userInfo.userPhoneNumber,
+      needsAttention: true,
+    });
+  }
 
   // Set active channel to this first channel, since the voter is new.
   // Makes sure subsequent messages from the voter go to this channel, unless
