@@ -33,6 +33,7 @@ const requireModules = () => {
   SlackApiUtil.fetchSlackMessageBlocks = jest.fn();
   SlackInteractionApiUtil.replaceSlackMessageBlocks = jest.fn();
   RedisApiUtil.setHash = jest.fn();
+  RedisApiUtil.getKey = jest.fn();
   DbApiUtil.getMessageHistoryFor = jest.fn();
   DbApiUtil.logVoterStatusToDb = jest.fn();
   DbApiUtil.logInitialVoterStatusToDb = jest.fn();

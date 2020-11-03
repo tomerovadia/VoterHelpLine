@@ -26,7 +26,7 @@ axiosRetry(slackAPI, {
   retries: 3,
 });
 
-type SlackSendMessageResponse = {
+export type SlackSendMessageResponse = {
   data: {
     channel: string;
     ts: string;
