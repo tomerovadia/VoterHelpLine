@@ -648,7 +648,7 @@ const routeVoterToSlackChannel = async (
       }
     );
     // Operations for AUTOMATED route of voter.
-  } else if (!skipLobby) {
+  } else if (!skipLobby && userInfo.activeChannelId && userInfo[userInfo.activeChannelId]) {
     await SlackApiUtil.sendMessage(
       `*Operator:* Routing voter to *${destinationSlackChannelName}*.`,
       {
@@ -887,7 +887,7 @@ export async function determineVoterState(
   const lobbyChannelId = skipLobby ? '' : userInfo.activeChannelId;
   const lobbyParentMessageTs = skipLobby ? '' : userInfo[lobbyChannelId];
 
-  if (!skipLobby) {
+  if (!skipLobby && lobbyChannelId && lobbyParentMessageTs) {
     logger.debug(
       `ROUTER.determineVoterState: Passing voter message to Slack, slackChannelName: ${lobbyChannelId}, parentMessageTs: ${lobbyParentMessageTs}.`
     );
@@ -924,7 +924,7 @@ export async function determineVoterState(
 
     try {
       await DbApiUtil.logMessageToDb(inboundDbMessageEntry);
-      if (!skipLobby)
+      if (!skipLobby && lobbyChannelId && lobbyParentMessageTs)
         await DbApiUtil.updateThreadStatusFromMessage(inboundDbMessageEntry);
     } catch (error) {
       logger.info(
@@ -952,7 +952,7 @@ export async function determineVoterState(
         { userPhoneNumber, twilioPhoneNumber, twilioCallbackURL },
         DbApiUtil.populateAutomatedDbMessageEntry(userInfo)
       );
-      if (!skipLobby) {
+      if (!skipLobby && lobbyChannelId && lobbyParentMessageTs) {
         await SlackApiUtil.sendMessage(MessageConstants.CLARIFY_STATE(), {
           parentMessageTs: lobbyParentMessageTs,
           channel: lobbyChannelId,
@@ -990,7 +990,7 @@ export async function determineVoterState(
     { userPhoneNumber, twilioPhoneNumber, twilioCallbackURL },
     DbApiUtil.populateAutomatedDbMessageEntry(userInfo)
   );
-  if (!skipLobby) {
+  if (!skipLobby && lobbyChannelId && lobbyParentMessageTs) {
     await SlackApiUtil.sendMessage(messageToVoter, {
       parentMessageTs: lobbyParentMessageTs,
       channel: lobbyChannelId,
