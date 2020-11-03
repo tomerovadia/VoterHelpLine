@@ -735,9 +735,7 @@ describe('determineVoterState', () => {
         inboundDbMessageEntry
       ).then(() => {
         expect(TwilioApiUtil.sendMessage.mock.calls[0][0]).toEqual(
-          expect.stringMatching(
-            /Great!.*will be with you shortly/i
-          )
+          expect.stringMatching(/Great!.*will be with you shortly/i)
         );
         expect(TwilioApiUtil.sendMessage.mock.calls[0][1]).toEqual(
           expect.objectContaining({
