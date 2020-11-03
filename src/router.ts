@@ -648,7 +648,7 @@ const routeVoterToSlackChannel = async (
       }
     );
     // Operations for AUTOMATED route of voter.
-  } else if (!skipLobby && userInfo.activeChannelId && userInfo[userInfo.activeChannelId]) {
+  } else if (!skipLobby && userInfo.activeChannelId != 'NONEXISTENT_LOBBY') {
     await SlackApiUtil.sendMessage(
       `*Operator:* Routing voter to *${destinationSlackChannelName}*.`,
       {
@@ -887,7 +887,7 @@ export async function determineVoterState(
   const lobbyChannelId = skipLobby ? '' : userInfo.activeChannelId;
   const lobbyParentMessageTs = skipLobby ? '' : userInfo[lobbyChannelId];
 
-  if (!skipLobby && lobbyChannelId && lobbyParentMessageTs) {
+  if (!skipLobby && userInfo.activeChannelId != 'NONEXISTENT_LOBBY') {
     logger.debug(
       `ROUTER.determineVoterState: Passing voter message to Slack, slackChannelName: ${lobbyChannelId}, parentMessageTs: ${lobbyParentMessageTs}.`
     );
@@ -924,7 +924,7 @@ export async function determineVoterState(
 
     try {
       await DbApiUtil.logMessageToDb(inboundDbMessageEntry);
-      if (!skipLobby && lobbyChannelId && lobbyParentMessageTs)
+      if (!skipLobby && userInfo.activeChannelId != 'NONEXISTENT_LOBBY')
         await DbApiUtil.updateThreadStatusFromMessage(inboundDbMessageEntry);
     } catch (error) {
       logger.info(
@@ -952,7 +952,7 @@ export async function determineVoterState(
         { userPhoneNumber, twilioPhoneNumber, twilioCallbackURL },
         DbApiUtil.populateAutomatedDbMessageEntry(userInfo)
       );
-      if (!skipLobby && lobbyChannelId && lobbyParentMessageTs) {
+      if (!skipLobby && userInfo.activeChannelId != 'NONEXISTENT_LOBBY') {
         await SlackApiUtil.sendMessage(MessageConstants.CLARIFY_STATE(), {
           parentMessageTs: lobbyParentMessageTs,
           channel: lobbyChannelId,
@@ -990,7 +990,7 @@ export async function determineVoterState(
     { userPhoneNumber, twilioPhoneNumber, twilioCallbackURL },
     DbApiUtil.populateAutomatedDbMessageEntry(userInfo)
   );
-  if (!skipLobby && lobbyChannelId && lobbyParentMessageTs) {
+  if (!skipLobby && userInfo.activeChannelId != 'NONEXISTENT_LOBBY') {
     await SlackApiUtil.sendMessage(messageToVoter, {
       parentMessageTs: lobbyParentMessageTs,
       channel: lobbyChannelId,
