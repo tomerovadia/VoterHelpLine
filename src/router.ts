@@ -924,7 +924,8 @@ export async function determineVoterState(
 
     try {
       await DbApiUtil.logMessageToDb(inboundDbMessageEntry);
-      if (!skipLobby) await DbApiUtil.updateThreadStatusFromMessage(inboundDbMessageEntry);
+      if (!skipLobby)
+        await DbApiUtil.updateThreadStatusFromMessage(inboundDbMessageEntry);
     } catch (error) {
       logger.info(
         `SLACKAPIUTIL.sendMessage: failed to log message send success to DB`
