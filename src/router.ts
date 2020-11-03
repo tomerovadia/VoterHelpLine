@@ -910,7 +910,10 @@ export async function determineVoterState(
         `SLACKAPIUTIL.sendMessage: This Slack message send will log to DB (inboundDbMessageEntry is not null).`
       );
       // Copies a few fields from userInfo to inboundDbMessageEntry.
-      DbApiUtil.updateDbMessageEntryWithUserInfo(userInfo!, inboundDbMessageEntry);
+      DbApiUtil.updateDbMessageEntryWithUserInfo(
+        userInfo!,
+        inboundDbMessageEntry
+      );
       inboundDbMessageEntry.slackChannel = 'NONEXISTENT_LOBBY';
       inboundDbMessageEntry.slackParentMessageTs = 'NONEXISTENT_LOBBY_TS';
       inboundDbMessageEntry.slackSendTimestamp = new Date();
