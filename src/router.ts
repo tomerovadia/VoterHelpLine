@@ -877,10 +877,10 @@ export async function determineVoterState(
 
   const skipLobby = await RedisApiUtil.getKey(redisClient, 'skipLobby') === 'true'
 
-  if (!skipLobby) {
-    const lobbyChannelId = userInfo.activeChannelId;
-    const lobbyParentMessageTs = userInfo[lobbyChannelId];
+  const lobbyChannelId = skipLobby ? '' : userInfo.activeChannelId;
+  const lobbyParentMessageTs = skipLobby ? '' : userInfo[lobbyChannelId];
 
+  if (!skipLobby) {
     logger.debug(
       `ROUTER.determineVoterState: Passing voter message to Slack, slackChannelName: ${lobbyChannelId}, parentMessageTs: ${lobbyParentMessageTs}.`
     );
@@ -919,11 +919,13 @@ export async function determineVoterState(
         { userPhoneNumber, twilioPhoneNumber, twilioCallbackURL },
         DbApiUtil.populateAutomatedDbMessageEntry(userInfo)
       );
-      // await SlackApiUtil.sendMessage(MessageConstants.CLARIFY_STATE(), {
-      //   parentMessageTs: lobbyParentMessageTs,
-      //   channel: lobbyChannelId,
-      //   isAutomatedMessage: true,
-      // });
+      if (!skipLobby) {
+        await SlackApiUtil.sendMessage(MessageConstants.CLARIFY_STATE(), {
+          parentMessageTs: lobbyParentMessageTs,
+          channel: lobbyChannelId,
+          isAutomatedMessage: true,
+        });
+      }
 
       logger.debug(
         `ROUTER.determineVoterState: Writing updated userInfo to Redis.`
@@ -955,11 +957,13 @@ export async function determineVoterState(
     { userPhoneNumber, twilioPhoneNumber, twilioCallbackURL },
     DbApiUtil.populateAutomatedDbMessageEntry(userInfo)
   );
-  // await SlackApiUtil.sendMessage(messageToVoter, {
-  //   parentMessageTs: lobbyParentMessageTs,
-  //   channel: lobbyChannelId,
-  //   isAutomatedMessage: true,
-  // });
+  if (!skipLobby) {
+    await SlackApiUtil.sendMessage(messageToVoter, {
+      parentMessageTs: lobbyParentMessageTs,
+      channel: lobbyChannelId,
+      isAutomatedMessage: true,
+    });
+  }
 
   let selectedStateChannelName = await LoadBalancer.selectSlackChannel(
     redisClient,
