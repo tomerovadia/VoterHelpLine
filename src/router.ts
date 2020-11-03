@@ -185,7 +185,7 @@ const introduceNewVoterToSlackChannel = async (
     );
   }
 
-  const skipLobby = await RedisApiUtil.getKey(redisClient, 'skipLobby') === 'true'
+  const skipLobby = await RedisApiUtil.getKey(redisClient, 'skipLobby') === 'true';
 
   let response = {
     data: {
@@ -899,6 +899,28 @@ export async function determineVoterState(
       inboundDbMessageEntry,
       userInfo
     );
+  } else {
+    if (inboundDbMessageEntry) {
+      logger.info(
+        `SLACKAPIUTIL.sendMessage: This Slack message send will log to DB (inboundDbMessageEntry is not null).`
+      );
+      // Copies a few fields from userInfo to inboundDbMessageEntry.
+      DbApiUtil.updateDbMessageEntryWithUserInfo(userInfo!, inboundDbMessageEntry);
+      inboundDbMessageEntry.slackChannel = 'NONEXISTENT_LOBBY';
+      inboundDbMessageEntry.slackParentMessageTs = 'NONEXISTENT_LOBBY_TS';
+      inboundDbMessageEntry.slackSendTimestamp = new Date();
+    }
+    inboundDbMessageEntry.successfullySent = true;
+
+    try {
+      await DbApiUtil.logMessageToDb(inboundDbMessageEntry);
+      await DbApiUtil.updateThreadStatusFromMessage(inboundDbMessageEntry);
+    } catch (error) {
+      logger.info(
+        `SLACKAPIUTIL.sendMessage: failed to log message send success to DB`
+      );
+      Sentry.captureException(error);
+    }
   }
 
   let stateName = StateParser.determineState(userMessage);
