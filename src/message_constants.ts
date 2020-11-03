@@ -1,26 +1,26 @@
 export function STATE_CONFIRMATION(state: string): string {
   switch (process.env.CLIENT_ORGANIZATION) {
     case 'VOTE_AMERICA':
-      return `Thanks! We are finding a ${state} volunteer. We try to reply within minutes but may take 24 hours. Meanwhile, please share more about how we can help.`;
+      return `Thanks! We are finding a ${state} volunteer and will be with you shortly. Meanwhile, please share more about how we can help.`;
     case 'VOTE_FROM_HOME_2020':
-      return `Great! We are finding a ${state} volunteer. We try to reply within minutes but may take 24 hours. Meanwhile, please share more about how we can help.`;
+      return `Great! We are finding a ${state} volunteer and will be with you shortly. Meanwhile, please share more about how we can help.`;
     case 'VOTER_HELP_LINE':
-      return `Great! We are finding a ${state} volunteer. We try to reply within minutes but may take 24 hours. Meanwhile, please share more about how we can help.`;
+      return `Great! We are finding a ${state} volunteer and will be with you shortly. Meanwhile, please share more about how we can help.`;
     default:
-      return `Great! We are finding a ${state} volunteer. We try to reply within minutes but may take 24 hours. Meanwhile, please share more about how we can help.`;
+      return `Great! We are finding a ${state} volunteer and will be with you shortly. Meanwhile, please share more about how we can help.`;
   }
 }
 
 export function NO_STATE_FINDING_VOLUNTEER(): string {
   switch (process.env.CLIENT_ORGANIZATION) {
     case 'VOTE_AMERICA':
-      return `We are finding a volunteer. We try to reply within minutes but may take 24 hours. Meanwhile, please share more about how we can help.`;
+      return `We are finding a volunteer and will be with you shortly. Meanwhile, please share more about how we can help.`;
     case 'VOTE_FROM_HOME_2020':
-      return `We are finding a volunteer. We try to reply within minutes but may take 24 hours. Meanwhile, please share more about how we can help.`;
+      return `We are finding a volunteer and will be with you shortly. Meanwhile, please share more about how we can help.`;
     case 'VOTER_HELP_LINE':
-      return `We are finding a volunteer. We try to reply within minutes but may take 24 hours. Meanwhile, please share more about how we can help.`;
+      return `We are finding a volunteer and will be with you shortly. Meanwhile, please share more about how we can help.`;
     default:
-      return `We are finding a volunteer. We try to reply within minutes but may take 24 hours. Meanwhile, please share more about how we can help.`;
+      return `We are finding a volunteer and will be with you shortly. Meanwhile, please share more about how we can help.`;
   }
 }
 
@@ -95,12 +95,12 @@ export function STATE_QUESTION(): string {
 export function WELCOME_BACK(): string {
   switch (process.env.CLIENT_ORGANIZATION) {
     case 'VOTE_AMERICA':
-      return 'Welcome back! We are connecting you with a volunteer. We will try to reply within a matter of minutes, but depending on the time of day, you might hear back later. In the meantime, please feel free to share more information about your question and situation.';
+      return 'Welcome back! We are connecting you with a volunteer and will be with you shortly. In the meantime, please feel free to share more information about your question and situation.';
     case 'VOTE_FROM_HOME_2020':
-      return `Welcome back! We are connecting you with a volunteer. We will try to reply within a matter of minutes, but depending on the time of day, you might hear back later. In the meantime, please feel free to share more information about your question and situation. (Msg & data rates may apply).`;
+      return `Welcome back! We are connecting you with a volunteer and will be with you shortly. In the meantime, please feel free to share more information about your question and situation. (Msg & data rates may apply).`;
     case 'VOTER_HELP_LINE':
-      return `Welcome back! We are connecting you with a volunteer. We will try to reply within a matter of minutes, but depending on the time of day, you might hear back later. In the meantime, please feel free to share more information about your question and situation. (Msg & data rates may apply).`;
+      return `Welcome back! We are connecting you with a volunteer and will be with you shortly. In the meantime, please feel free to share more information about your question and situation. (Msg & data rates may apply).`;
     default:
-      return `Welcome back! We are connecting you with a volunteer. We will try to reply within a matter of minutes, but depending on the time of day, you might hear back later. In the meantime, please feel free to share more information about your question and situation. (Msg & data rates may apply).`;
+      return `Welcome back! We are connecting you with a volunteer and will be with you shortly. In the meantime, please feel free to share more information about your question and situation. (Msg & data rates may apply).`;
   }
 }

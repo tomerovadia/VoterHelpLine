@@ -735,9 +735,7 @@ describe('determineVoterState', () => {
         inboundDbMessageEntry
       ).then(() => {
         expect(TwilioApiUtil.sendMessage.mock.calls[0][0]).toEqual(
-          expect.stringMatching(
-            /Great!.*We try to reply within minutes but may take 24 hours./i
-          )
+          expect.stringMatching(/Great!.*will be with you shortly/i)
         );
         expect(TwilioApiUtil.sendMessage.mock.calls[0][1]).toEqual(
           expect.objectContaining({
@@ -833,7 +831,7 @@ describe('determineVoterState', () => {
         expectNthSlackMessageToChannel(
           'CTHELOBBYID',
           1,
-          ['We try to reply within minutes but may take 24 hours.'],
+          ['will be with you shortly'],
           '293874928374'
         );
       });
