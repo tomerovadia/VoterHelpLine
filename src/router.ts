@@ -780,10 +780,6 @@ const routeVoterToSlackChannel = async (
     logger.debug(
       'ROUTER.routeVoterToSlackChannel: Routing of voter should succeed from here on out. Letting the admin (if applicable) know.'
     );
-    await SlackApiUtil.sendMessage(`*Operator:* Operation successful.`, {
-      channel: process.env.ADMIN_CONTROL_ROOM_SLACK_CHANNEL_ID!,
-      parentMessageTs: adminCommandParams.commandParentMessageTs,
-    });
     await SlackApiUtil.sendMessage(
       `*Operator:* Voter is being routed to *${destinationSlackChannelName}* by *${adminCommandParams.routingSlackUserName}*.`,
       {
@@ -1005,6 +1001,14 @@ const routeVoterToSlackChannel = async (
   }
 
   await DbApiUtil.setThreadInactive(oldSlackParentMessageTs, oldChannelId);
+
+  if (adminCommandParams) {
+    await SlackApiUtil.addSlackMessageReaction(
+      process.env.ADMIN_CONTROL_ROOM_SLACK_CHANNEL_ID!,
+      adminCommandParams.commandParentMessageTs,
+      'white_check_mark',
+    );
+  }
 };
 
 export async function recordVotedStatus(
