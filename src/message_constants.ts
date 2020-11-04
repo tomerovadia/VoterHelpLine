@@ -76,7 +76,7 @@ export function WELCOME_AND_STATE_QUESTION(): string {
 }
 
 export function VOTED_WELCOME_RESPONSE(): string {
-  return 'Thank you for voting! Please remind your friends and family to vote too.\n\nReply STOP to opt out of texts. Msg&data rates may apply.';
+  return 'Thank you for voting!\n\nReply STOP to opt out of texts. Msg&data rates may apply.';
 }
 
 export function STATE_QUESTION(): string {
