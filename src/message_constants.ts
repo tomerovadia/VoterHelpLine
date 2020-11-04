@@ -40,7 +40,7 @@ export function CLARIFY_STATE(): string {
 export function WELCOME_VOTER(): string {
   switch (process.env.CLIENT_ORGANIZATION) {
     case 'VOTE_AMERICA':
-      return "Welcome to VoteAmerica! Msg&data rates may apply.\n\nReply HELPLINE to connect with a trained volunteer, VOTED if you've already voted, STOP to unsubscribe.";
+      return 'Thank you for contacting VoteAmerica. If you need assistance, please view our Frequently Asked Questions document https://help.voteamerica.com/\n\nVoteAmerica provides election news and reminders to ensure all Americans are able to cast a ballot. To opt out of further messages from us, reply STOP.';
     case 'VOTE_FROM_HOME_2020':
       return 'Vote From Home 2020 is excited to help you vote!\n\nPlease note this is not an official or government-affiliated service. Volunteers will do their best to share official links that support their answers to your questions, but by using this service you release Vote From Home 2020 of all liability for your personal voting experience.\n\nReply AGREE to confirm that you understand and would like to continue to receive automated text messages from this number with further information. (Msg & data rates may apply). Reply STOP to unsubscribe.';
     case 'VOTER_HELP_LINE':
@@ -64,7 +64,7 @@ export function CLARIFY_DISCLAIMER(): string {
 export function CLARIFY_HELPLINE_REQUEST(): string {
   switch (process.env.CLIENT_ORGANIZATION) {
     case 'VOTE_AMERICA':
-      return 'Reply HELPLINE to be connected to the helpline, or STOP to opt out of texts.';
+      return 'If you need assistance, please view our Frequently Asked Questions document https://help.voteamerica.com/\n\nReply STOP to opt out of texts.';
     default:
       return 'Reply HELPLINE to be connected to the helpline, or STOP to opt out of texts.';
   }
@@ -76,7 +76,7 @@ export function WELCOME_AND_STATE_QUESTION(): string {
 }
 
 export function VOTED_WELCOME_RESPONSE(): string {
-  return 'Thank you for voting! Please remind your friends and family to vote too.\n\nReply HELPLINE if you have any questions, or STOP to opt out of texts. Msg&data rates may apply.';
+  return 'Thank you for voting! Please remind your friends and family to vote too.\n\nReply STOP to opt out of texts. Msg&data rates may apply.';
 }
 
 export function STATE_QUESTION(): string {
