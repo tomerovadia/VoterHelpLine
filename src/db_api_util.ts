@@ -96,6 +96,7 @@ export type DatabaseThreadEntry = {
   channelId: string | null;
   userId: string | null;
   userPhoneNumber: string | null;
+  twilioPhoneNumber: string | null;
   needsAttention: boolean | null;
   isDemo: boolean;
 };
@@ -570,8 +571,9 @@ export async function archiveDemoVoter(
       SET archived = true
       WHERE
         is_demo = true
-        AND user_id = $1`,
-      [userId]
+        AND user_id = $1
+        AND twilio_phone_number = $2`,
+      [userId, twilioPhoneNumber]
     );
     logger.info(
       `DBAPIUTIL.archiveDemoVoter: Successfully archived demo voter.`
@@ -587,12 +589,13 @@ export async function logThreadToDb(
   const client = await pool.connect();
   try {
     await client.query(
-      'INSERT INTO threads (slack_parent_message_ts, slack_channel_id, user_id, user_phone_number, needs_attention, is_demo, updated_at, active) VALUES ($1, $2, $3, $4, $5, $6, NOW(), true)',
+      'INSERT INTO threads (slack_parent_message_ts, slack_channel_id, user_id, user_phone_number, twilio_phone_number, needs_attention, is_demo, updated_at, active) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), true)',
       [
         databaseThreadEntry.slackParentMessageTs,
         databaseThreadEntry.channelId,
         databaseThreadEntry.userId,
         databaseThreadEntry.userPhoneNumber,
+        databaseThreadEntry.twilioPhoneNumber,
         databaseThreadEntry.needsAttention,
         databaseThreadEntry.isDemo,
       ]
@@ -659,6 +662,10 @@ export async function updateThreadStatusFromMessage(
           databaseMessageEntry.direction === 'INBOUND'
             ? databaseMessageEntry.fromPhoneNumber
             : databaseMessageEntry.toPhoneNumber,
+        twilioPhoneNumber:
+          databaseMessageEntry.direction === 'INBOUND'
+            ? databaseMessageEntry.toPhoneNumber
+            : databaseMessageEntry.fromPhoneNumber,
         needsAttention: databaseMessageEntry.direction === 'INBOUND',
       } as DatabaseThreadEntry);
     }
