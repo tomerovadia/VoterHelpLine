@@ -274,6 +274,7 @@ const introduceNewVoterToSlackChannel = async (
       channelId: response.data.channel,
       userId: userInfo.userId,
       userPhoneNumber: userInfo.userPhoneNumber,
+      twilioPhoneNumber: twilioPhoneNumber,
       needsAttention: true,
       isDemo: userInfo.isDemo,
     });
@@ -831,6 +832,7 @@ const routeVoterToSlackChannel = async (
       channelId: response.data.channel,
       userId: userInfo.userId,
       userPhoneNumber: userInfo.userPhoneNumber,
+      twilioPhoneNumber: twilioPhoneNumber,
       needsAttention: needsAttention,
       isDemo: userInfo.isDemo,
     });
