@@ -601,8 +601,6 @@ export async function logThreadToDb(
       ]
     );
     logger.info('DBAPIUTIL.logThreadToDb: Successfully created thread');
-  } catch (error) {
-    logger.info('Failed to update threads; ignoring for now!');
   } finally {
     client.release();
   }
@@ -669,8 +667,6 @@ export async function updateThreadStatusFromMessage(
         needsAttention: databaseMessageEntry.direction === 'INBOUND',
       } as DatabaseThreadEntry);
     }
-  } catch (error) {
-    logger.info('Failed to update threads; ignoring for now!');
   } finally {
     // Make sure to release the client before any error handling,
     // just in case the error handling itself throws an error.
@@ -692,8 +688,6 @@ export async function setThreadNeedsAttentionToDb(
     logger.info(
       `DBAPIUTIL.setThreadNeedsAttentionToDb: Set thread ${slackParentMessageTs} needs_attention=${needsAttention}`
     );
-  } catch (error) {
-    logger.info('Failed to update threads; ignoring for now!');
   } finally {
     client.release();
   }
@@ -747,8 +741,6 @@ export async function setThreadHistoryTs(
       'UPDATE threads SET history_ts = $1 WHERE slack_parent_message_ts = $2 AND slack_channel_id = $3;',
       [historyTs, slackParentMessageTs, slackChannelId]
     );
-  } catch (error) {
-    logger.info('Failed to update threads; ignoring for now!');
   } finally {
     client.release();
   }
@@ -780,9 +772,6 @@ export async function getThreadLatestMessageTs(
     if (result.rows.length > 0) {
       return result.rows[0]['slack_message_ts'] || result.rows[0]['history_ts'];
     }
-    return null;
-  } catch (error) {
-    logger.info('Failed to query threads; ignoring for now!');
     return null;
   } finally {
     client.release();
@@ -831,9 +820,6 @@ export async function getUnclaimedVoters(
       volunteerSlackUserId: null,
       volunteerSlackUserName: null,
     }));
-  } catch (error) {
-    logger.info('Failed to query unclaimed threads; ignoring for now!');
-    return [];
   } finally {
     client.release();
   }
@@ -878,9 +864,6 @@ export async function getUnclaimedVotersByChannel(): Promise<ChannelStat[]> {
           maxLastUpdateAge: x['max_last_update_age'],
         } as ChannelStat)
     );
-  } catch (error) {
-    logger.info('Failed to query all threads for channel; ignoring for now!');
-    return [];
   } finally {
     client.release();
   }
@@ -911,9 +894,6 @@ export async function getThreadsNeedingAttentionByChannel(): Promise<
           maxLastUpdateAge: x['max_last_update_age'],
         } as ChannelStat)
     );
-  } catch (error) {
-    logger.info('Failed to query all threads for channel; ignoring for now!');
-    return [];
   } finally {
     client.release();
   }
@@ -957,9 +937,6 @@ export async function getThreadsNeedingAttentionByVolunteer(): Promise<
           maxLastUpdateAge: x['max_last_update_age'],
         } as VolunteerStat)
     );
-  } catch (error) {
-    logger.info('Failed to query all threads for channel; ignoring for now!');
-    return [];
   } finally {
     client.release();
   }
@@ -1005,10 +982,6 @@ export async function getThreadsNeedingAttentionForChannel(
       volunteerSlackUserId: x['volunteer_slack_user_id'],
       volunteerSlackUserName: x['volunteer_slack_user_name'],
     }));
-  } catch (error) {
-    logger.info('Failed to query threads; ignoring for now!');
-    throw error;
-    return [];
   } finally {
     client.release();
   }
@@ -1053,9 +1026,6 @@ export async function getThreadsNeedingAttentionFor(
       volunteerSlackUserId: slackUserId,
       volunteerSlackUserName: x['volunteer_slack_user_name'],
     }));
-  } catch (error) {
-    logger.info('Failed to query threads; ignoring for now!');
-    return [];
   } finally {
     client.release();
   }
@@ -1084,9 +1054,6 @@ export async function getThreadNeedsAttentionFor(
       return result.rows[0].needs_attention;
     }
     return false;
-  } catch (error) {
-    logger.info('Failed to query threads; assuming needs_attention for now!');
-    return true;
   } finally {
     client.release();
   }
