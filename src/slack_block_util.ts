@@ -203,7 +203,7 @@ export const voterStatusPanel: SlackBlock = {
         {
           text: {
             type: 'plain_text',
-            text: 'Voted',
+            text: 'Voted :tada:',
             emoji: true,
           },
           value: 'VOTED',
