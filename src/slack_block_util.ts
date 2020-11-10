@@ -86,19 +86,6 @@ export function getVoterStatusOptions(): { [key in VoterStatus]?: string } {
         SPAM: 'Spam',
         REFUSED: 'Refused',
       };
-    case 'VOTE_AMERICA':
-      return {
-        UNKNOWN: 'Unknown',
-        UNREGISTERED: 'Unregistered',
-        REGISTERED: 'Registered',
-        REQUESTED_BALLOT: 'Requested ballot',
-        RECEIVED_BALLOT: 'Received ballot',
-        IN_PERSON: 'Will vote in-person',
-        VOTED: 'Voted',
-        SPAM: 'Spam',
-        REFUSED: 'Refused',
-        ALREADY_VOTED: 'Already voted',
-      };
     default:
       return {
         UNKNOWN: 'Unknown',
@@ -312,10 +299,10 @@ if (process.env.CLIENT_ORGANIZATION === 'VOTE_AMERICA') {
   voterStatusPanel.elements[0].options.push({
     text: {
       type: 'plain_text',
-      text: 'Already voted',
+      text: 'Voted',
       emoji: true,
     },
-    value: 'ALREADY_VOTED',
+    value: 'VOTED',
   });
 }
 
