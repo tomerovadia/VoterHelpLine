@@ -200,37 +200,15 @@ export const voterStatusPanel: SlackBlock = {
           },
           value: 'IN_PERSON',
         },
+        {
+          text: {
+            type: 'plain_text',
+            text: 'Voted',
+            emoji: true,
+          },
+          value: 'VOTED',
+        },
       ],
-    },
-    {
-      type: 'button',
-      style: 'primary',
-      text: {
-        type: 'plain_text',
-        text: 'Voted',
-        emoji: true,
-      },
-      action_id: SlackActionId.VOTER_STATUS_VOTED_BUTTON,
-      value: 'VOTED',
-      confirm: {
-        title: {
-          type: 'plain_text',
-          text: 'Are you sure?',
-        },
-        text: {
-          type: 'mrkdwn',
-          text:
-            "Please confirm that you'd like to update this voter's status to VOTED.",
-        },
-        confirm: {
-          type: 'plain_text',
-          text: 'Confirm',
-        },
-        deny: {
-          type: 'plain_text',
-          text: 'Cancel',
-        },
-      },
     },
     {
       type: 'button',
@@ -294,17 +272,6 @@ export const voterStatusPanel: SlackBlock = {
     },
   ],
 };
-
-if (process.env.CLIENT_ORGANIZATION === 'VOTE_AMERICA') {
-  voterStatusPanel.elements[0].options.push({
-    text: {
-      type: 'plain_text',
-      text: 'Voted',
-      emoji: true,
-    },
-    value: 'VOTED',
-  });
-}
 
 export function loadingSlackView(): SlackView {
   return {
