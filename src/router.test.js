@@ -44,6 +44,7 @@ const requireModules = () => {
   DbApiUtil.updateThreadStatusFromMessage = jest.fn();
   DbApiUtil.getLatestVoterStatus = jest.fn();
   DbApiUtil.setThreadInactive = jest.fn();
+  DbApiUtil.getKnownPhoneState = jest.fn();
 
   SlackBlockUtil.populateDropdownWithLatestVoterStatus = jest.fn();
 };
