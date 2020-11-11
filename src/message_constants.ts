@@ -79,6 +79,10 @@ export function VOTED_WELCOME_RESPONSE(): string {
   return 'Thank you for voting!\n\nReply STOP to opt out of texts. Msg&data rates may apply.';
 }
 
+export function VOTED_RESPONSE(): string {
+  return 'Thank you for voting!';
+}
+
 export function STATE_QUESTION(): string {
   switch (process.env.CLIENT_ORGANIZATION) {
     case 'VOTE_AMERICA':
