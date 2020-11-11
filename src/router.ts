@@ -498,7 +498,7 @@ export async function handleNewVoter(
   );
 }
 
-const postUserMessageHistoryToSlack = async (
+async function postUserMessageHistoryToSlack(
   userId: string,
   twilioPhoneNumber: string,
   timestampOfLastMessageInThread: string,
@@ -510,7 +510,7 @@ const postUserMessageHistoryToSlack = async (
     destinationSlackParentMessageTs: string;
     destinationSlackChannelId: string;
   }
-) => {
+): Promise<string|null> {
   logger.debug('ENTERING ROUTER.postUserMessageHistoryToSlack');
   const messageHistory = await DbApiUtil.getMessageHistoryFor(
     userId,
@@ -523,7 +523,7 @@ const postUserMessageHistoryToSlack = async (
     logger.debug(
       'ROUTER.postUserMessageHistoryToSlack: No message history found.'
     );
-    return;
+    return null;
   }
 
   logger.debug(
@@ -547,6 +547,9 @@ const postUserMessageHistoryToSlack = async (
       destinationSlackChannelId,
       msgInfo.data.ts
     );
+    return msgInfo.data.ts;
+  } else {
+    return null;
   }
 };
 
