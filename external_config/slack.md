@@ -193,6 +193,7 @@ This should be added as a **global** shortcut.
 - **Request URL:** base URL + /slack-command
 - **Short Description:** List unclaimed voters in a channel
 - **Usage Hint:** (None)
+- **Escape channels, users, and links sent to your app:** Unchecked
 
 #### Needs attention
 
@@ -200,6 +201,7 @@ This should be added as a **global** shortcut.
 - **Request URL:** base URL + /slack-command
 - **Short Description:** List voters needing your attention
 - **Usage Hint:** (None)
+- **Escape channels, users, and links sent to your app:** Checked
 
 #### Broadcast
 
@@ -207,6 +209,7 @@ This should be added as a **global** shortcut.
 - **Request URL:** base URL + /slack-command
 - **Short Description:** Broadcast helpline status to channels or volunteers
 - **Usage Hint:** channel-status|volunteer-status [optional preamble message]
+- **Escape channels, users, and links sent to your app:** Unchecked
 
 #### Follow-up
 
@@ -214,3 +217,4 @@ This should be added as a **global** shortcut.
 - **Request URL:** base URL + /slack-command
 - **Short Description:** List voters to follow-up with
 - **Usage Hint:** days-idle
+- **Escape channels, users, and links sent to your app:** Unchecked
