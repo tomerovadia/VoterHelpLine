@@ -19,7 +19,6 @@ import * as Sentry from '@sentry/node';
 import { isVotedKeyword } from './keyword_parser';
 import { SlackActionId } from './slack_interaction_ids';
 import { SlackFile } from './message_parser';
-import { VoterStatus } from './types';
 
 const MINS_BEFORE_WELCOME_BACK_MESSAGE = 60 * 24;
 export const NUM_STATE_SELECTION_ATTEMPTS_LIMIT = 2;
@@ -1203,56 +1202,6 @@ export async function handleClearedVoter(
       nowSecondsEpoch - lastVoterMessageSecsFromEpoch
     }`
   );
-
-  if (isVotedKeyword(userOptions.userMessage)) {
-    // log it
-    await DbApiUtil.logVoterStatusToDb({
-      userId: userInfo.userId,
-      userPhoneNumber: userInfo.userPhoneNumber,
-      twilioPhoneNumber: twilioPhoneNumber,
-      isDemo: userInfo.isDemo,
-      voterStatus: 'VOTED',
-      originatingSlackUserName: null,
-      originatingSlackUserId: null,
-      slackChannelName: null,
-      slackChannelId: null,
-      slackParentMessageTs: null,
-      actionTs: null,
-    });
-    await SlackApiUtil.sendMessage(
-      `*Operator:* Voter status changed to *VOTED* by user text.`,
-      {
-        channel: userInfo.activeChannelId,
-        parentMessageTs: userInfo[userInfo.activeChannelId],
-      }
-    );
-
-    // update blocks
-    let blocks = await SlackApiUtil.fetchSlackMessageBlocks(
-      userInfo.activeChannelId,
-      userInfo[userInfo.activeChannelId]
-    );
-    if (blocks) {
-      if (
-        !SlackBlockUtil.populateDropdownNewInitialValue(
-          blocks,
-          SlackActionId.VOTER_STATUS_DROPDOWN,
-          'VOTED' as VoterStatus
-        )
-      ) {
-        logger.error(
-          'ROUTER.handleClearedVoter: unable to modify status dropdown'
-        );
-      }
-      await SlackInteractionApiUtil.updateVoterStatusBlocks(
-        userInfo.activeChannelId,
-        userInfo[userInfo.activeChannelId],
-        blocks
-      );
-    } else {
-      logger.error('ROUTER.handleClearedVoter: unable to fetch old blocks');
-    }
-  }
 
   if (
     nowSecondsEpoch - lastVoterMessageSecsFromEpoch >
