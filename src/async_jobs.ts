@@ -305,8 +305,6 @@ async function slackInteractivityHandler(
     if (
       payload.actions[0].action_id === SlackActionId.VOTER_STATUS_DROPDOWN ||
       payload.actions[0].action_id ===
-        SlackActionId.VOTER_STATUS_VOTED_BUTTON ||
-      payload.actions[0].action_id ===
         SlackActionId.VOTER_STATUS_REFUSED_BUTTON ||
       payload.actions[0].action_id === SlackActionId.VOTER_STATUS_SPAM_BUTTON ||
       payload.actions[0].action_id ===

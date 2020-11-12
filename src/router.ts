@@ -98,7 +98,7 @@ export async function welcomePotentialVoter(
       userPhoneNumber: userInfo.userPhoneNumber,
       twilioPhoneNumber: twilioPhoneNumber,
       isDemo: userInfo.isDemo,
-      voterStatus: 'ALREADY_VOTED',
+      voterStatus: 'VOTED',
       originatingSlackUserName: null,
       originatingSlackUserId: null,
       slackChannelName: null,
@@ -177,7 +177,7 @@ const introduceNewVoterToSlackChannel = async (
     userInfo.userId,
     twilioPhoneNumber
   );
-  if (status === 'ALREADY_VOTED') {
+  if (status === 'VOTED') {
     SlackBlockUtil.populateDropdownNewInitialValue(
       slackBlocks,
       SlackActionId.VOTER_STATUS_DROPDOWN,
@@ -1045,7 +1045,7 @@ export async function clarifyHelplineRequest(
       userPhoneNumber: userInfo.userPhoneNumber,
       twilioPhoneNumber: twilioPhoneNumber,
       isDemo: userInfo.isDemo,
-      voterStatus: 'ALREADY_VOTED',
+      voterStatus: 'VOTED',
       originatingSlackUserName: null,
       originatingSlackUserId: null,
       slackChannelName: null,
@@ -1212,9 +1212,14 @@ export async function handleClearedVoter(
         nowSecondsEpoch - lastVoterMessageSecsFromEpoch
       } > : ${MINS_BEFORE_WELCOME_BACK_MESSAGE}), sending welcome back message.`
     );
-    const welcomeBackMessage = MessageConstants.WELCOME_BACK();
+    let userMessage = null as string | null;
+    if (isVotedKeyword(userOptions.userMessage)) {
+      userMessage = MessageConstants.VOTED_RESPONSE();
+    } else {
+      userMessage = MessageConstants.WELCOME_BACK();
+    }
     await TwilioApiUtil.sendMessage(
-      welcomeBackMessage,
+      userMessage,
       {
         userPhoneNumber: userOptions.userPhoneNumber,
         twilioPhoneNumber,
@@ -1222,7 +1227,7 @@ export async function handleClearedVoter(
       },
       DbApiUtil.populateAutomatedDbMessageEntry(userInfo)
     );
-    await SlackApiUtil.sendMessage(welcomeBackMessage, {
+    await SlackApiUtil.sendMessage(userMessage, {
       ...activeChannelMessageParams,
       isAutomatedMessage: true,
     });

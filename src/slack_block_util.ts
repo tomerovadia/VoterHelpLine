@@ -86,19 +86,6 @@ export function getVoterStatusOptions(): { [key in VoterStatus]?: string } {
         SPAM: 'Spam',
         REFUSED: 'Refused',
       };
-    case 'VOTE_AMERICA':
-      return {
-        UNKNOWN: 'Unknown',
-        UNREGISTERED: 'Unregistered',
-        REGISTERED: 'Registered',
-        REQUESTED_BALLOT: 'Requested ballot',
-        RECEIVED_BALLOT: 'Received ballot',
-        IN_PERSON: 'Will vote in-person',
-        VOTED: 'Voted',
-        SPAM: 'Spam',
-        REFUSED: 'Refused',
-        ALREADY_VOTED: 'Already voted',
-      };
     default:
       return {
         UNKNOWN: 'Unknown',
@@ -213,37 +200,15 @@ export const voterStatusPanel: SlackBlock = {
           },
           value: 'IN_PERSON',
         },
+        {
+          text: {
+            type: 'plain_text',
+            text: 'Voted :tada:',
+            emoji: true,
+          },
+          value: 'VOTED',
+        },
       ],
-    },
-    {
-      type: 'button',
-      style: 'primary',
-      text: {
-        type: 'plain_text',
-        text: 'Voted',
-        emoji: true,
-      },
-      action_id: SlackActionId.VOTER_STATUS_VOTED_BUTTON,
-      value: 'VOTED',
-      confirm: {
-        title: {
-          type: 'plain_text',
-          text: 'Are you sure?',
-        },
-        text: {
-          type: 'mrkdwn',
-          text:
-            "Please confirm that you'd like to update this voter's status to VOTED.",
-        },
-        confirm: {
-          type: 'plain_text',
-          text: 'Confirm',
-        },
-        deny: {
-          type: 'plain_text',
-          text: 'Cancel',
-        },
-      },
     },
     {
       type: 'button',
@@ -307,17 +272,6 @@ export const voterStatusPanel: SlackBlock = {
     },
   ],
 };
-
-if (process.env.CLIENT_ORGANIZATION === 'VOTE_AMERICA') {
-  voterStatusPanel.elements[0].options.push({
-    text: {
-      type: 'plain_text',
-      text: 'Already voted',
-      emoji: true,
-    },
-    value: 'ALREADY_VOTED',
-  });
-}
 
 export function loadingSlackView(): SlackView {
   return {

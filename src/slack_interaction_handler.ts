@@ -112,12 +112,7 @@ const getClosedVoterPanelText = (
   // See https://api.slack.com/reference/surfaces/formatting#visual-styles
   const specialSlackTimestamp = `<!date^${timeSinceEpochSecs}^{date_num} {time_secs}|${new Date()}>`;
 
-  switch (selectedVoterStatus) {
-    case 'VOTED':
-      return `*Congratulations!* :tada: This voter was marked as *VOTED* by *${originatingSlackUserName}* on *${specialSlackTimestamp}*. On to the next one! :ballot_box_with_ballot:`;
-    default:
-      return `:no_entry_sign: This voter was marked as *${selectedVoterStatus}* by *${originatingSlackUserName}* on *${specialSlackTimestamp}*. :no_entry_sign:`;
-  }
+  return `:no_entry_sign: This voter was marked as *${selectedVoterStatus}* by *${originatingSlackUserName}* on *${specialSlackTimestamp}*. :no_entry_sign:`;
 };
 
 const handleVoterStatusUpdateHelper = async ({
@@ -265,12 +260,11 @@ export async function handleVoterStatusUpdate({
         );
       }
 
-      // Replace the entire block so that the initial option change persists.
-      await SlackInteractionApiUtil.replaceSlackMessageBlocks({
-        slackChannelId: payload.channel.id,
-        slackParentMessageTs: payload.container.thread_ts,
-        newBlocks: payload.message.blocks,
-      });
+      await SlackInteractionApiUtil.updateVoterStatusBlocks(
+        payload.channel.id,
+        payload.container.thread_ts,
+        payload.message.blocks
+      );
     }
   } else if (
     selectedVoterStatus === 'UNDO' &&

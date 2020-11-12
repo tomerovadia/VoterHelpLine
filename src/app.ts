@@ -6,6 +6,7 @@ import morgan from 'morgan';
 import axios, { AxiosResponse } from 'axios';
 import { Pool } from 'pg';
 
+import * as MessageConstants from './message_constants';
 import * as SlackApiUtil from './slack_api_util';
 import * as SlackInteractionHandler from './slack_interaction_handler';
 import * as TwilioApiUtil from './twilio_api_util';
@@ -29,6 +30,8 @@ import { handleTwilioStatusCallback } from './twilio_status_callback_handler';
 import { SlackInteractionEventPayload } from './slack_interaction_handler';
 import { TwilioRequestBody } from './twilio_util';
 import * as KeywordParser from './keyword_parser';
+import { SlackActionId } from './slack_interaction_ids';
+import { VoterStatus } from './types';
 
 const app = express();
 
@@ -356,6 +359,58 @@ const handleIncomingTwilioMessage = async (
       logger.info(
         `SERVER.handleIncomingTwilioMessage (${userId}): Voter has previously confirmed the disclaimer, or one is not required for this organization.`
       );
+
+      // always update the status if user texts VOTED
+      if (KeywordParser.isVotedKeyword(userMessage)) {
+        // log it
+        await DbApiUtil.logVoterStatusToDb({
+          userId: userInfo.userId,
+          userPhoneNumber: userInfo.userPhoneNumber,
+          twilioPhoneNumber: twilioPhoneNumber,
+          isDemo: userInfo.isDemo,
+          voterStatus: 'VOTED',
+          originatingSlackUserName: null,
+          originatingSlackUserId: null,
+          slackChannelName: null,
+          slackChannelId: null,
+          slackParentMessageTs: null,
+          actionTs: null,
+        });
+        await SlackApiUtil.sendMessage(
+          `*Operator:* Voter status changed to *VOTED* by user text.`,
+          {
+            channel: userInfo.activeChannelId,
+            parentMessageTs: userInfo[userInfo.activeChannelId],
+          }
+        );
+
+        // update blocks
+        let blocks = await SlackApiUtil.fetchSlackMessageBlocks(
+          userInfo.activeChannelId,
+          userInfo[userInfo.activeChannelId]
+        );
+        if (blocks) {
+          if (
+            !SlackBlockUtil.populateDropdownNewInitialValue(
+              blocks,
+              SlackActionId.VOTER_STATUS_DROPDOWN,
+              'VOTED' as VoterStatus
+            )
+          ) {
+            logger.error(
+              'ROUTER.handleClearedVoter: unable to modify status dropdown'
+            );
+          }
+          await SlackInteractionApiUtil.updateVoterStatusBlocks(
+            userInfo.activeChannelId,
+            userInfo[userInfo.activeChannelId],
+            blocks
+          );
+        } else {
+          logger.error('ROUTER.handleClearedVoter: unable to fetch old blocks');
+        }
+      }
+
       // Voter has a state determined. The U.S. state name is used for
       // operator messages as well as to know whether a U.S. state is known
       // for the voter. This may not be ideal (create separate bool?).
@@ -378,6 +433,33 @@ const handleIncomingTwilioMessage = async (
           inboundDbMessageEntry,
           twilioCallbackURL
         );
+        // Voter texted VOTED during the state determination
+      } else if (KeywordParser.isVotedKeyword(userMessage)) {
+        await SlackApiUtil.sendMessage(
+          userMessage,
+          {
+            parentMessageTs: userInfo[userInfo.activeChannelId],
+            channel: userInfo.activeChannelId,
+            isVoterMessage: true,
+          },
+          inboundDbMessageEntry,
+          userInfo
+        );
+        const replyMessage = MessageConstants.VOTED_RESPONSE();
+        await TwilioApiUtil.sendMessage(
+          replyMessage,
+          {
+            userPhoneNumber: userPhoneNumber,
+            twilioPhoneNumber,
+            twilioCallbackURL,
+          },
+          DbApiUtil.populateAutomatedDbMessageEntry(userInfo)
+        );
+        await SlackApiUtil.sendMessage(replyMessage, {
+          parentMessageTs: userInfo[userInfo.activeChannelId],
+          channel: userInfo.activeChannelId,
+          isAutomatedMessage: true,
+        });
         // Voter has no state determined
       } else {
         logger.info(
