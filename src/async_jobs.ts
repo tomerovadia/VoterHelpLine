@@ -102,6 +102,23 @@ async function slackInteractivityHandler(
     );
   }
 
+  // ignore all actions on inactive threads (archived, re-routed, or old session)
+  if (
+    payload.message.thread_ts &&
+    !(await DbApiUtil.isActiveSessionThread(
+      payload.message.thread_ts,
+      payload.channel.id
+    ))
+  ) {
+    logger.info('slackInteractivityHandler: ignoring event on inactive thread');
+    await SlackApiUtil.addSlackMessageReaction(
+      payload.channel.id,
+      payload.message.thread_ts,
+      'zombie'
+    );
+    return;
+  }
+
   // Global shortcut
   if (payload.type === 'shortcut') {
     // Technically it's possible to have a shortcut that doesn't open a global but all of ours

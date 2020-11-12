@@ -47,6 +47,7 @@ export type SlackInteractionEventPayload = {
   };
   container: {
     thread_ts: string;
+    channel_id: string;
   };
   channel: {
     id: string;
