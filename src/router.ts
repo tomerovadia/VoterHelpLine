@@ -415,27 +415,33 @@ export async function handleNewVoter(
   let slackChannelName = null as string | null;
 
   // do we already know the voter's state?
-  const knownState = await DbApiUtil.getKnownPhoneState(
-    userOptions.userPhoneNumber
-  );
-  if (knownState) {
-    const stateName = StateParser.determineState(knownState);
-    if (stateName) {
-      userInfo.stateName = stateName;
-      slackChannelName = await LoadBalancer.selectSlackChannel(
-        redisClient,
-        LoadBalancer.PULL_ENTRY_POINT,
-        stateName,
-        userInfo.isDemo
-      );
-      if (slackChannelName) {
-        logger.info(
-          `ROUTER.handleNewVoter (${userInfo.userId}): New voter is in known state {stateName}, channel {slackChannelName}`
+  if (process.env.CLIENT_ORGANIZATION === 'VOTE_AMERICA') {
+    const knownState = await DbApiUtil.getKnownPhoneState(
+      userOptions.userPhoneNumber
+    );
+    if (knownState) {
+      const stateName = StateParser.determineState(knownState);
+      if (stateName) {
+        userInfo.stateName = stateName;
+        slackChannelName = await LoadBalancer.selectSlackChannel(
+          redisClient,
+          LoadBalancer.PULL_ENTRY_POINT,
+          stateName,
+          userInfo.isDemo
         );
+        if (slackChannelName) {
+          logger.info(
+            `ROUTER.handleNewVoter (${userInfo.userId}): New voter is in known state {stateName}, selected Slack channel {slackChannelName}`
+          );
+        } else {
+          slackChannelName = userInfo.isDemo ? 'demo-national' : 'national';
+          logger.info(
+            `ROUTER.handleNewVoter (${userInfo.userId}): New voter is in known state {stateName}, but no channel match`
+          );
+        }
       } else {
-        slackChannelName = userInfo.isDemo ? 'demo-national' : 'national';
-        logger.info(
-          `ROUTER.handleNewVoter (${userInfo.userId}): New voter is in known state {stateName}, but no channel match`
+        logger.warning(
+          `ROUTER.handleNewVoter (${userInfo.userId}): unable to parse known state '${knownState}`
         );
       }
     }
