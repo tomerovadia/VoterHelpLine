@@ -365,7 +365,7 @@ export async function handleVolunteerUpdate({
   );
 
   logger.info(
-    `SLACKINTERACTIONHANDLER.handleVolunteerUpdate: Successfully sent message recording volunteer status change`
+    `SLACKINTERACTIONHANDLER.handleVolunteerUpdate: Successfully sent message recording volunteer claim change`
   );
 
   await DbApiUtil.logVolunteerVoterClaimToDb({
