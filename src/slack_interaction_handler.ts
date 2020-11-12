@@ -834,6 +834,74 @@ export async function handleCommandBroadcast(
   }
 }
 
+export async function handleCommandFollowUp(
+  channelId: string,
+  channelName: string,
+  userId: string,
+  userName: string,
+  text: string,
+  responseUrl: string
+): Promise<void> {
+  const args = text.split(' ');
+  if (args.length != 1) {
+    await SlackApiUtil.sendEphemeralResponse(
+      responseUrl,
+      `Usage: \`/follow-up <days>`
+    );
+    return;
+  }
+  const days = parseInt(args[0], 10);
+  if (isNaN(days) || days < 0) {
+    await SlackApiUtil.sendEphemeralResponse(
+      responseUrl,
+      `Usage: \`/follow-up <days>`
+    );
+    return;
+  }
+
+  const slackChannelIds = await RedisApiUtil.getHash(
+    redisClient,
+    'slackPodChannelIds'
+  );
+  const slackChannelNames: Record<string, string> = {};
+  for (const name in slackChannelIds) {
+    slackChannelNames[slackChannelIds[name]] = name;
+  }
+
+  const threads = await DbApiUtil.getThreadsNeedingFollowUp(userId, days);
+  const lines = [
+    `You have *${threads.length}* voters idle for >= ${days} days`,
+  ];
+  for (const thread of threads) {
+    const messageTs =
+      (await DbApiUtil.getThreadLatestMessageTs(
+        thread.slackParentMessageTs,
+        thread.channelId
+      )) || thread.slackParentMessageTs;
+    const url = await SlackApiUtil.getThreadPermalink(
+      thread.channelId,
+      messageTs
+    );
+    lines.push(
+      `:bust_in_silhouette: Voter ${thread.userId?.substr(
+        0,
+        5
+      )} - ${SlackApiUtil.linkToSlackChannel(
+        thread.channelId,
+        slackChannelNames[thread.channelId]
+      )} - ${thread.voterStatus} - age ${prettyTimeInterval(
+        thread.lastUpdateAge || 0
+      )} - <${url}|Open>`
+    );
+    if (lines.length >= maxCommandLines) {
+      lines.push('... (truncated for brevity) ...');
+      break;
+    }
+  }
+
+  await SlackApiUtil.sendEphemeralResponse(responseUrl, lines.join('\n'));
+}
+
 export async function handleShortcutShowNeedsAttention({
   payload,
   viewId,

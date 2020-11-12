@@ -262,6 +262,7 @@ const introduceNewVoterToSlackChannel = async (
       userId: userInfo.userId,
       userPhoneNumber: userInfo.userPhoneNumber,
       needsAttention: true,
+      isDemo: userInfo.isDemo,
     });
   }
 
@@ -663,11 +664,8 @@ const routeVoterToSlackChannel = async (
     userInfo[userInfo.activeChannelId],
     userInfo.activeChannelId
   );
-  await DbApiUtil.setThreadNeedsAttentionToDb(
-    userInfo[userInfo.activeChannelId],
-    userInfo.activeChannelId,
-    false
-  );
+  const oldSlackParentMessageTs = userInfo[userInfo.activeChannelId];
+  const oldChannelId = userInfo.activeChannelId;
 
   let previousParentMessageBlocks;
   if (userInfo.activeChannelId === 'NONEXISTENT_LOBBY') {
@@ -780,85 +778,87 @@ const routeVoterToSlackChannel = async (
       userId: userInfo.userId,
       userPhoneNumber: userInfo.userPhoneNumber,
       needsAttention: needsAttention,
+      isDemo: userInfo.isDemo,
+    });
+  } else {
+    // If this user HAS been to the destination channel, use the same thread info.
+
+    if (!adminCommandParams) {
+      throw new Error('Missing adminCommandParams');
+    }
+
+    // Fetch the blocks of the parent message of the destination thread to which the voter is returning.
+    const destinationParentMessageBlocks = await SlackApiUtil.fetchSlackMessageBlocks(
+      destinationSlackChannelId,
+      userInfo[destinationSlackChannelId]
+    );
+
+    if (!destinationParentMessageBlocks) {
+      throw new Error('Unable to get destinationParentMessageBlocks');
+    }
+
+    // Preserve the voter info message of the destination thread to which the voter is returning, but otherwise use the blocks of the previous thread in which the voter was active.
+    if (previousParentMessageBlocks[0] && previousParentMessageBlocks[0].text) {
+      previousParentMessageBlocks[0].text.text =
+        destinationParentMessageBlocks[0].text.text;
+    } else {
+      logger.error(
+        'ROUTER.routeVoterToSlackChannel: ERROR replacing voter info text above voter panel blocks that are being moved.'
+      );
+    }
+
+    await SlackInteractionApiUtil.replaceSlackMessageBlocks({
+      slackChannelId: destinationSlackChannelId,
+      slackParentMessageTs: userInfo[destinationSlackChannelId],
+      newBlocks: previousParentMessageBlocks,
     });
 
-    return;
-  }
-  // If this user HAS been to the destination channel, use the same thread info.
+    logger.debug(
+      `ROUTER.routeVoterToSlackChannel: Returning voter back to *${destinationSlackChannelName}* from *${adminCommandParams.previousSlackChannelName}*. Voter has been here before.`
+    );
 
-  if (!adminCommandParams) {
-    throw new Error('Missing adminCommandParams');
-  }
+    await SlackApiUtil.sendMessage(
+      `*Operator:* Voter *${userId}* was routed from *${adminCommandParams.previousSlackChannelName}* back to this channel by *${adminCommandParams.routingSlackUserName}*. See their thread with *${twilioPhoneNumber}* above.`,
+      { channel: destinationSlackChannelId }
+    );
 
-  // Fetch the blocks of the parent message of the destination thread to which the voter is returning.
-  const destinationParentMessageBlocks = await SlackApiUtil.fetchSlackMessageBlocks(
-    destinationSlackChannelId,
-    userInfo[destinationSlackChannelId]
-  );
+    const timestampOfLastMessageInThread = await DbApiUtil.getTimestampOfLastMessageInThread(
+      userInfo[destinationSlackChannelId]
+    );
 
-  if (!destinationParentMessageBlocks) {
-    throw new Error('Unable to get destinationParentMessageBlocks');
-  }
+    logger.debug(
+      `timestampOfLastMessageInThread: ${timestampOfLastMessageInThread}`
+    );
 
-  // Preserve the voter info message of the destination thread to which the voter is returning, but otherwise use the blocks of the previous thread in which the voter was active.
-  if (previousParentMessageBlocks[0] && previousParentMessageBlocks[0].text) {
-    previousParentMessageBlocks[0].text.text =
-      destinationParentMessageBlocks[0].text.text;
-  } else {
-    logger.error(
-      'ROUTER.routeVoterToSlackChannel: ERROR replacing voter info text above voter panel blocks that are being moved.'
+    // Set destination thread to have same needs_attention status as origin thread
+    await DbApiUtil.reactivateThread(
+      userInfo[destinationSlackChannelId],
+      destinationSlackChannelId,
+      needsAttention
+    );
+
+    await SlackApiUtil.sendMessage(
+      `*Operator:* Voter *${userId}* was routed from *${adminCommandParams.previousSlackChannelName}* back to this thread by *${adminCommandParams.routingSlackUserName}*. Messages sent here will again relay to the voter.`,
+      {
+        channel: destinationSlackChannelId,
+        parentMessageTs: userInfo[destinationSlackChannelId],
+      }
+    );
+
+    await routeVoterToSlackChannelHelper(
+      userInfo,
+      redisClient,
+      twilioPhoneNumber,
+      {
+        destinationSlackChannelName,
+        destinationSlackChannelId,
+        destinationSlackParentMessageTs: userInfo[destinationSlackChannelId],
+      },
+      timestampOfLastMessageInThread
     );
   }
 
-  await SlackInteractionApiUtil.replaceSlackMessageBlocks({
-    slackChannelId: destinationSlackChannelId,
-    slackParentMessageTs: userInfo[destinationSlackChannelId],
-    newBlocks: previousParentMessageBlocks,
-  });
-
-  logger.debug(
-    `ROUTER.routeVoterToSlackChannel: Returning voter back to *${destinationSlackChannelName}* from *${adminCommandParams.previousSlackChannelName}*. Voter has been here before.`
-  );
-
-  await SlackApiUtil.sendMessage(
-    `*Operator:* Voter *${userId}* was routed from *${adminCommandParams.previousSlackChannelName}* back to this channel by *${adminCommandParams.routingSlackUserName}*. See their thread with *${twilioPhoneNumber}* above.`,
-    { channel: destinationSlackChannelId }
-  );
-
-  const timestampOfLastMessageInThread = await DbApiUtil.getTimestampOfLastMessageInThread(
-    userInfo[destinationSlackChannelId]
-  );
-
-  logger.debug(
-    `timestampOfLastMessageInThread: ${timestampOfLastMessageInThread}`
-  );
-
-  // Set destination thread to have same needs_attention status as origin thread
-  await DbApiUtil.setThreadNeedsAttentionToDb(
-    userInfo[destinationSlackChannelId],
-    destinationSlackChannelId,
-    needsAttention
-  );
-
-  await SlackApiUtil.sendMessage(
-    `*Operator:* Voter *${userId}* was routed from *${adminCommandParams.previousSlackChannelName}* back to this thread by *${adminCommandParams.routingSlackUserName}*. Messages sent here will again relay to the voter.`,
-    {
-      channel: destinationSlackChannelId,
-      parentMessageTs: userInfo[destinationSlackChannelId],
-    }
-  );
-
-  await routeVoterToSlackChannelHelper(
-    userInfo,
-    redisClient,
-    twilioPhoneNumber,
-    {
-      destinationSlackChannelName,
-      destinationSlackChannelId,
-      destinationSlackParentMessageTs: userInfo[destinationSlackChannelId],
-    },
-    timestampOfLastMessageInThread
-  );
+  await DbApiUtil.setThreadInactive(oldSlackParentMessageTs, oldChannelId);
 };
 
 export async function determineVoterState(

@@ -207,3 +207,10 @@ This should be added as a **global** shortcut.
 - **Request URL:** base URL + /slack-command
 - **Short Description:** Broadcast helpline status to channels or volunteers
 - **Usage Hint:** channel-status|volunteer-status [optional preamble message]
+
+#### Follow-up
+
+- **Command:** /follow-up
+- **Request URL:** base URL + /slack-command
+- **Short Description:** List voters to follow-up with
+- **Usage Hint:** days-idle
