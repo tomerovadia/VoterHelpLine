@@ -604,6 +604,28 @@ export async function setSessionEnd(
   }
 }
 
+export async function isActiveSessionThread(
+  threadTs: string,
+  channelId: string
+): Promise<boolean> {
+  const client = await pool.connect();
+  try {
+    const result = await client.query(
+      `SELECT COUNT(*) FROM threads
+      WHERE
+        slack_parent_message_ts = $1
+        AND slack_channel_id = $2
+        AND active = true
+        AND session_end_at IS NULL
+        AND archived IS NOT TRUE`,
+      [threadTs, channelId]
+    );
+    return result.rowCount > 0 && result.rows[0]['count'] > 0;
+  } finally {
+    client.release();
+  }
+}
+
 export async function logThreadToDb(
   databaseThreadEntry: DatabaseThreadEntry
 ): Promise<void> {
