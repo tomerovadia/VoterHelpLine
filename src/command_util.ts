@@ -5,15 +5,18 @@ export type AdminCommand =
   | 'ROUTE_VOTER'
   | 'UPDATE_VOTER_STATUS'
   | 'FIND_VOTER'
-  | 'RESET_VOTER';
+  | 'RESET_VOTER'
+  | 'END_SESSION';
 
 export const ROUTE_VOTER = 'ROUTE_VOTER';
 export const UPDATE_VOTER_STATUS = 'UPDATE_VOTER_STATUS';
 export const FIND_VOTER = 'FIND_VOTER';
 export const RESET_VOTER = 'RESET_VOTER';
+export const END_SESSION = 'END_SESSION';
 export const VALID_COMMANDS: AdminCommand[] = [
   ROUTE_VOTER,
   UPDATE_VOTER_STATUS,
+  END_SESSION,
 ];
 
 // TODO: should this be the same as the VoterStatus in db_api_util? It doesn't
@@ -86,11 +89,18 @@ export type ParsedCommandResetVoter = {
   twilioPhoneNumber: string;
 };
 
+export type ParsedCommandEndSession = {
+  command: typeof END_SESSION;
+  userId: string;
+  twilioPhoneNumber: string;
+};
+
 export type ParsedCommand =
   | ParsedCommandRouteVoter
   | ParsedCommandUpdateVoterStatus
   | ParsedCommandFindVoter
-  | ParsedCommandResetVoter;
+  | ParsedCommandResetVoter
+  | ParsedCommandEndSession;
 
 const compileRouteVoterCommandArgs = (
   args: string[]
@@ -113,6 +123,29 @@ const compileRouteVoterCommandArgs = (
       ? parsedTwilioPhoneNumber
       : args[1],
     destinationSlackChannelName: args[2],
+  };
+};
+
+const compileEndSessionCommandArgs = (
+  args: string[]
+): null | ParsedCommandEndSession => {
+  if (args.length !== 2) {
+    return null;
+  }
+
+  // Parsing necessary because phone numbers are converted to links in Slack
+  // and sent as e.g. <tel:+18551234567|+18551234567>.
+  const parsedTwilioPhoneNumber = MessageParser.processMessageText(args[1]);
+
+  return {
+    command: END_SESSION,
+    userId: args[0],
+    // Ternary is necessary because MessageParser returns null if unchanged,
+    // which is necessary for its other use case (to know if a message was modified
+    // so the DB write can indicate this).
+    twilioPhoneNumber: parsedTwilioPhoneNumber
+      ? parsedTwilioPhoneNumber
+      : args[1],
   };
 };
 
@@ -156,6 +189,8 @@ export function parseSlackCommand(message: string): ParsedCommand | null {
       return compileRouteVoterCommandArgs(args);
     case UPDATE_VOTER_STATUS:
       return compileUpdateVoterStatusCommandArgs(args);
+    case END_SESSION:
+      return compileEndSessionCommandArgs(args);
     default:
       // This should never be relevant because of the valid command check above.
       return null;

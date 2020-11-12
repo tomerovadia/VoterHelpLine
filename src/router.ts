@@ -77,6 +77,21 @@ function prepareUserInfoForNewVoter({
   } as UserInfo;
 }
 
+export async function endVoterSession(
+  redisClient: PromisifiedRedisClient,
+  userInfo: UserInfo,
+  twilioPhoneNumber: string
+): Promise<void> {
+  await DbApiUtil.setSessionEnd(userInfo.userId, twilioPhoneNumber);
+  const redisHashKey = `${userInfo.userId}:${twilioPhoneNumber}`;
+  RedisApiUtil.deleteKeys(redisClient, [redisHashKey]);
+  // update old blocks async; do not await
+  SlackInteractionApiUtil.updateOldSessionBlocks(
+    userInfo.activeChannelId,
+    userInfo[userInfo.activeChannelId]
+  );
+}
+
 export async function welcomePotentialVoter(
   userOptions: UserOptions & { userId: string },
   redisClient: PromisifiedRedisClient,
@@ -1525,6 +1540,43 @@ export async function handleSlackAdminCommand(
             adminCommandParams
           );
         }
+      }
+      return;
+    }
+    case CommandUtil.END_SESSION: {
+      const redisHashKey = `${adminCommandArgs.userId}:${adminCommandArgs.twilioPhoneNumber}`;
+      logger.debug(
+        `ROUTER.handleSlackAdminCommand: Looking up ${redisHashKey} in Redis.`
+      );
+      const userInfo = (await RedisApiUtil.getHash(
+        redisClient,
+        redisHashKey
+      )) as UserInfo;
+
+      // This catches invalid userPhoneNumber:twilioPhoneNumber pairs.
+      if (!userInfo) {
+        logger.debug(
+          'Router.handleSlackAdminCommand: No Redis data found for userId:twilioPhoneNumber pair.'
+        );
+        await SlackApiUtil.sendMessage(
+          `*Operator:* No record found for user ID (${adminCommandArgs.userId}) and/or Twilio phone number (${adminCommandArgs.twilioPhoneNumber}).`,
+          {
+            channel: process.env.ADMIN_CONTROL_ROOM_SLACK_CHANNEL_ID!,
+            parentMessageTs: reqBody.event.ts,
+          }
+        );
+        // userPhoneNumber:twilioPhoneNumber pair found successfully.
+      } else {
+        await endVoterSession(
+          redisClient,
+          userInfo,
+          adminCommandArgs.twilioPhoneNumber
+        );
+        await SlackApiUtil.addSlackMessageReaction(
+          process.env.ADMIN_CONTROL_ROOM_SLACK_CHANNEL_ID!,
+          reqBody.event.ts,
+          'white_check_mark'
+        );
       }
       return;
     }
