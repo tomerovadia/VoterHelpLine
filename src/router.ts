@@ -336,8 +336,9 @@ const introduceNewVoterToSlackChannel = async (
     const messageHistoryContextText =
       "Below is the voter's message history so far.";
     if (slackChannelName !== 'lobby' || !skipLobby) {
-      await postUserMessageHistoryToSlack(
-        userInfo.userId,
+      const historyTs = await postUserMessageHistoryToSlack(
+        redisClient,
+        userInfo,
         twilioPhoneNumber,
         '1990-01-01 10:00:00.000',
         messageHistoryContextText,
@@ -517,7 +518,8 @@ export async function handleNewVoter(
 }
 
 async function postUserMessageHistoryToSlack(
-  userId: string,
+  redisClient: PromisifiedRedisClient,
+  userInfo: UserInfo,
   twilioPhoneNumber: string,
   timestampOfLastMessageInThread: string,
   messageHistoryContextText: string,
@@ -531,7 +533,7 @@ async function postUserMessageHistoryToSlack(
 ): Promise<string | null> {
   logger.debug('ENTERING ROUTER.postUserMessageHistoryToSlack');
   const messageHistory = await DbApiUtil.getMessageHistoryFor(
-    userId,
+    userInfo.userId,
     twilioPhoneNumber,
     timestampOfLastMessageInThread
   );
@@ -549,7 +551,7 @@ async function postUserMessageHistoryToSlack(
   );
   const formattedMessageHistory = SlackMessageFormatter.formatMessageHistory(
     messageHistory,
-    userId.substring(0, 5)
+    userInfo.userId.substring(0, 5)
   );
 
   const msgInfo = await SlackApiUtil.sendMessage(
@@ -632,7 +634,8 @@ const routeVoterToSlackChannelHelper = async (
 
   // Populate state channel thread with message history so far.
   await postUserMessageHistoryToSlack(
-    userInfo.userId,
+    redisClient,
+    userInfo,
     twilioPhoneNumber,
     timestampOfLastMessageInThread,
     messageHistoryContextText,
