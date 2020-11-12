@@ -584,6 +584,25 @@ export async function archiveDemoVoter(
   }
 }
 
+export async function setSessionEnd(
+  userId: string,
+  twilioPhoneNumber: string
+): Promise<void> {
+  logger.info(`ENTERING DBAPIUTIL.setSessionEnd`);
+  const client = await pool.connect();
+  try {
+    await client.query(
+      `UPDATE threads SET session_end_at = (
+        SELECT MAX(updated_at) FROM threads WHERE user_id = $1 AND twilio_phone_number = $2 AND session_end_at IS NULL
+      )
+      WHERE user_id = $1 AND twilio_phone_number = $2 AND session_end_at IS NULL`,
+      [userId, twilioPhoneNumber]
+    );
+  } finally {
+    client.release();
+  }
+}
+
 export async function logThreadToDb(
   databaseThreadEntry: DatabaseThreadEntry
 ): Promise<void> {

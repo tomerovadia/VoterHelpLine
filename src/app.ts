@@ -279,6 +279,7 @@ const handleIncomingTwilioMessage = async (
     logger.info(
       `SERVER.handleIncomingTwilioMessage (${userId}): no sessionStartEpoch, starting with fresh userInfo`
     );
+    await DbApiUtil.setSessionEnd(userInfo.userId, twilioPhoneNumber);
     userInfo = null;
     RedisApiUtil.deleteKeys(redisClient, [redisHashKey]);
   }
