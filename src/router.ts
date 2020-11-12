@@ -528,7 +528,7 @@ async function postUserMessageHistoryToSlack(
     destinationSlackParentMessageTs: string;
     destinationSlackChannelId: string;
   }
-): Promise<string|null> {
+): Promise<string | null> {
   logger.debug('ENTERING ROUTER.postUserMessageHistoryToSlack');
   const messageHistory = await DbApiUtil.getMessageHistoryFor(
     userId,
@@ -569,7 +569,7 @@ async function postUserMessageHistoryToSlack(
   } else {
     return null;
   }
-};
+}
 
 // This helper handles all tasks associated with routing a voter to a new
 // channel that require the new channel's thread.
