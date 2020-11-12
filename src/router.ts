@@ -1409,8 +1409,19 @@ export async function handleSlackVoterThreadMessage(
     );
     // Slack message is from inactive Slack thread.
   } else {
+    const ts = await DbApiUtil.getThreadLatestMessageTs(
+      userInfo[userInfo.activeChannelId],
+      userInfo.activeChannelId
+    );
+    const url = await SlackApiUtil.getThreadPermalink(
+      userInfo.activeChannelId,
+      ts || userInfo[userInfo.activeChannelId]
+    );
     await SlackApiUtil.sendMessage(
-      `*Operator:* Your message was not relayed, as this thread is inactive. The voter's active thread is in ${userInfo.activeChannelName}.`,
+      `*Operator:* Your message was not relayed, as this thread is inactive. The voter's active thread is in ${SlackApiUtil.linkToSlackChannel(
+        userInfo.activeChannelId,
+        userInfo.activeChannelName
+      )} - <${url}|Open>`,
       {
         channel: reqBody.event.channel,
         parentMessageTs: reqBody.event.thread_ts,
