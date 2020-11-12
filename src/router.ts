@@ -817,6 +817,17 @@ const routeVoterToSlackChannel = async (
       { userPhoneNumber, twilioPhoneNumber }
     );
 
+    // Create the thread with the origin thread's need_attention status
+    await DbApiUtil.logThreadToDb({
+      slackParentMessageTs: response.data.ts,
+      channelId: response.data.channel,
+      userId: userInfo.userId,
+      userPhoneNumber: userInfo.userPhoneNumber,
+      twilioPhoneNumber: twilioPhoneNumber,
+      needsAttention: needsAttention,
+      isDemo: userInfo.isDemo,
+    });
+
     // The logic above this is for a voter's first time at a channel (e.g. create thread).
     // This function is separated so that it could be used to return a voter to
     // their thread in a channel they've already been in.
@@ -830,17 +841,6 @@ const routeVoterToSlackChannel = async (
         destinationSlackParentMessageTs: response.data.ts,
       }
     );
-
-    // Create the thread with the origin thread's need_attention status
-    await DbApiUtil.logThreadToDb({
-      slackParentMessageTs: response.data.ts,
-      channelId: response.data.channel,
-      userId: userInfo.userId,
-      userPhoneNumber: userInfo.userPhoneNumber,
-      twilioPhoneNumber: twilioPhoneNumber,
-      needsAttention: needsAttention,
-      isDemo: userInfo.isDemo,
-    });
   } else {
     // If this user HAS been to the destination channel, use the same thread info.
 
