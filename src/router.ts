@@ -184,7 +184,7 @@ const introduceNewVoterToSlackChannel = async (
     userInfo.userId,
     twilioPhoneNumber
   );
-  if (status === 'VOTED') {
+  if (status !== 'UNKNOWN') {
     SlackBlockUtil.populateDropdownNewInitialValue(
       slackBlocks,
       SlackActionId.VOTER_STATUS_DROPDOWN,
