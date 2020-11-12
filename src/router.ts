@@ -279,6 +279,7 @@ const introduceNewVoterToSlackChannel = async (
       twilioPhoneNumber: twilioPhoneNumber,
       needsAttention: true,
       isDemo: userInfo.isDemo,
+      sessionStartEpoch: userInfo.sessionStartEpoch || null,
     });
   }
 
@@ -826,6 +827,7 @@ const routeVoterToSlackChannel = async (
       twilioPhoneNumber: twilioPhoneNumber,
       needsAttention: needsAttention,
       isDemo: userInfo.isDemo,
+      sessionStartEpoch: userInfo.sessionStartEpoch || null,
     });
 
     // The logic above this is for a voter's first time at a channel (e.g. create thread).
