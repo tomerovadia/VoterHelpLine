@@ -41,10 +41,12 @@ function prepareUserInfoForNewVoter({
   userOptions,
   twilioPhoneNumber,
   entryPoint,
+  sessionStartEpoch,
 }: {
   userOptions: UserOptions & { userId: string; userPhoneNumber: string | null };
   twilioPhoneNumber: string;
   entryPoint: EntryPoint;
+  sessionStartEpoch?: number;
 }): UserInfo {
   let isDemo, confirmedDisclaimer, volunteerEngaged;
   if (entryPoint === LoadBalancer.PULL_ENTRY_POINT) {
@@ -58,6 +60,13 @@ function prepareUserInfoForNewVoter({
     confirmedDisclaimer = false;
     volunteerEngaged = false;
   }
+  if (!sessionStartEpoch) {
+    sessionStartEpoch =
+      Math.round(Date.now() / 1000) -
+      10 /* a bit of slop so we capture the first message */;
+    sessionStartEpoch -= new Date().getTimezoneOffset() * 60;
+  }
+
   return {
     userId: userOptions.userId,
     // Necessary for admin controls, so userPhoneNumber can be found even though
@@ -73,7 +82,7 @@ function prepareUserInfoForNewVoter({
     entryPoint,
     numStateSelectionAttempts: 0,
     // Start time for this session
-    sessionStartEpoch: Math.round(Date.now() / 1000),
+    sessionStartEpoch: sessionStartEpoch,
   } as UserInfo;
 }
 
@@ -411,7 +420,8 @@ export async function handleNewVoter(
   inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry,
   entryPoint: EntryPoint,
   twilioCallbackURL: string,
-  includeWelcome?: boolean
+  includeWelcome?: boolean,
+  sessionStartEpoch?: number
 ): Promise<void> {
   logger.debug('ENTERING ROUTER.handleNewVoter');
   const userMessage = userOptions.userMessage;
@@ -419,6 +429,7 @@ export async function handleNewVoter(
     userOptions,
     twilioPhoneNumber,
     entryPoint,
+    sessionStartEpoch,
   });
 
   await DbApiUtil.logInitialVoterStatusToDb(
