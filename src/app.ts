@@ -264,15 +264,24 @@ const handleIncomingTwilioMessage = async (
     `SERVER.handleIncomingTwilioMessage (${userId}): Retrieving userInfo using redisHashKey: ${redisHashKey}`
   );
 
-  const userInfo = (await RedisApiUtil.getHash(
+  let userInfo = (await RedisApiUtil.getHash(
     redisClient,
     redisHashKey
-  )) as UserInfo;
+  )) as UserInfo | null;
   logger.info(
     `SERVER.handleIncomingTwilioMessage (${userId}): Successfully received Redis response for userInfo retrieval with redisHashKey ${redisHashKey}, userInfo: ${JSON.stringify(
       userInfo
     )}`
   );
+
+  // new session?
+  if (userInfo && !userInfo.sessionStartEpoch) {
+    logger.info(
+      `SERVER.handleIncomingTwilioMessage (${userId}): no sessionStartEpoch, starting with fresh userInfo`
+    );
+    userInfo = null;
+    RedisApiUtil.deleteKeys(redisClient, [redisHashKey]);
+  }
 
   const twilioCallbackURL = TwilioUtil.twilioCallbackURL(req);
 
