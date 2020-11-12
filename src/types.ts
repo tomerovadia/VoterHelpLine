@@ -27,6 +27,7 @@ type UserInfoCore = {
   stateName: string | null;
   twilioPhoneNumber: string;
   numStateSelectionAttempts: number;
+  sessionStartEpoch?: number;
 };
 
 type UserInfoChannels = {

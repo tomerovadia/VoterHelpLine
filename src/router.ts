@@ -72,6 +72,8 @@ function prepareUserInfoForNewVoter({
     // messages, this is necessary.
     entryPoint,
     numStateSelectionAttempts: 0,
+    // Start time for this session
+    sessionStartEpoch: Math.round(Date.now() / 1000),
   } as UserInfo;
 }
 
