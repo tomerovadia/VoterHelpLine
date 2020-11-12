@@ -77,6 +77,21 @@ function prepareUserInfoForNewVoter({
   } as UserInfo;
 }
 
+export async function endVoterSession(
+  redisClient: PromisifiedRedisClient,
+  userInfo: UserInfo,
+  twilioPhoneNumber: string
+): Promise<void> {
+  await DbApiUtil.setSessionEnd(userInfo.userId, twilioPhoneNumber);
+  const redisHashKey = `${userInfo.userId}:${twilioPhoneNumber}`;
+  RedisApiUtil.deleteKeys(redisClient, [redisHashKey]);
+  // update old blocks async; do not await
+  SlackInteractionApiUtil.updateOldSessionBlocks(
+    userInfo.activeChannelId,
+    userInfo[userInfo.activeChannelId]
+  );
+}
+
 export async function welcomePotentialVoter(
   userOptions: UserOptions & { userId: string },
   redisClient: PromisifiedRedisClient,
