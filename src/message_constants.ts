@@ -76,7 +76,7 @@ export function WELCOME_AND_STATE_QUESTION(): string {
 }
 
 export function WELCOME_FINDING_VOLUNTEER(): string {
-  return `Welcome to the VoteAmerica Helpline! We are finding a volunteer and will be with you shortly. Meanwhile, please share more about how we can help.`;
+  return `Welcome to the VoteAmerica Helpline! Msg&data rates may apply. Reply STOP to unsubscribe.\n\nWe are finding a volunteer and will be with you shortly. Meanwhile, please share more about how we can help.`;
 }
 
 export function VOTED_WELCOME_RESPONSE(): string {
