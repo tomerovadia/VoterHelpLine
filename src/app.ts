@@ -320,7 +320,8 @@ const handleIncomingTwilioMessage = async (
             inboundDbMessageEntry,
             entryPoint,
             twilioCallbackURL,
-            false /* includeWelcome */
+            false /* includeWelcome */,
+            userInfo.sessionStartEpoch
           );
           return;
         } else {
