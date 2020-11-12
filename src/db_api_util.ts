@@ -108,6 +108,7 @@ export type ThreadInfo = {
   lastUpdateAge: number | null;
   volunteerSlackUserId: string | null;
   volunteerSlackUserName: string | null;
+  historyTs: string | null;
   voterStatus?: string;
 };
 
@@ -797,6 +798,7 @@ export async function getUnclaimedVoters(
         t.slack_parent_message_ts
         , t.slack_channel_id
         , t.user_id
+        , t.history_ts
         , EXTRACT(EPOCH FROM now() - t.updated_at) as last_update_age
       FROM threads t
       LEFT JOIN latest_status s ON (t.user_id = s.user_id)
@@ -819,6 +821,7 @@ export async function getUnclaimedVoters(
       lastUpdateAge: x['last_update_age'],
       volunteerSlackUserId: null,
       volunteerSlackUserName: null,
+      historyTs: x['history_ts'],
     }));
   } finally {
     client.release();
@@ -965,6 +968,7 @@ export async function getThreadsNeedingAttentionForChannel(
         , EXTRACT(EPOCH FROM now() - updated_at) as last_update_age
         , c.volunteer_slack_user_id
         , c.volunteer_slack_user_name
+        , t.history_ts
         FROM threads t, claims c
         WHERE
           needs_attention
@@ -981,6 +985,7 @@ export async function getThreadsNeedingAttentionForChannel(
       lastUpdateAge: x['last_update_age'],
       volunteerSlackUserId: x['volunteer_slack_user_id'],
       volunteerSlackUserName: x['volunteer_slack_user_name'],
+      historyTs: x['history_ts'],
     }));
   } finally {
     client.release();
@@ -1009,6 +1014,7 @@ export async function getThreadsNeedingAttentionFor(
         , t.user_id
         , EXTRACT(EPOCH FROM now() - updated_at) as last_update_age
         , c.volunteer_slack_user_name
+        , t.history_ts
         FROM threads t, claims c
         WHERE
           needs_attention
@@ -1025,6 +1031,7 @@ export async function getThreadsNeedingAttentionFor(
       lastUpdateAge: x['last_update_age'],
       volunteerSlackUserId: slackUserId,
       volunteerSlackUserName: x['volunteer_slack_user_name'],
+      historyTs: x['history_ts'],
     }));
   } finally {
     client.release();
@@ -1081,6 +1088,7 @@ export async function getThreadsNeedingFollowUp(
         t.slack_parent_message_ts
         , t.slack_channel_id
         , t.user_id
+        , t.history_ts
         , EXTRACT(EPOCH FROM now() - updated_at) as last_update_age
         , c.volunteer_slack_user_name
         , s.voter_status
@@ -1105,6 +1113,7 @@ export async function getThreadsNeedingFollowUp(
       volunteerSlackUserId: slackUserId,
       volunteerSlackUserName: x['volunteer_slack_user_name'],
       voterStatus: x['voter_status'],
+      historyTs: x['history_ts'],
     }));
   } finally {
     client.release();
