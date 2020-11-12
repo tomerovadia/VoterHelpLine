@@ -801,6 +801,43 @@ export async function getThreadLatestMessageTs(
   }
 }
 
+export async function getPastSessionThreads(
+  userId: string,
+  twilioPhoneNumber: string
+): Promise<ThreadInfo[]> {
+  const client = await pool.connect();
+  try {
+    const result = await client.query(
+      `SELECT
+        t.slack_parent_message_ts
+        , t.slack_channel_id
+        , t.user_id
+        , t.history_ts
+        , EXTRACT(EPOCH FROM now() - t.updated_at) as last_update_age
+      FROM threads t
+      WHERE
+        archived IS NOT TRUE
+        AND active
+        AND user_id = $1
+        AND twilio_phone_number = $2
+        AND session_end_at IS NOT NULL
+      ORDER BY t.updated_at`,
+      [userId, twilioPhoneNumber]
+    );
+    return result.rows.map((x) => ({
+      slackParentMessageTs: x['slack_parent_message_ts'],
+      channelId: x['slack_channel_id'],
+      userId: x['user_id'],
+      lastUpdateAge: x['last_update_age'],
+      volunteerSlackUserId: null,
+      volunteerSlackUserName: null,
+      historyTs: x['history_ts'],
+    }));
+  } finally {
+    client.release();
+  }
+}
+
 export async function getUnclaimedVoters(
   channelId: string
 ): Promise<ThreadInfo[]> {
