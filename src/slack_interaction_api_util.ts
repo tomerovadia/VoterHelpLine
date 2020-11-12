@@ -4,6 +4,7 @@ import { UserInfo } from './types';
 import * as SlackApiUtil from './slack_api_util';
 import * as SlackInteractionHandler from './slack_interaction_handler';
 import { PromisifiedRedisClient } from './redis_client';
+import * as SlackBlockUtil from './slack_block_util';
 
 export async function replaceSlackMessageBlocks({
   slackChannelId,
@@ -56,6 +57,25 @@ export function addBackVoterStatusPanel({
     slackParentMessageTs,
     newBlocks,
   });
+}
+
+export async function updateOldSessionBlocks(
+  channelId: string,
+  threadTs: string
+): Promise<void> {
+  let blocks = await SlackApiUtil.fetchSlackMessageBlocks(channelId, threadTs);
+  if (blocks) {
+    const closedBlocks = SlackBlockUtil.makeClosedVoterPanelBlocks(
+      `This voter helpline session is closed`,
+      false /* no undo button */
+    );
+    const newBlocks = [blocks[0]].concat(closedBlocks);
+    await replaceSlackMessageBlocks({
+      slackChannelId: channelId,
+      slackParentMessageTs: threadTs,
+      newBlocks: newBlocks,
+    });
+  }
 }
 
 // This function is used in app.js for automated refusals.

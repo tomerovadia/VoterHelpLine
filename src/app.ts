@@ -280,6 +280,11 @@ const handleIncomingTwilioMessage = async (
       `SERVER.handleIncomingTwilioMessage (${userId}): no sessionStartEpoch, starting with fresh userInfo`
     );
     await DbApiUtil.setSessionEnd(userInfo.userId, twilioPhoneNumber);
+    // update old blocks async; do not await
+    SlackInteractionApiUtil.updateOldSessionBlocks(
+      userInfo.activeChannelId,
+      userInfo[userInfo.activeChannelId]
+    );
     userInfo = null;
     RedisApiUtil.deleteKeys(redisClient, [redisHashKey]);
   }
