@@ -92,12 +92,12 @@ export type DatabaseCommandEntry = {
 };
 
 export type DatabaseThreadEntry = {
-  slackParentMessageTs: string | null;
-  channelId: string | null;
-  userId: string | null;
-  userPhoneNumber: string | null;
-  twilioPhoneNumber: string | null;
-  needsAttention: boolean | null;
+  slackParentMessageTs: string;
+  channelId: string;
+  userId: string;
+  userPhoneNumber: string;
+  twilioPhoneNumber: string;
+  needsAttention: boolean;
   isDemo: boolean;
 };
 
