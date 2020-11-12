@@ -18,6 +18,7 @@ import redisClient from './redis_client';
 import Hashes from 'jshashes';
 import * as DbApiUtil from './db_api_util';
 import * as SlackBlockUtil from './slack_block_util';
+import { cloneDeep } from 'lodash';
 
 import {
   SlackInteractionEventPayload,
@@ -313,9 +314,14 @@ async function slackInteractivityHandler(
       logger.info(
         `SERVER POST /slack-interactivity: Determined user interaction is a voter status update or undo.`
       );
-      const selectedVoterStatus = payload.actions[0].selected_option
+      let selectedVoterStatus = payload.actions[0].selected_option
         ? payload.actions[0].selected_option.value
         : payload.actions[0].value;
+      if (selectedVoterStatus === 'ALREADY_VOTED') {
+        // take this opportunity to update the voter status blocks!
+        selectedVoterStatus = 'VOTED';
+        payload.message.blocks[2] = cloneDeep(SlackBlockUtil.voterStatusPanel);
+      }
       await SlackInteractionHandler.handleVoterStatusUpdate({
         payload,
         selectedVoterStatus: selectedVoterStatus as SlackInteractionHandler.VoterStatusUpdate,
