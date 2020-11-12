@@ -99,6 +99,7 @@ export type DatabaseThreadEntry = {
   twilioPhoneNumber: string;
   needsAttention: boolean;
   isDemo: boolean;
+  sessionStartEpoch: number | null;
 };
 
 export type ThreadInfo = {
@@ -609,13 +610,14 @@ export async function logThreadToDb(
   const client = await pool.connect();
   try {
     await client.query(
-      'INSERT INTO threads (slack_parent_message_ts, slack_channel_id, user_id, user_phone_number, twilio_phone_number, needs_attention, is_demo, updated_at, active) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), true)',
+      'INSERT INTO threads (slack_parent_message_ts, slack_channel_id, user_id, user_phone_number, twilio_phone_number, session_start_at, needs_attention, is_demo, updated_at, active) VALUES ($1, $2, $3, $4, $5, TO_TIMESTAMP($6), $7, $8, NOW(), true)',
       [
         databaseThreadEntry.slackParentMessageTs,
         databaseThreadEntry.channelId,
         databaseThreadEntry.userId,
         databaseThreadEntry.userPhoneNumber,
         databaseThreadEntry.twilioPhoneNumber,
+        databaseThreadEntry.sessionStartEpoch || 0,
         databaseThreadEntry.needsAttention,
         databaseThreadEntry.isDemo,
       ]
@@ -685,6 +687,7 @@ export async function updateThreadStatusFromMessage(
             ? databaseMessageEntry.toPhoneNumber
             : databaseMessageEntry.fromPhoneNumber,
         needsAttention: databaseMessageEntry.direction === 'INBOUND',
+        sessionStartEpoch: 0 /* kludge but this code path is so rare */,
       } as DatabaseThreadEntry);
     }
   } finally {
