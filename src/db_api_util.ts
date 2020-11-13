@@ -111,6 +111,8 @@ export type ThreadInfo = {
   volunteerSlackUserName: string | null;
   historyTs: string | null;
   voterStatus?: string;
+  sessionStartEpoch: number;
+  sessionEndEpoch: number | null;
 };
 
 export type ChannelStat = {
@@ -125,6 +127,12 @@ export type VolunteerStat = {
   count: number;
   maxLastUpdateAge: number;
 };
+
+export function epochToPostgresTimestamp(epoch: number): string {
+  let d = new Date(0);
+  d.setUTCSeconds(epoch);
+  return d.toISOString().replace('T', ' ').replace('Z', '');
+}
 
 export async function logMessageToDb(
   databaseMessageEntry: DatabaseMessageEntry
@@ -835,6 +843,8 @@ export async function getPastSessionThreads(
         , t.slack_channel_id
         , t.user_id
         , t.history_ts
+        , EXTRACT(EPOCH FROM t.session_start_at) as session_start_epoch
+        , EXTRACT(EPOCH FROM t.session_end_at) as session_end_epoch
         , EXTRACT(EPOCH FROM now() - t.updated_at) as last_update_age
       FROM threads t
       WHERE
@@ -854,6 +864,8 @@ export async function getPastSessionThreads(
       volunteerSlackUserId: null,
       volunteerSlackUserName: null,
       historyTs: x['history_ts'],
+      sessionStartEpoch: x['session_start_epoch'],
+      sessionEndEpoch: x['session_end_epoch'],
     }));
   } finally {
     client.release();
@@ -880,6 +892,8 @@ export async function getUnclaimedVoters(
         , t.slack_channel_id
         , t.user_id
         , t.history_ts
+        , EXTRACT(EPOCH FROM t.session_start_at) as session_start_epoch
+        , EXTRACT(EPOCH FROM t.session_end_at) as session_end_epoch
         , EXTRACT(EPOCH FROM now() - t.updated_at) as last_update_age
       FROM threads t
       LEFT JOIN latest_status s ON (t.user_id = s.user_id)
@@ -903,6 +917,8 @@ export async function getUnclaimedVoters(
       volunteerSlackUserId: null,
       volunteerSlackUserName: null,
       historyTs: x['history_ts'],
+      sessionStartEpoch: x['session_start_epoch'],
+      sessionEndEpoch: x['session_end_epoch'],
     }));
   } finally {
     client.release();
@@ -1050,6 +1066,8 @@ export async function getThreadsNeedingAttentionForChannel(
         , c.volunteer_slack_user_id
         , c.volunteer_slack_user_name
         , t.history_ts
+        , EXTRACT(EPOCH FROM t.session_start_at) as session_start_epoch
+        , EXTRACT(EPOCH FROM t.session_end_at) as session_end_epoch
         FROM threads t, claims c
         WHERE
           needs_attention
@@ -1067,6 +1085,8 @@ export async function getThreadsNeedingAttentionForChannel(
       volunteerSlackUserId: x['volunteer_slack_user_id'],
       volunteerSlackUserName: x['volunteer_slack_user_name'],
       historyTs: x['history_ts'],
+      sessionStartEpoch: x['session_start_epoch'],
+      sessionEndEpoch: x['session_end_epoch'],
     }));
   } finally {
     client.release();
@@ -1096,6 +1116,8 @@ export async function getThreadsNeedingAttentionFor(
         , EXTRACT(EPOCH FROM now() - updated_at) as last_update_age
         , c.volunteer_slack_user_name
         , t.history_ts
+        , EXTRACT(EPOCH FROM t.session_start_at) as session_start_epoch
+        , EXTRACT(EPOCH FROM t.session_end_at) as session_end_epoch
         FROM threads t, claims c
         WHERE
           needs_attention
@@ -1113,6 +1135,8 @@ export async function getThreadsNeedingAttentionFor(
       volunteerSlackUserId: slackUserId,
       volunteerSlackUserName: x['volunteer_slack_user_name'],
       historyTs: x['history_ts'],
+      sessionStartEpoch: x['session_start_epoch'],
+      sessionEndEpoch: x['session_end_epoch'],
     }));
   } finally {
     client.release();
@@ -1173,6 +1197,8 @@ export async function getThreadsNeedingFollowUp(
         , EXTRACT(EPOCH FROM now() - updated_at) as last_update_age
         , c.volunteer_slack_user_name
         , s.voter_status
+        , EXTRACT(EPOCH FROM t.session_start_at) as session_start_epoch
+        , EXTRACT(EPOCH FROM t.session_end_at) as session_end_epoch
         FROM threads t, latest_claims c, latest_statuses s
         WHERE
           active
@@ -1195,6 +1221,8 @@ export async function getThreadsNeedingFollowUp(
       volunteerSlackUserName: x['volunteer_slack_user_name'],
       voterStatus: x['voter_status'],
       historyTs: x['history_ts'],
+      sessionStartEpoch: x['session_start_epoch'],
+      sessionEndEpoch: x['session_end_epoch'],
     }));
   } finally {
     client.release();
