@@ -38,6 +38,18 @@ type AdminCommandParams = {
   previousSlackChannelName: string;
 };
 
+export function isStaleSession(userInfo: UserInfo): boolean {
+  if (!userInfo.sessionStartEpoch) {
+    // legacy session from before 2020-11-03 election
+    return true;
+  }
+
+  // add other "stale" logic here (e.g., session is idle for >2 months)
+  // ...
+
+  return false;
+}
+
 // prepareUserInfoForNewVoter is used by functions that handle
 // phone numbers not previously seen.
 function prepareUserInfoForNewVoter({
