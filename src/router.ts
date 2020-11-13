@@ -183,7 +183,7 @@ export async function welcomePotentialVoter(
   );
 }
 
-const introduceNewVoterToSlackChannel = async (
+async function introduceNewVoterToSlackChannel(
   {
     userInfo,
     userMessage,
@@ -191,13 +191,14 @@ const introduceNewVoterToSlackChannel = async (
   }: { userInfo: UserInfo; userMessage: string; userAttachments: string[] },
   redisClient: PromisifiedRedisClient,
   twilioPhoneNumber: string,
-  inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry,
+  inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry | null,
   entryPoint: EntryPoint,
   slackChannelName: string,
   twilioCallbackURL: string,
   // This is only used by VOTE_AMERICA
-  includeWelcome?: boolean
-) => {
+  includeWelcome?: boolean,
+  noWelcome?: boolean
+): Promise<string> {
   logger.debug('ENTERING ROUTER.introduceNewVoterToSlackChannel');
   logger.debug(
     `ROUTER.introduceNewVoterToSlackChannel: Updating lastVoterMessageSecsFromEpoch to ${userInfo.lastVoterMessageSecsFromEpoch}`
@@ -269,7 +270,7 @@ const introduceNewVoterToSlackChannel = async (
   }
 
   if (response) {
-    if (entryPoint === LoadBalancer.PULL_ENTRY_POINT) {
+    if (!noWelcome && entryPoint === LoadBalancer.PULL_ENTRY_POINT) {
       logger.debug(
         `ROUTER.introduceNewVoterToSlackChannel: Entry point is PULL, so sending automated welcome to voter.`
       );
@@ -338,22 +339,28 @@ const introduceNewVoterToSlackChannel = async (
       `ROUTER.introduceNewVoterToSlackChannel: Retrieving and passing message history to Slack, slackChannelName: ${slackChannelName}, parentMessageTs: ${response.data.channel}.`
     );
 
-    DbApiUtil.updateDbMessageEntryWithUserInfo(
-      userInfo!,
-      inboundDbMessageEntry
-    );
-    inboundDbMessageEntry.slackChannel = response.data.channel;
-    inboundDbMessageEntry.slackParentMessageTs = response.data.ts;
-    inboundDbMessageEntry.slackSendTimestamp = new Date();
-    // The message will be relayed via the message history, so this field isn't relevant.
-    inboundDbMessageEntry.successfullySent = null;
-    try {
-      await DbApiUtil.logMessageToDb(inboundDbMessageEntry);
-    } catch (error) {
-      logger.info(
-        `ROUTER.introduceNewVoterToSlackChannel: failed to log incoming voter message to DB`
+    if (!inboundDbMessageEntry) {
+      logger.debug(
+        `ROUTER.introduceNewVoterToSlackChannel: reopen empty session thread, slackChannelName: ${slackChannelName}, parentMessageTs: ${response.data.channel}.`
       );
-      Sentry.captureException(error);
+    } else {
+      DbApiUtil.updateDbMessageEntryWithUserInfo(
+        userInfo!,
+        inboundDbMessageEntry
+      );
+      inboundDbMessageEntry.slackChannel = response.data.channel;
+      inboundDbMessageEntry.slackParentMessageTs = response.data.ts;
+      inboundDbMessageEntry.slackSendTimestamp = new Date();
+      // The message will be relayed via the message history, so this field isn't relevant.
+      inboundDbMessageEntry.successfullySent = null;
+      try {
+        await DbApiUtil.logMessageToDb(inboundDbMessageEntry);
+      } catch (error) {
+        logger.info(
+          `ROUTER.introduceNewVoterToSlackChannel: failed to log incoming voter message to DB`
+        );
+        Sentry.captureException(error);
+      }
     }
 
     if (slackChannelName !== 'lobby' || !skipLobby) {
@@ -375,21 +382,23 @@ const introduceNewVoterToSlackChannel = async (
     logger.debug(
       `ROUTER.introduceNewVoterToSlackChannel: Passing voter message to Slack, slackChannelName: ${slackChannelName}, parentMessageTs: ${response.data.ts}.`
     );
-    const blocks = SlackBlockUtil.formatMessageWithAttachmentLinks(
-      userMessage,
-      userAttachments
-    );
-    await SlackApiUtil.sendMessage(
-      '',
-      {
-        parentMessageTs: response.data.ts,
-        blocks,
-        channel: response.data.channel,
-        isVoterMessage: true,
-      },
-      inboundDbMessageEntry,
-      userInfo
-    );
+    if (inboundDbMessageEntry) {
+      const blocks = SlackBlockUtil.formatMessageWithAttachmentLinks(
+        userMessage,
+        userAttachments
+      );
+      await SlackApiUtil.sendMessage(
+        '',
+        {
+          parentMessageTs: response.data.ts,
+          blocks,
+          channel: response.data.channel,
+          isVoterMessage: true,
+        },
+        inboundDbMessageEntry,
+        userInfo
+      );
+    }
 
     logger.debug(
       `ROUTER.introduceNewVoterToSlackChannel: Passing automated welcome message to Slack, slackChannelName: ${slackChannelName}, parentMessageTs: ${response.data.channel}.`
@@ -422,7 +431,8 @@ const introduceNewVoterToSlackChannel = async (
     `${response.data.channel}:${response.data.ts}`,
     { userPhoneNumber: userInfo.userPhoneNumber, twilioPhoneNumber }
   );
-};
+  return response.data.ts;
+}
 
 export async function handleNewVoter(
   userOptions: UserOptions & { userId: string },
@@ -641,6 +651,10 @@ async function postUserMessageHistoryToSlack(
       'ROUTER.postUserMessageHistoryToSlack: No message history found.'
     );
     return null;
+  }
+  if (messageHistory.length == 0) {
+    messageHistoryContext =
+      'This helpline session has no message history (yet).';
   }
 
   logger.debug(
@@ -1426,6 +1440,8 @@ export async function handleSlackVoterThreadMessage(
     `Received message from Slack (channel ${reqBody.event.channel} ts ${reqBody.event.ts}): ${unprocessedSlackMessage}`
   );
 
+  logger.info(JSON.stringify(reqBody));
+
   // If the message doesn't need processing.
   let messageToSend = unprocessedSlackMessage;
   let unprocessedMessageToLog = null;
@@ -1519,6 +1535,131 @@ export async function handleSlackVoterThreadMessage(
           commandMessageTs: reqBody.event.ts,
           previousSlackChannelName: slackChannelNames[reqBody.event.channel],
           routingSlackUserName: originatingSlackUserName,
+        }
+      );
+      return;
+    }
+    if (messageToSend === '!unstale') {
+      // NOTE: right now we only handle the "no session start epoch" cause for stale-ness
+      if (!userInfo.sessionStartEpoch) {
+        userInfo.sessionStartEpoch = Math.round(Date.now() / 1000);
+      }
+      // refresh the voter blocks
+      const oldBlocks = await SlackApiUtil.fetchSlackMessageBlocks(
+        userInfo.activeChannelId,
+        userInfo[userInfo.activeChannelId]
+      );
+      const operatorMessage = `*User ID:* ${userInfo.userId}\n*Connected via:* ${twilioPhoneNumber} (PULL)`;
+      const freshBlocks = SlackBlockUtil.getVoterStatusBlocks(operatorMessage);
+      let newBlocks;
+      if (oldBlocks) {
+        newBlocks = [oldBlocks[0], freshBlocks[1], freshBlocks[2]];
+      } else {
+        newBlocks = freshBlocks;
+      }
+      const status = await DbApiUtil.getLatestVoterStatus(
+        userInfo.userId,
+        twilioPhoneNumber
+      );
+      if (status !== 'UNKNOWN') {
+        SlackBlockUtil.populateDropdownNewInitialValue(
+          newBlocks,
+          SlackActionId.VOTER_STATUS_DROPDOWN,
+          status
+        );
+      }
+      await SlackInteractionApiUtil.replaceSlackMessageBlocks({
+        slackChannelId: userInfo.activeChannelId,
+        slackParentMessageTs: userInfo[userInfo.activeChannelId],
+        newBlocks: newBlocks,
+      });
+      await RedisApiUtil.setHash(
+        redisClient,
+        `${userInfo.userId}:${twilioPhoneNumber}`,
+        userInfo
+      );
+      await SlackApiUtil.sendMessage(
+        '*Operator:* This session is no longer stale',
+        {
+          parentMessageTs: reqBody.event.thread_ts,
+          channel: reqBody.event.channel,
+        }
+      );
+      return;
+    }
+    if (messageToSend.startsWith('!new-session ')) {
+      const channel = messageToSend.substr('!new-session '.length);
+      await endVoterSession(redisClient, userInfo, twilioPhoneNumber);
+      userInfo.sessionStartEpoch = Math.round(Date.now() / 1000);
+      userInfo.volunteerEngaged = false;
+      userInfo.numStateSelectionAttempts = 0;
+      const ts = await introduceNewVoterToSlackChannel(
+        {
+          userInfo: userInfo as UserInfo,
+          userMessage: '',
+          userAttachments: [],
+        },
+        redisClient,
+        twilioPhoneNumber,
+        null,
+        'PULL',
+        channel,
+        twilioCallbackURL,
+        false,
+        true /* noWelcome */
+      );
+      if (ts) {
+        const slackChannelIds = await RedisApiUtil.getHash(
+          redisClient,
+          'slackPodChannelIds'
+        );
+        const url = await SlackApiUtil.getThreadPermalink(
+          slackChannelIds[channel],
+          ts
+        );
+        await SlackApiUtil.sendMessage(
+          `*Operator:* New session created: <${url}|Open>`,
+          {
+            parentMessageTs: reqBody.event.thread_ts,
+            channel: reqBody.event.channel,
+          }
+        );
+      }
+      return;
+    }
+
+    // mistyped command? ('!' '!!!' are okay, but starting with '!' and ending with not-'!' is probably a typo)
+    if (
+      messageToSend.startsWith('!') &&
+      messageToSend[messageToSend.length - 1] !== '!'
+    ) {
+      await SlackApiUtil.addSlackMessageReaction(
+        reqBody.event.channel,
+        reqBody.event.ts,
+        'x'
+      );
+      await SlackApiUtil.sendMessage(
+        '*Operator:* Messages to voters should not start with `!`',
+        {
+          parentMessageTs: reqBody.event.thread_ts,
+          channel: reqBody.event.channel,
+        }
+      );
+      return;
+    }
+
+    // is this a stale thread?
+    if (isStaleSession(userInfo)) {
+      await SlackApiUtil.addSlackMessageReaction(
+        reqBody.event.channel,
+        reqBody.event.ts,
+        'x'
+      );
+      await SlackApiUtil.sendMessage(
+        '*Operator:* This session is stale.\n`!unstale` to resurrect\n`!new-session <channelname>` to open a fresh session.',
+        {
+          parentMessageTs: reqBody.event.thread_ts,
+          channel: reqBody.event.channel,
         }
       );
       return;
