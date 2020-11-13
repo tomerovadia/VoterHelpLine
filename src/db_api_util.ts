@@ -845,6 +845,34 @@ export async function getThreadLatestMessageTs(
   }
 }
 
+export async function getCurrentSessionOldestMessageEpoch(
+  userId: string,
+  twilioPhoneNumber: string
+): Promise<number | null> {
+  const client = await pool.connect();
+  try {
+    // NOTE: we cast to timestamptz because these columns aren't timestamptz, and if we don't we get an epoch
+    // value offset by our timezone.
+    const result = await client.query(
+      `SELECT MIN(EXTRACT(EPOCH FROM COALESCE(twilio_receive_timestamp,slack_send_timestamp)::timestamptz)) AS epoch
+      FROM messages m, threads t
+      WHERE
+        m.slack_parent_message_ts = t.slack_parent_message_ts
+        AND m.slack_channel = t.slack_channel_id
+        AND t.session_end_at IS NULL
+        AND t.user_id = $1
+        AND t.twilio_phone_number = $2`,
+      [userId, twilioPhoneNumber]
+    );
+    if (result.rows.length > 0) {
+      return result.rows[0]['epoch'];
+    }
+    return null;
+  } finally {
+    client.release();
+  }
+}
+
 export async function getPastSessionThreads(
   userId: string,
   twilioPhoneNumber: string

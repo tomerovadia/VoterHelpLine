@@ -1590,7 +1590,10 @@ export async function handleSlackVoterThreadMessage(
       return;
     }
     if (messageToSend === '!unstale') {
-      if (!SlackApiUtil.isMemberOfAdminChannel(userId) || userInfo.sessionStartEpoch) {
+      if (
+        !SlackApiUtil.isMemberOfAdminChannel(userId) ||
+        userInfo.sessionStartEpoch
+      ) {
         await SlackApiUtil.addSlackMessageReaction(
           reqBody.event.channel,
           reqBody.event.ts,
@@ -1599,9 +1602,27 @@ export async function handleSlackVoterThreadMessage(
         return;
       }
       // NOTE: right now we only handle the "no session start epoch" cause for stale-ness
-      if (!userInfo.sessionStartEpoch) {
-        userInfo.sessionStartEpoch = Math.round(Date.now() / 1000);
+      const oldest = await DbApiUtil.getCurrentSessionOldestMessageEpoch(
+        userInfo.userId,
+        twilioPhoneNumber
+      );
+      if (!oldest) {
+        await SlackApiUtil.sendMessage(
+          '*Operator:* Unable to identify start of session',
+          {
+            parentMessageTs: reqBody.event.thread_ts,
+            channel: reqBody.event.channel,
+          }
+        );
+        await SlackApiUtil.addSlackMessageReaction(
+          reqBody.event.channel,
+          reqBody.event.ts,
+          'x'
+        );
+        return;
       }
+      userInfo.sessionStartEpoch = oldest;
+
       // refresh the voter blocks
       const oldBlocks = await SlackApiUtil.fetchSlackMessageBlocks(
         userInfo.activeChannelId,
