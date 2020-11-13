@@ -532,6 +532,7 @@ export async function getSlackThreadsForVoter(
           AND (to_phone_number = $2 OR from_phone_number = $2)
           AND slack_parent_message_ts IS NOT NULL
           AND NOT archived
+          AND session_end_at IS NULL
         GROUP BY slack_parent_message_ts, slack_channel;`,
       [userId, twilioPhoneNumber]
     );
@@ -830,6 +831,7 @@ export async function getThreadLatestMessageTs(
       WHERE
         t.slack_parent_message_ts=$1
         AND t.slack_channel_id=$2
+        AND t.session_end_at IS NULL
       ORDER BY COALESCE(m.slack_send_timestamp, m.slack_receive_timestamp) DESC
       LIMIT 1`,
       [slackParentMessageTs, slackChannelId]
@@ -912,6 +914,7 @@ export async function getUnclaimedVoters(
       WHERE
         t.needs_attention
         AND t.slack_channel_id = $1
+        AND t.session_end_at IS NULL
         AND NOT EXISTS (
           SELECT FROM volunteer_voter_claims c
           WHERE t.user_id=c.user_id
@@ -959,6 +962,7 @@ export async function getUnclaimedVotersByChannel(): Promise<ChannelStat[]> {
       LEFT JOIN latest_status s ON (t.user_id = s.user_id)
       WHERE
         needs_attention
+        AND session_end_at IS NULL
         AND s.voter_status NOT IN ('REFUSED', 'SPAM')
         AND NOT EXISTS (
           SELECT FROM volunteer_voter_claims c
@@ -995,6 +999,7 @@ export async function getThreadsNeedingAttentionByChannel(): Promise<
         FROM threads t
         WHERE
           needs_attention
+          AND session_end_at IS NULL
         GROUP BY slack_channel_id
         ORDER BY max_last_update_age DESC`
     );
@@ -1035,6 +1040,7 @@ export async function getThreadsNeedingAttentionByVolunteer(): Promise<
         FROM threads t, claims c
         WHERE
           needs_attention
+          AND session_end_at IS NULL
           AND t.user_id=c.user_id
           AND c.rn=1
         GROUP BY volunteer_slack_user_id, volunteer_slack_user_name
@@ -1086,6 +1092,7 @@ export async function getThreadsNeedingAttentionForChannel(
           AND t.user_id=c.user_id
           AND c.rn=1
           AND slack_channel_id = $1
+          AND session_end_at IS NULL
         ORDER BY updated_at`,
       [channelId]
     );
@@ -1134,6 +1141,7 @@ export async function getThreadsNeedingAttentionFor(
         WHERE
           needs_attention
           AND t.user_id=c.user_id
+          AND t.session_end_at IS NULL
           AND c.rn=1
           AND c.volunteer_slack_user_id=$1
         ORDER BY updated_at`,
@@ -1221,6 +1229,7 @@ export async function getThreadsNeedingFollowUp(
           AND s.user_id = t.user_id
           AND s.is_demo = t.is_demo
           AND t.archived IS NOT TRUE
+          AND t.session_end_at IS NULL
         ORDER BY updated_at`,
       [slackUserId]
     );
