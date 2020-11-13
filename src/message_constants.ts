@@ -11,7 +11,7 @@ export function STATE_CONFIRMATION(state: string): string {
   }
 }
 
-export function NO_STATE_FINDING_VOLUNTEER(): string {
+export function FINDING_VOLUNTEER(): string {
   switch (process.env.CLIENT_ORGANIZATION) {
     case 'VOTE_AMERICA':
       return `We are finding a volunteer and will be with you shortly. Meanwhile, please share more about how we can help.`;

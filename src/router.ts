@@ -219,14 +219,14 @@ const introduceNewVoterToSlackChannel = async (
     } else {
       // Voter has already received automated welcome and is just now responding with "HELPLINE".
       if (userInfo.stateName) {
-        messageToVoter = MessageConstants.NO_STATE_FINDING_VOLUNTEER();
+        messageToVoter = MessageConstants.FINDING_VOLUNTEER();
       } else {
         messageToVoter = MessageConstants.STATE_QUESTION();
       }
     }
   } else {
     if (userInfo.stateName) {
-      messageToVoter = MessageConstants.NO_STATE_FINDING_VOLUNTEER();
+      messageToVoter = MessageConstants.FINDING_VOLUNTEER();
     } else {
       messageToVoter = MessageConstants.WELCOME_VOTER();
     }
@@ -1036,7 +1036,7 @@ export async function determineVoterState(
 
   const messageToVoter =
     userInfo.stateName === 'National'
-      ? MessageConstants.NO_STATE_FINDING_VOLUNTEER()
+      ? MessageConstants.FINDING_VOLUNTEER()
       : MessageConstants.STATE_CONFIRMATION(stateName);
 
   await TwilioApiUtil.sendMessage(
