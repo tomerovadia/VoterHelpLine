@@ -32,6 +32,8 @@ type UserOptions = {
 
 type AdminCommandParams = {
   commandParentMessageTs: string;
+  commandMessageTs: string; // if command is in a thread, this is the in-thread message
+  commandChannel: string;
   routingSlackUserName: string;
   previousSlackChannelName: string;
 };
@@ -769,7 +771,7 @@ const routeVoterToSlackChannel = async (
       await SlackApiUtil.sendMessage(
         `*Operator:* Slack channel ${destinationSlackChannelName} not found.`,
         {
-          channel: process.env.ADMIN_CONTROL_ROOM_SLACK_CHANNEL_ID!,
+          channel: adminCommandParams.commandChannel,
           parentMessageTs: adminCommandParams.commandParentMessageTs,
         }
       );
@@ -1004,9 +1006,9 @@ const routeVoterToSlackChannel = async (
 
   if (adminCommandParams) {
     await SlackApiUtil.addSlackMessageReaction(
-      process.env.ADMIN_CONTROL_ROOM_SLACK_CHANNEL_ID!,
-      adminCommandParams.commandParentMessageTs,
-      'white_check_mark',
+      adminCommandParams.commandChannel,
+      adminCommandParams.commandMessageTs,
+      'heavy_check_mark'
     );
   }
 };
@@ -1565,6 +1567,45 @@ export async function handleSlackVoterThreadMessage(
     userInfo.activeChannelId === reqBody.event.channel &&
     userInfo[userInfo.activeChannelId] === reqBody.event.thread_ts
   ) {
+    // is it a command?
+    if (messageToSend.startsWith('!route ')) {
+      if (!SlackApiUtil.isMemberOfAdminChannel(userId)) {
+        await SlackApiUtil.addSlackMessageReaction(
+          reqBody.event.channel,
+          reqBody.event.ts,
+          'x'
+        );
+        return;
+      }
+      const channel = messageToSend.substr('!route '.length);
+      const slackChannelIds = await RedisApiUtil.getHash(
+        redisClient,
+        'slackPodChannelIds'
+      );
+      const slackChannelNames: Record<string, string> = {};
+      for (const name in slackChannelIds) {
+        slackChannelNames[slackChannelIds[name]] = name;
+      }
+      await routeVoterToSlackChannel(
+        userInfo,
+        redisClient,
+        {
+          userId: userInfo.userId,
+          twilioPhoneNumber: twilioPhoneNumber,
+          destinationSlackChannelName: channel,
+        } as CommandUtil.ParsedCommandRouteVoter,
+        {
+          commandParentMessageTs: reqBody.event.thread_ts,
+          commandChannel: reqBody.event.channel,
+          commandMessageTs: reqBody.event.ts,
+          previousSlackChannelName: slackChannelNames[reqBody.event.channel],
+          routingSlackUserName: originatingSlackUserName,
+        }
+      );
+      return;
+    }
+
+    // relay!
     userInfo.lastVoterMessageSecsFromEpoch = Math.round(Date.now() / 1000);
     if (!userInfo.volunteerEngaged) {
       logger.debug('Router: volunteer engaged, suppressing automated system.');
@@ -1705,6 +1746,8 @@ export async function handleSlackAdminCommand(
         } else {
           const adminCommandParams = {
             commandParentMessageTs: reqBody.event.ts,
+            commandMessageTs: reqBody.event.ts,
+            commandChannel: reqBody.event.channel,
             previousSlackChannelName: userInfo.activeChannelName,
             routingSlackUserName: originatingSlackUserName,
           };
