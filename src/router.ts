@@ -65,7 +65,6 @@ function prepareUserInfoForNewVoter({
     sessionStartEpoch =
       Math.round(Date.now() / 1000) -
       10 /* a bit of slop so we capture the first message */;
-    sessionStartEpoch -= new Date().getTimezoneOffset() * 60;
   }
 
   return {

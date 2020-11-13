@@ -130,7 +130,7 @@ export type VolunteerStat = {
 
 export function epochToPostgresTimestamp(epoch: number): string {
   let d = new Date(0);
-  d.setUTCSeconds(epoch);
+  d.setUTCSeconds(epoch - new Date().getTimezoneOffset() * 60);
   return d.toISOString().replace('T', ' ').replace('Z', '');
 }
 
