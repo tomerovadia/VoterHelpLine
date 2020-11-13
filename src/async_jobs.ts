@@ -63,8 +63,18 @@ async function slackCommandHandler(
       return;
     }
     case '/broadcast': {
-      logger.info('calling handleCommandBroadcast');
       await SlackInteractionHandler.handleCommandBroadcast(
+        channelId,
+        channelName,
+        userId,
+        userName,
+        text,
+        responseUrl
+      );
+      return;
+    }
+    case '/follow-up': {
+      await SlackInteractionHandler.handleCommandFollowUp(
         channelId,
         channelName,
         userId,
