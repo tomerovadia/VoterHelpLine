@@ -824,6 +824,11 @@ const routeVoterToSlackChannel = async (
           parentMessageTs: adminCommandParams.commandParentMessageTs,
         }
       );
+      await SlackApiUtil.addSlackMessageReaction(
+        adminCommandParams.commandChannel,
+        adminCommandParams.commandMessageTs,
+        'x'
+      );
       return;
     }
 
