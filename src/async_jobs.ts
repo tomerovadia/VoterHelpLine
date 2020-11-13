@@ -272,11 +272,13 @@ async function slackInteractivityHandler(
   // Block action
   if (payload.type === 'block_actions') {
     const actionId = payload.actions[0]?.action_id;
+    // match the *prefix* for the expand action, since we have multiple page buttons and
+    // the action_ids have to be unique
+    if (actionId?.startsWith(SlackActionId.VOTER_SESSION_EXPAND)) {
+      await SlackInteractionHandler.handleSessionShow(payload);
+      return;
+    }
     switch (actionId) {
-      case SlackActionId.VOTER_SESSION_EXPAND: {
-        await SlackInteractionHandler.handleSessionShow(payload);
-        return;
-      }
       case SlackActionId.VOTER_SESSION_HIDE: {
         await SlackInteractionHandler.handleSessionHide(payload);
         return;

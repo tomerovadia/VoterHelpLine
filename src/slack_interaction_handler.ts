@@ -935,6 +935,7 @@ export async function handleSessionShow(
   const twilioPhoneNumber = v[1];
   const startEpoch = parseInt(v[2]);
   const endEpoch = parseInt(v[3]);
+  const page = parseInt(v[4]);
 
   const messageHistory = await DbApiUtil.getMessageHistoryFor(
     userId,
@@ -942,36 +943,59 @@ export async function handleSessionShow(
     DbApiUtil.epochToPostgresTimestamp(startEpoch),
     DbApiUtil.epochToPostgresTimestamp(endEpoch)
   );
-  const formattedMessageHistory =
-    SlackMessageFormatter.formatMessageHistory(
-      messageHistory,
-      userId.substring(0, 5)
-    ) || 'Unable to show session history';
-
+  const formattedMessageHistory = SlackMessageFormatter.formatMessageHistory(
+    messageHistory,
+    userId.substring(0, 5)
+  );
+  const messagePages = SlackMessageFormatter.paginateMessageHistory(
+    formattedMessageHistory
+  );
+  let buttons = [];
+  if (messagePages.length > 1) {
+    for (let i = 0; i < messagePages.length; ++i) {
+      // if we have lots of pages, show button for first + last + those adjacent to the current page
+      if (
+        (i < page - 1 && i > 0) ||
+        (i > page + 1 && i < messagePages.length - 1)
+      ) {
+        continue;
+      }
+      buttons.push({
+        type: 'button',
+        style: 'primary',
+        text: {
+          type: 'plain_text',
+          text: i == page ? `*${i + 1}*` : `${i + 1}`,
+          emoji: true,
+        },
+        action_id: `${SlackActionId.VOTER_SESSION_EXPAND} ${i}`,
+        value: `${userId} ${twilioPhoneNumber} ${startEpoch} ${endEpoch} ${i}`,
+      });
+    }
+  }
+  buttons.push({
+    type: 'button',
+    style: 'primary',
+    text: {
+      type: 'plain_text',
+      text: 'Hide',
+      emoji: true,
+    },
+    action_id: SlackActionId.VOTER_SESSION_HIDE,
+    value: payload.actions[0].value,
+  });
   const blocks = [
     payload.message.blocks[0],
     {
       type: 'section',
       text: {
         type: 'mrkdwn',
-        text: formattedMessageHistory,
+        text: messagePages[page],
       },
     },
     {
       type: 'actions',
-      elements: [
-        {
-          type: 'button',
-          style: 'primary',
-          text: {
-            type: 'plain_text',
-            text: 'Hide',
-            emoji: true,
-          },
-          action_id: SlackActionId.VOTER_SESSION_HIDE,
-          value: payload.actions[0].value,
-        },
-      ],
+      elements: buttons,
     },
   ];
 
