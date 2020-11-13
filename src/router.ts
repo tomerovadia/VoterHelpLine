@@ -1632,7 +1632,9 @@ export async function handleSlackVoterThreadMessage(
       const freshBlocks = SlackBlockUtil.getVoterStatusBlocks(operatorMessage);
       let newBlocks;
       if (oldBlocks) {
-        newBlocks = [oldBlocks[0], freshBlocks[1], freshBlocks[2]];
+        newBlocks = SlackBlockUtil.replaceVoterPanelBlocks(oldBlocks, [
+          freshBlocks[2],
+        ]);
       } else {
         newBlocks = freshBlocks;
       }
