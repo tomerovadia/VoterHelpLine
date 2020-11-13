@@ -636,7 +636,7 @@ async function postUserMessageHistoryToSlack(
   let formattedMessageHistory = SlackMessageFormatter.formatMessageHistory(
     messageHistory,
     userInfo.userId.substring(0, 5)
-  );
+  ).join('\n\n');
 
   const msgInfo = await SlackApiUtil.sendMessage(
     `*Operator:* ${messageHistoryContext}\n\n${formattedMessageHistory}`,
