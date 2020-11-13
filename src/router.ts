@@ -342,19 +342,16 @@ const introduceNewVoterToSlackChannel = async (
       Sentry.captureException(error);
     }
 
-    const messageHistoryContextText =
-      "Below is the voter's message history so far.";
     if (slackChannelName !== 'lobby' || !skipLobby) {
       const historyTs = await postUserMessageHistoryToSlack(
         redisClient,
         userInfo,
         twilioPhoneNumber,
-        DbApiUtil.epochToPostgresTimestamp(userInfo.sessionStartEpoch || 0),
-        messageHistoryContextText,
         {
           destinationSlackParentMessageTs: response.data.ts,
           destinationSlackChannelId: response.data.channel,
-        }
+        },
+        false
       );
     }
   } else if (entryPoint === LoadBalancer.PULL_ENTRY_POINT) {
@@ -532,77 +529,92 @@ async function postUserMessageHistoryToSlack(
   redisClient: PromisifiedRedisClient,
   userInfo: UserInfo,
   twilioPhoneNumber: string,
-  timestampOfLastMessageInThread: string,
-  messageHistoryContextText: string,
   {
     destinationSlackParentMessageTs,
     destinationSlackChannelId,
   }: {
     destinationSlackParentMessageTs: string;
     destinationSlackChannelId: string;
-  }
+  },
+  returningToThread: boolean
 ): Promise<string | null> {
   logger.debug('ENTERING ROUTER.postUserMessageHistoryToSlack');
 
   // past sessions
-  const sessionHistory = await DbApiUtil.getPastSessionThreads(
-    userInfo.userId,
-    twilioPhoneNumber
-  );
-  if (sessionHistory?.length > 0) {
-    const slackChannelIds = await RedisApiUtil.getHash(
-      redisClient,
-      'slackPodChannelIds'
+  if (!returningToThread) {
+    const sessionHistory = await DbApiUtil.getPastSessionThreads(
+      userInfo.userId,
+      twilioPhoneNumber
     );
-    const slackChannelNames: Record<string, string> = {};
-    for (const name in slackChannelIds) {
-      slackChannelNames[slackChannelIds[name]] = name;
-    }
-
-    for (const thread of sessionHistory) {
-      const url = await SlackApiUtil.getThreadPermalink(
-        thread.channelId,
-        thread.historyTs || thread.slackParentMessageTs
+    if (sessionHistory?.length > 0) {
+      const slackChannelIds = await RedisApiUtil.getHash(
+        redisClient,
+        'slackPodChannelIds'
       );
-      const description = `*Operator:* Past session in ${SlackApiUtil.linkToSlackChannel(
-        thread.channelId,
-        slackChannelNames[thread.channelId]
-      )} ended ${prettyTimeInterval(
-        thread.lastUpdateAge || 0
-      )} ago - <${url}|Open>`;
-      await SlackApiUtil.sendMessage('', {
-        parentMessageTs: destinationSlackParentMessageTs,
-        channel: destinationSlackChannelId,
-        blocks: [
-          {
-            type: 'section',
-            text: {
-              type: 'mrkdwn',
-              text: description,
-            },
-          },
-          {
-            type: 'actions',
-            elements: [
-              {
-                type: 'button',
-                style: 'primary',
-                text: {
-                  type: 'plain_text',
-                  text: 'Show',
-                  emoji: true,
-                },
-                action_id: SlackActionId.VOTER_SESSION_EXPAND,
-                value: `${userInfo.userId} ${twilioPhoneNumber} ${thread.sessionStartEpoch} ${thread.sessionEndEpoch} 0`,
+      const slackChannelNames: Record<string, string> = {};
+      for (const name in slackChannelIds) {
+        slackChannelNames[slackChannelIds[name]] = name;
+      }
+
+      for (const thread of sessionHistory) {
+        const url = await SlackApiUtil.getThreadPermalink(
+          thread.channelId,
+          thread.historyTs || thread.slackParentMessageTs
+        );
+        const description = `*Operator:* Past session in ${SlackApiUtil.linkToSlackChannel(
+          thread.channelId,
+          slackChannelNames[thread.channelId]
+        )} ended ${prettyTimeInterval(
+          thread.lastUpdateAge || 0
+        )} ago - <${url}|Open>`;
+        await SlackApiUtil.sendMessage('', {
+          parentMessageTs: destinationSlackParentMessageTs,
+          channel: destinationSlackChannelId,
+          blocks: [
+            {
+              type: 'section',
+              text: {
+                type: 'mrkdwn',
+                text: description,
               },
-            ],
-          },
-        ],
-      });
+            },
+            {
+              type: 'actions',
+              elements: [
+                {
+                  type: 'button',
+                  style: 'primary',
+                  text: {
+                    type: 'plain_text',
+                    text: 'Show',
+                    emoji: true,
+                  },
+                  action_id: SlackActionId.VOTER_SESSION_EXPAND,
+                  value: `${userInfo.userId} ${twilioPhoneNumber} ${thread.sessionStartEpoch} ${thread.sessionEndEpoch} 0`,
+                },
+              ],
+            },
+          ],
+        });
+      }
     }
   }
 
   // messages
+  let timestampOfLastMessageInThread = '';
+  let messageHistoryContext = '';
+  if (returningToThread) {
+    timestampOfLastMessageInThread = await DbApiUtil.getTimestampOfLastMessageInThread(
+      userInfo[destinationSlackChannelId]
+    );
+    messageHistoryContext =
+      'Below are our messages with the voter since they left this thread.';
+  } else {
+    timestampOfLastMessageInThread = DbApiUtil.epochToPostgresTimestamp(
+      userInfo.sessionStartEpoch || 0
+    );
+    messageHistoryContext = "Below is the voter's message history so far.";
+  }
   const messageHistory = await DbApiUtil.getMessageHistoryFor(
     userInfo.userId,
     twilioPhoneNumber,
@@ -620,13 +632,13 @@ async function postUserMessageHistoryToSlack(
   logger.debug(
     'ROUTER.postUserMessageHistoryToSlack: Message history found, formatting it by calling SlackMessageFormatter.'
   );
-  const formattedMessageHistory = SlackMessageFormatter.formatMessageHistory(
+  let formattedMessageHistory = SlackMessageFormatter.formatMessageHistory(
     messageHistory,
     userInfo.userId.substring(0, 5)
   );
 
   const msgInfo = await SlackApiUtil.sendMessage(
-    `*Operator:* ${messageHistoryContextText}\n\n${formattedMessageHistory}`,
+    `*Operator:* ${messageHistoryContext}\n\n${formattedMessageHistory}`,
     {
       parentMessageTs: destinationSlackParentMessageTs,
       channel: destinationSlackChannelId,
@@ -659,7 +671,7 @@ const routeVoterToSlackChannelHelper = async (
     destinationSlackChannelId: string;
     destinationSlackParentMessageTs: string;
   },
-  timestampOfLastMessageInThread?: string
+  returningToThread: boolean
 ) => {
   logger.debug('ENTERING ROUTER.routeVoterToSlackChannelHelper');
   logger.debug(`ROUTER.routeVoterToSlackChannelHelper: Voter is being routed to,
@@ -685,32 +697,13 @@ const routeVoterToSlackChannelHelper = async (
     userInfo
   );
 
-  let messageHistoryContextText =
-    'Below are our messages with the voter since they left this thread.';
-  // If voter is new to a channel/thread, retrieve all message history. If a
-  // voter is returning to a channel/thread, timestamp should be passed, used
-  // to only retrieve messages since the voter left that thread.
-  if (!timestampOfLastMessageInThread) {
-    logger.debug(
-      'ROUTER.routeVoterToSlackChannelHelper: Voter HAS NOT been to this channel before.'
-    );
-    // If timestamp isn't passed, voter is new to channel. Retrieve full message history.
-    timestampOfLastMessageInThread = '1990-01-01 10:00:00.000';
-    messageHistoryContextText = "Below is the voter's message history so far.";
-  } else {
-    logger.debug(
-      'ROUTER.routeVoterToSlackChannelHelper: Voter HAS been to this channel before.'
-    );
-  }
-
   // Populate state channel thread with message history so far.
   await postUserMessageHistoryToSlack(
     redisClient,
     userInfo,
     twilioPhoneNumber,
-    timestampOfLastMessageInThread,
-    messageHistoryContextText,
-    { destinationSlackParentMessageTs, destinationSlackChannelId }
+    { destinationSlackParentMessageTs, destinationSlackChannelId },
+    returningToThread
   );
 };
 
@@ -930,7 +923,8 @@ const routeVoterToSlackChannel = async (
         destinationSlackChannelName,
         destinationSlackChannelId: response.data.channel,
         destinationSlackParentMessageTs: response.data.ts,
-      }
+      },
+      false
     );
   } else {
     // If this user HAS been to the destination channel, use the same thread info.
@@ -974,14 +968,6 @@ const routeVoterToSlackChannel = async (
       { channel: destinationSlackChannelId }
     );
 
-    const timestampOfLastMessageInThread = await DbApiUtil.getTimestampOfLastMessageInThread(
-      userInfo[destinationSlackChannelId]
-    );
-
-    logger.debug(
-      `timestampOfLastMessageInThread: ${timestampOfLastMessageInThread}`
-    );
-
     // Set destination thread to have same needs_attention status as origin thread
     await DbApiUtil.reactivateThread(
       userInfo[destinationSlackChannelId],
@@ -1006,7 +992,7 @@ const routeVoterToSlackChannel = async (
         destinationSlackChannelId,
         destinationSlackParentMessageTs: userInfo[destinationSlackChannelId],
       },
-      timestampOfLastMessageInThread
+      true /* returning to channel */
     );
   }
 
