@@ -275,7 +275,7 @@ const handleIncomingTwilioMessage = async (
   );
 
   // new session?
-  if (userInfo && !userInfo.sessionStartEpoch) {
+  if (userInfo && Router.isStaleSession(userInfo)) {
     logger.info(
       `SERVER.handleIncomingTwilioMessage (${userId}): no sessionStartEpoch, starting with fresh userInfo`
     );
