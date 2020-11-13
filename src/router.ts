@@ -105,10 +105,33 @@ export async function endVoterSession(
   userInfo: UserInfo,
   twilioPhoneNumber: string
 ): Promise<void> {
+  // end old session thread(s)
   await DbApiUtil.setSessionEnd(userInfo.userId, twilioPhoneNumber);
+
+  // clear any assigned volunteer
+  await DbApiUtil.logVolunteerVoterClaimToDb({
+    userId: userInfo.userId,
+    userPhoneNumber: userInfo.userPhoneNumber,
+    twilioPhoneNumber,
+    isDemo: LoadBalancer.phoneNumbersAreDemo(
+      twilioPhoneNumber,
+      userInfo.userPhoneNumber
+    ),
+    volunteerSlackUserName: null,
+    volunteerSlackUserId: null,
+    originatingSlackUserName: null,
+    originatingSlackUserId: null,
+    slackChannelName: null,
+    slackChannelId: null,
+    slackParentMessageTs: null,
+    actionTs: null,
+  });
+
+  // delete userInfo
   const redisHashKey = `${userInfo.userId}:${twilioPhoneNumber}`;
   RedisApiUtil.deleteKeys(redisClient, [redisHashKey]);
-  // update old blocks async; do not await
+
+  // update old session thread's blocks async; do not await
   SlackInteractionApiUtil.updateOldSessionBlocks(
     userInfo.activeChannelId,
     userInfo[userInfo.activeChannelId]
