@@ -1567,6 +1567,28 @@ export async function handleSlackVoterThreadMessage(
       );
       return;
     }
+    if (messageToSend === '!fake-old-session') {
+      // this simulates the situation of a pre-2020 thread that has no sessionStartEpoch value.
+      if (!SlackApiUtil.isMemberOfAdminChannel(userId)) {
+        await SlackApiUtil.addSlackMessageReaction(
+          reqBody.event.channel,
+          reqBody.event.ts,
+          'x'
+        );
+        return;
+      }
+      await RedisApiUtil.deleteHashField(
+        redisClient,
+        `${userInfo.userId}:${twilioPhoneNumber}`,
+        'sessionStartEpoch'
+      );
+      await SlackApiUtil.addSlackMessageReaction(
+        reqBody.event.channel,
+        reqBody.event.ts,
+        'white_check_mark'
+      );
+      return;
+    }
     if (messageToSend === '!unstale') {
       // NOTE: right now we only handle the "no session start epoch" cause for stale-ness
       if (!userInfo.sessionStartEpoch) {
