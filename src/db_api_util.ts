@@ -431,28 +431,40 @@ const MESSAGE_HISTORY_SQL_SCRIPT = `
       WHEN slack_receive_timestamp IS NOT NULL THEN slack_receive_timestamp
       ELSE twilio_send_timestamp
       END
-    ) > $3
+    ) >= $3
+    AND (
+      CASE
+      WHEN twilio_receive_timestamp IS NOT NULL THEN twilio_receive_timestamp
+      WHEN slack_receive_timestamp IS NOT NULL THEN slack_receive_timestamp
+      ELSE twilio_send_timestamp
+      END
+    ) <= $4
   ORDER BY timestamp ASC;`;
 
 export async function getMessageHistoryFor(
   userId: string,
   twilioPhoneNumber: string,
-  timestampSince: string
+  timestampSince: string,
+  timestampEnd?: string
 ): Promise<HistoricalMessage[]> {
   logger.info(`ENTERING DBAPIUTIL.getMessageHistoryFor`);
   logger.info(
-    `DBAPIUTIL.getMessageHistoryFor: Looking up user:${userId}, ${twilioPhoneNumber}, message history since timestamp: ${timestampSince}.`
+    `DBAPIUTIL.getMessageHistoryFor: Looking up user:${userId}, ${twilioPhoneNumber}, message history since timestamp: ${timestampSince} to ${timestampEnd}.`
   );
 
   const client = await pool.connect();
   try {
+    if (!timestampEnd) {
+      timestampEnd = '2100-01-01 00:00:00';
+    }
     const result = await client.query(MESSAGE_HISTORY_SQL_SCRIPT, [
       userId,
       twilioPhoneNumber,
       timestampSince,
+      timestampEnd,
     ]);
     logger.info(
-      `DBAPIUTIL.getMessageHistoryFor: Successfully looked up message history in PostgreSQL.`
+      `DBAPIUTIL.getMessageHistoryFor: Successfully looked up message history in PostgreSQL (${result.rowCount})`
     );
     return result.rows;
   } finally {

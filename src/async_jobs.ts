@@ -272,6 +272,14 @@ async function slackInteractivityHandler(
   if (payload.type === 'block_actions') {
     const actionId = payload.actions[0]?.action_id;
     switch (actionId) {
+      case SlackActionId.VOTER_SESSION_EXPAND: {
+        await SlackInteractionHandler.handleSessionShow(payload);
+        return;
+      }
+      case SlackActionId.VOTER_SESSION_HIDE: {
+        await SlackInteractionHandler.handleSessionHide(payload);
+        return;
+      }
       case SlackActionId.MANAGE_ENTRY_POINTS_FILTER_STATE:
       case SlackActionId.MANAGE_ENTRY_POINTS_FILTER_TYPE: {
         logger.info(

@@ -19,6 +19,7 @@ import * as Sentry from '@sentry/node';
 import { isVotedKeyword } from './keyword_parser';
 import { SlackActionId } from './slack_interaction_ids';
 import { SlackFile } from './message_parser';
+import { prettyTimeInterval } from './slack_interaction_handler';
 
 const MINS_BEFORE_WELCOME_BACK_MESSAGE = 60 * 24;
 export const NUM_STATE_SELECTION_ATTEMPTS_LIMIT = 2;
@@ -349,7 +350,7 @@ const introduceNewVoterToSlackChannel = async (
         redisClient,
         userInfo,
         twilioPhoneNumber,
-        '1990-01-01 10:00:00.000',
+        DbApiUtil.epochToPostgresTimestamp(userInfo.sessionStartEpoch || 0),
         messageHistoryContextText,
         {
           destinationSlackParentMessageTs: response.data.ts,
@@ -543,6 +544,66 @@ async function postUserMessageHistoryToSlack(
   }
 ): Promise<string | null> {
   logger.debug('ENTERING ROUTER.postUserMessageHistoryToSlack');
+
+  // past sessions
+  const sessionHistory = await DbApiUtil.getPastSessionThreads(
+    userInfo.userId,
+    twilioPhoneNumber
+  );
+  if (sessionHistory?.length > 0) {
+    const slackChannelIds = await RedisApiUtil.getHash(
+      redisClient,
+      'slackPodChannelIds'
+    );
+    const slackChannelNames: Record<string, string> = {};
+    for (const name in slackChannelIds) {
+      slackChannelNames[slackChannelIds[name]] = name;
+    }
+
+    for (const thread of sessionHistory) {
+      const url = await SlackApiUtil.getThreadPermalink(
+        thread.channelId,
+        thread.historyTs || thread.slackParentMessageTs
+      );
+      const description = `*Operator:* Past session in ${SlackApiUtil.linkToSlackChannel(
+        thread.channelId,
+        slackChannelNames[thread.channelId]
+      )} ended ${prettyTimeInterval(
+        thread.lastUpdateAge || 0
+      )} ago - <${url}|Open>`;
+      await SlackApiUtil.sendMessage('', {
+        parentMessageTs: destinationSlackParentMessageTs,
+        channel: destinationSlackChannelId,
+        blocks: [
+          {
+            type: 'section',
+            text: {
+              type: 'mrkdwn',
+              text: description,
+            },
+          },
+          {
+            type: 'actions',
+            elements: [
+              {
+                type: 'button',
+                style: 'primary',
+                text: {
+                  type: 'plain_text',
+                  text: 'Show',
+                  emoji: true,
+                },
+                action_id: SlackActionId.VOTER_SESSION_EXPAND,
+                value: `${userInfo.userId} ${twilioPhoneNumber} ${thread.sessionStartEpoch} ${thread.sessionEndEpoch} 0`,
+              },
+            ],
+          },
+        ],
+      });
+    }
+  }
+
+  // messages
   const messageHistory = await DbApiUtil.getMessageHistoryFor(
     userInfo.userId,
     twilioPhoneNumber,

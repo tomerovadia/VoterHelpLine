@@ -13,6 +13,7 @@ import { VoterStatus } from './types';
 import { PromisifiedRedisClient } from './redis_client';
 import { ChannelType, UserInfo, SlackThreadInfo } from './types';
 import redisClient from './redis_client';
+import * as SlackMessageFormatter from './slack_message_formatter';
 
 const maxCommandLines = 50; // if we go bigger slack tends to truncate the msg
 
@@ -930,6 +931,91 @@ export async function handleShortcutShowNeedsAttention({
     type: 'modal',
   };
   await SlackApiUtil.updateModal(viewId, slackView);
+}
+
+export async function handleSessionShow(
+  payload: SlackInteractionEventPayload
+): Promise<void> {
+  const v = payload.actions[0].value?.split(' ') || [];
+  const userId = v[0];
+  const twilioPhoneNumber = v[1];
+  const startEpoch = parseInt(v[2]);
+  const endEpoch = parseInt(v[3]);
+
+  const messageHistory = await DbApiUtil.getMessageHistoryFor(
+    userId,
+    twilioPhoneNumber,
+    DbApiUtil.epochToPostgresTimestamp(startEpoch),
+    DbApiUtil.epochToPostgresTimestamp(endEpoch)
+  );
+  const formattedMessageHistory =
+    SlackMessageFormatter.formatMessageHistory(
+      messageHistory,
+      userId.substring(0, 5)
+    ) || 'Unable to show session history';
+
+  const blocks = [
+    payload.message.blocks[0],
+    {
+      type: 'section',
+      text: {
+        type: 'mrkdwn',
+        text: formattedMessageHistory,
+      },
+    },
+    {
+      type: 'actions',
+      elements: [
+        {
+          type: 'button',
+          style: 'primary',
+          text: {
+            type: 'plain_text',
+            text: 'Hide',
+            emoji: true,
+          },
+          action_id: SlackActionId.VOTER_SESSION_HIDE,
+          value: payload.actions[0].value,
+        },
+      ],
+    },
+  ];
+
+  logger.info(JSON.stringify(blocks));
+  await SlackInteractionApiUtil.replaceSlackMessageBlocks({
+    slackChannelId: payload.channel.id,
+    slackParentMessageTs: payload.message.ts,
+    newBlocks: blocks,
+  });
+}
+
+export async function handleSessionHide(
+  payload: SlackInteractionEventPayload
+): Promise<void> {
+  const blocks = [
+    payload.message.blocks[0],
+    {
+      type: 'actions',
+      elements: [
+        {
+          type: 'button',
+          style: 'primary',
+          text: {
+            type: 'plain_text',
+            text: 'Show',
+            emoji: true,
+          },
+          action_id: SlackActionId.VOTER_SESSION_EXPAND,
+          value: payload.actions[0].value,
+        },
+      ],
+    },
+  ];
+  await SlackInteractionApiUtil.replaceSlackMessageBlocks({
+    slackChannelId: payload.channel.id,
+    slackParentMessageTs: payload.message.ts,
+    newBlocks: blocks,
+  });
 }
 
 // This function receives the initial request to reset a demo
