@@ -1589,7 +1589,7 @@ export async function handleSlackVoterThreadMessage(
       );
       return;
     }
-    if (messageToSend === '!unstale') {
+    if (messageToSend === '!resume-session') {
       if (
         !SlackApiUtil.isMemberOfAdminChannel(userId) ||
         userInfo.sessionStartEpoch
@@ -1745,7 +1745,7 @@ export async function handleSlackVoterThreadMessage(
         'x'
       );
       await SlackApiUtil.sendMessage(
-        '*Operator:* This session is stale.\n`!unstale` to resurrect\n`!new-session <channelname>` to open a fresh session.',
+        '*Operator:* This helpline session is stale.\n`!resume-session` to resume\n`!new-session <channelname>` to open a fresh session in specified channel.',
         {
           parentMessageTs: reqBody.event.thread_ts,
           channel: reqBody.event.channel,
