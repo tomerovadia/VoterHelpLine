@@ -964,8 +964,16 @@ const routeVoterToSlackChannel = async (
       `ROUTER.routeVoterToSlackChannel: Returning voter back to *${destinationSlackChannelName}* from *${adminCommandParams.previousSlackChannelName}*. Voter has been here before.`
     );
 
+    const historyTs = await DbApiUtil.getThreadLatestMessageTs(
+      userInfo[destinationSlackChannelId],
+      destinationSlackChannelId
+    );
+    const url = await SlackApiUtil.getThreadPermalink(
+      destinationSlackChannelId,
+      historyTs || userInfo[destinationSlackChannelId]
+    );
     await SlackApiUtil.sendMessage(
-      `*Operator:* Voter *${userId}* was routed from *${adminCommandParams.previousSlackChannelName}* back to this channel by *${adminCommandParams.routingSlackUserName}*. See their thread with *${twilioPhoneNumber}* above.`,
+      `*Operator:* Voter *${userId}* was routed from *${adminCommandParams.previousSlackChannelName}* back to this channel by *${adminCommandParams.routingSlackUserName}*: <${url}|Open>`,
       { channel: destinationSlackChannelId }
     );
 
