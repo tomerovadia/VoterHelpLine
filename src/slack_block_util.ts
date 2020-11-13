@@ -141,7 +141,7 @@ const volunteerSelectionPanel: SlackBlock = {
       style: 'primary',
       text: {
         type: 'plain_text',
-        text: 'Release claim',
+        text: 'Clear volunteer',
         emoji: true,
       },
       action_id: SlackActionId.VOLUNTEER_RELEASE_CLAIM,

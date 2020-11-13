@@ -334,7 +334,7 @@ export async function handleVolunteerUpdate({
     )
   ) {
     throw new Error(
-      'Expected selected_user or release claim in SLACKINTERACTIONHANDLER.handleVolunteerUpdate'
+      'Expected selected_user or clear volunteer in SLACKINTERACTIONHANDLER.handleVolunteerUpdate'
     );
   }
 
