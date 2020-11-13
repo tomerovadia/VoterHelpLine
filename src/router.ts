@@ -1457,7 +1457,10 @@ export async function handleSlackVoterThreadMessage(
     `${userId}:${twilioPhoneNumber}`
   )) as UserInfo;
   // Only relay Slack messages from the active Slack thread.
-  if (userInfo.activeChannelId === reqBody.event.channel) {
+  if (
+    userInfo.activeChannelId === reqBody.event.channel &&
+    userInfo[userInfo.activeChannelId] === reqBody.event.thread_ts
+  ) {
     userInfo.lastVoterMessageSecsFromEpoch = Math.round(Date.now() / 1000);
     if (!userInfo.volunteerEngaged) {
       logger.debug('Router: volunteer engaged, suppressing automated system.');
