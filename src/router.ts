@@ -609,7 +609,7 @@ async function postUserMessageHistoryToSlack(
         );
         const lastUpdateEpoch = Date.parse(thread.lastUpdate || '') / 1000;
         const endTime = `<!date^${lastUpdateEpoch}^{time} {date_short}|${lastUpdateEpoch}>`;
-        const description = `*Operator:* Past session in ${SlackApiUtil.linkToSlackChannel(
+        const description = `Past session in ${SlackApiUtil.linkToSlackChannel(
           thread.channelId,
           slackChannelNames[thread.channelId]
         )} ended ${endTime} - <${url}|Open>`;
@@ -688,7 +688,7 @@ async function postUserMessageHistoryToSlack(
   ).join('\n\n');
 
   const msgInfo = await SlackApiUtil.sendMessage(
-    `*Operator:* ${messageHistoryContext}\n\n${formattedMessageHistory}`,
+    `${messageHistoryContext}\n\n${formattedMessageHistory}`,
     {
       parentMessageTs: destinationSlackParentMessageTs,
       channel: destinationSlackChannelId,
