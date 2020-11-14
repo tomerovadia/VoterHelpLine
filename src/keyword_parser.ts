@@ -6,7 +6,14 @@ export function isHelplineKeyword(userMessage: string): boolean {
 }
 
 export function isStopKeyword(userMessage: string): boolean {
-  return userMessage.toLowerCase().trim() === 'stop';
+  const userMessageSanitized = userMessage
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-zA-Z]/g, '');
+
+  // Catches a one-word message that is simply STOP (including any case, catching e.g. Stop),
+  // and disregarding punctuation (catching e.g. STOP!!!).
+  return userMessageSanitized === 'stop';
 }
 
 export function isVotedKeyword(userMessage: string): boolean {
