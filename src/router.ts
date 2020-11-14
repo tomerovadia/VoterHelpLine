@@ -410,16 +410,16 @@ export async function handleNewVoter(
 
   let slackChannelName = null as string | null;
 
-  // do we already know the voter's state?
+  // Do we already know the voter's state?
   if (process.env.CLIENT_ORGANIZATION === 'VOTE_AMERICA') {
     const knownState = await DbApiUtil.getKnownPhoneState(
       userOptions.userPhoneNumber
     );
     if (knownState) {
-      // the knownState value from the db is probably a state abbreviation, so we need to resolve it
+      // The knownState value from the db is probably a state abbreviation, so we need to resolve it
       const stateName = StateParser.determineState(knownState);
       if (stateName) {
-        // success, we know the state
+        // Success: we know the state
         userInfo.stateName = stateName;
         slackChannelName = await LoadBalancer.selectSlackChannel(
           redisClient,
@@ -428,12 +428,12 @@ export async function handleNewVoter(
           userInfo.isDemo
         );
         if (slackChannelName) {
-          // we can route them too
+          // We can route them too
           logger.info(
             `ROUTER.handleNewVoter (${userInfo.userId}): New voter is in known state {stateName}, selected Slack channel {slackChannelName}`
           );
         } else {
-          // that state doesn't route for some reason; go to national
+          // That state doesn't route for some reason; go to national
           slackChannelName = userInfo.isDemo ? 'demo-national' : 'national';
           logger.info(
             `ROUTER.handleNewVoter (${userInfo.userId}): New voter is in known state {stateName}, but no channel match`
