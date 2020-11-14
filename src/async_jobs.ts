@@ -101,18 +101,20 @@ async function slackInteractivityHandler(
     );
   }
 
+
   // ignore all actions on inactive threads (archived, re-routed, or old session)
+  const thread_ts = payload.message?.thread_ts || payload.message?.ts;
   if (
-    payload.message.thread_ts &&
+    thread_ts &&
     !(await DbApiUtil.isActiveSessionThread(
-      payload.message.thread_ts,
+      thread_ts,
       payload.channel.id
     ))
   ) {
     logger.info('slackInteractivityHandler: ignoring event on inactive thread');
     await SlackApiUtil.addSlackMessageReaction(
       payload.channel.id,
-      payload.message.thread_ts,
+      thread_ts,
       'zombie'
     );
     return;
