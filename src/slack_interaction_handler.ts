@@ -260,23 +260,11 @@ export async function handleVoterStatusUpdate({
         );
       }
 
-      // HACK: work around slack bug updating blocks: we must first remove the dropdown before we change it
-      const oldBlock = payload.message.blocks[2];
-      payload.message.blocks[2] = {
-        type: 'section',
-        block_id: 'asdf',
-        text: {
-          type: 'mrkdwn',
-          text: 'Updating...',
-          verbatim: false,
-        },
-      };
-      await SlackInteractionApiUtil.replaceSlackMessageBlocks({
-        slackChannelId: payload.channel.id,
-        slackParentMessageTs: payload.container.thread_ts,
-        newBlocks: payload.message.blocks,
-      });
-      payload.message.blocks[2] = oldBlock;
+      // HACK: work around slack bug updating blocks by adjusting the block_id
+      payload.message.blocks[2]['block_id'] = Math.random()
+        .toString(36)
+        .replace(/[^a-z]+/g, '')
+        .substr(0, 8);
 
       // Replace the entire block so that the initial option change persists.
       await SlackInteractionApiUtil.replaceSlackMessageBlocks({
