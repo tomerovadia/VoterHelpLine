@@ -615,7 +615,7 @@ export async function setSessionEnd(
   try {
     await client.query(
       `UPDATE threads SET session_end_at = (
-        SELECT MAX(updated_at) FROM threads WHERE user_id = $1 AND twilio_phone_number = $2 AND session_end_at IS NULL
+        SELECT MAX(updated_at) + interval '1 second' FROM threads WHERE user_id = $1 AND twilio_phone_number = $2 AND session_end_at IS NULL
       )
       WHERE user_id = $1 AND twilio_phone_number = $2 AND session_end_at IS NULL`,
       [userId, twilioPhoneNumber]
