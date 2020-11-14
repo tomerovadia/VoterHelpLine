@@ -115,6 +115,11 @@ const handleNewVoterWrapper = (
   return new Promise((resolve) => {
     resolve(
       Router.handleNewVoter(
+        Router.prepareUserInfoForNewVoter({
+          userOptions,
+          twilioPhoneNumber,
+          entryPoint: LoadBalancer.PULL_ENTRY_POINT
+        }),
         userOptions,
         redisClient,
         twilioPhoneNumber,

@@ -51,16 +51,14 @@ export function isStaleSession(userInfo: UserInfo): boolean {
 
 // prepareUserInfoForNewVoter is used by functions that handle
 // phone numbers not previously seen.
-function prepareUserInfoForNewVoter({
+export function prepareUserInfoForNewVoter({
   userOptions,
   twilioPhoneNumber,
   entryPoint,
-  sessionStartEpoch,
 }: {
   userOptions: UserOptions & { userId: string; userPhoneNumber: string | null };
   twilioPhoneNumber: string;
   entryPoint: EntryPoint;
-  sessionStartEpoch?: number;
 }): UserInfo {
   let isDemo, confirmedDisclaimer, volunteerEngaged;
   if (entryPoint === LoadBalancer.PULL_ENTRY_POINT) {
@@ -73,11 +71,6 @@ function prepareUserInfoForNewVoter({
     );
     confirmedDisclaimer = false;
     volunteerEngaged = false;
-  }
-  if (!sessionStartEpoch) {
-    sessionStartEpoch =
-      Math.round(Date.now() / 1000) -
-      10 /* a bit of slop so we capture the first message */;
   }
 
   return {
@@ -94,8 +87,8 @@ function prepareUserInfoForNewVoter({
     // messages, this is necessary.
     entryPoint,
     numStateSelectionAttempts: 0,
-    // Start time for this session
-    sessionStartEpoch: sessionStartEpoch,
+    // Start time for this session, with a bit of slop to capture the first message
+    sessionStartEpoch: Math.round(Date.now() / 1000) - 10,
   } as UserInfo;
 }
 
@@ -138,6 +131,7 @@ export async function endVoterSession(
 }
 
 export async function welcomePotentialVoter(
+  userInfo: UserInfo,
   userOptions: UserOptions & { userId: string },
   redisClient: PromisifiedRedisClient,
   twilioPhoneNumber: string,
@@ -146,11 +140,6 @@ export async function welcomePotentialVoter(
   twilioCallbackURL: string
 ): Promise<void> {
   logger.debug('ENTERING ROUTER.welcomePotentialVoter');
-  const userInfo = prepareUserInfoForNewVoter({
-    userOptions,
-    twilioPhoneNumber,
-    entryPoint,
-  });
 
   let messageToVoter = MessageConstants.WELCOME_VOTER();
   if (isVotedKeyword(userOptions.userMessage)) {
@@ -457,23 +446,17 @@ async function introduceNewVoterToSlackChannel(
 }
 
 export async function handleNewVoter(
+  userInfo: UserInfo,
   userOptions: UserOptions & { userId: string },
   redisClient: PromisifiedRedisClient,
   twilioPhoneNumber: string,
   inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry,
   entryPoint: EntryPoint,
   twilioCallbackURL: string,
-  includeWelcome?: boolean,
-  sessionStartEpoch?: number
+  includeWelcome?: boolean
 ): Promise<void> {
   logger.debug('ENTERING ROUTER.handleNewVoter');
   const userMessage = userOptions.userMessage;
-  const userInfo = prepareUserInfoForNewVoter({
-    userOptions,
-    twilioPhoneNumber,
-    entryPoint,
-    sessionStartEpoch,
-  });
 
   await DbApiUtil.logInitialVoterStatusToDb(
     userInfo.userId,

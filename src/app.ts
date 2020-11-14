@@ -314,14 +314,14 @@ const handleIncomingTwilioMessage = async (
           .replace(/[^a-zA-Z]/g, '');
         if (userMessageNoPunctuation.startsWith('helpline')) {
           await Router.handleNewVoter(
+            userInfo,
             { userPhoneNumber, userMessage, userAttachments, userId },
             redisClient,
             twilioPhoneNumber,
             inboundDbMessageEntry,
             entryPoint,
             twilioCallbackURL,
-            false /* includeWelcome */,
-            userInfo.sessionStartEpoch
+            false /* includeWelcome */
           );
           return;
         } else {
@@ -440,10 +440,23 @@ const handleIncomingTwilioMessage = async (
       return;
     }
 
+    const userOptions = {
+      userPhoneNumber,
+      userMessage,
+      userAttachments,
+      userId,
+    };
+    const userInfo = Router.prepareUserInfoForNewVoter({
+      userOptions,
+      twilioPhoneNumber,
+      entryPoint,
+    });
+
     if (process.env.CLIENT_ORGANIZATION === 'VOTE_AMERICA') {
       if (KeywordParser.isHelplineKeyword(userMessage)) {
         await Router.handleNewVoter(
-          { userPhoneNumber, userMessage, userAttachments, userId },
+          userInfo,
+          userOptions,
           redisClient,
           twilioPhoneNumber,
           inboundDbMessageEntry,
@@ -453,7 +466,8 @@ const handleIncomingTwilioMessage = async (
         );
       } else {
         await Router.welcomePotentialVoter(
-          { userPhoneNumber, userMessage, userAttachments, userId },
+          userInfo,
+          userOptions,
           redisClient,
           twilioPhoneNumber,
           inboundDbMessageEntry,
@@ -463,7 +477,8 @@ const handleIncomingTwilioMessage = async (
       }
     } else {
       await Router.handleNewVoter(
-        { userPhoneNumber, userMessage, userAttachments, userId },
+        userInfo,
+        userOptions,
         redisClient,
         twilioPhoneNumber,
         inboundDbMessageEntry,
