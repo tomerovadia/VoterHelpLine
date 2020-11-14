@@ -106,6 +106,7 @@ export type ThreadInfo = {
   slackParentMessageTs: string;
   channelId: string;
   userId: string | null;
+  lastUpdate: string | null;
   lastUpdateAge: number | null;
   volunteerSlackUserId: string | null;
   volunteerSlackUserName: string | null;
@@ -885,6 +886,7 @@ export async function getPastSessionThreads(
         , t.slack_channel_id
         , t.user_id
         , t.history_ts
+        , t.updated_at
         , EXTRACT(EPOCH FROM t.session_start_at) as session_start_epoch
         , EXTRACT(EPOCH FROM t.session_end_at) as session_end_epoch
         , EXTRACT(EPOCH FROM now() - t.updated_at) as last_update_age
@@ -902,6 +904,7 @@ export async function getPastSessionThreads(
       slackParentMessageTs: x['slack_parent_message_ts'],
       channelId: x['slack_channel_id'],
       userId: x['user_id'],
+      lastUpdate: x['updated_at'],
       lastUpdateAge: x['last_update_age'],
       volunteerSlackUserId: null,
       volunteerSlackUserName: null,
@@ -934,6 +937,7 @@ export async function getUnclaimedVoters(
         , t.slack_channel_id
         , t.user_id
         , t.history_ts
+        , t.updated_at
         , EXTRACT(EPOCH FROM t.session_start_at) as session_start_epoch
         , EXTRACT(EPOCH FROM t.session_end_at) as session_end_epoch
         , EXTRACT(EPOCH FROM now() - t.updated_at) as last_update_age
@@ -956,6 +960,7 @@ export async function getUnclaimedVoters(
       slackParentMessageTs: x['slack_parent_message_ts'],
       channelId: x['slack_channel_id'],
       userId: x['user_id'],
+      lastUpdate: x['updated_at'],
       lastUpdateAge: x['last_update_age'],
       volunteerSlackUserId: null,
       volunteerSlackUserName: null,
@@ -1108,6 +1113,7 @@ export async function getThreadsNeedingAttentionForChannel(
         slack_parent_message_ts
         , slack_channel_id
         , t.user_id
+        , t.updated_at
         , EXTRACT(EPOCH FROM now() - updated_at) as last_update_age
         , c.volunteer_slack_user_id
         , c.volunteer_slack_user_name
@@ -1128,6 +1134,7 @@ export async function getThreadsNeedingAttentionForChannel(
       slackParentMessageTs: x['slack_parent_message_ts'],
       channelId: x['slack_channel_id'],
       userId: x['user_id'],
+      lastUpdate: x['updated_at'],
       lastUpdateAge: x['last_update_age'],
       volunteerSlackUserId: x['volunteer_slack_user_id'],
       volunteerSlackUserName: x['volunteer_slack_user_name'],
@@ -1163,6 +1170,7 @@ export async function getThreadsNeedingAttentionFor(
         , EXTRACT(EPOCH FROM now() - updated_at) as last_update_age
         , c.volunteer_slack_user_name
         , t.history_ts
+        , t.updated_at
         , EXTRACT(EPOCH FROM t.session_start_at) as session_start_epoch
         , EXTRACT(EPOCH FROM t.session_end_at) as session_end_epoch
         FROM threads t, claims c
@@ -1179,6 +1187,7 @@ export async function getThreadsNeedingAttentionFor(
       slackParentMessageTs: x['slack_parent_message_ts'],
       channelId: x['slack_channel_id'],
       userId: x['user_id'],
+      lastUpdate: x['updated_at'],
       lastUpdateAge: x['last_update_age'],
       volunteerSlackUserId: slackUserId,
       volunteerSlackUserName: x['volunteer_slack_user_name'],
@@ -1242,6 +1251,7 @@ export async function getThreadsNeedingFollowUp(
         , t.slack_channel_id
         , t.user_id
         , t.history_ts
+        , t.updated_at
         , EXTRACT(EPOCH FROM now() - updated_at) as last_update_age
         , c.volunteer_slack_user_name
         , s.voter_status
@@ -1265,6 +1275,7 @@ export async function getThreadsNeedingFollowUp(
       slackParentMessageTs: x['slack_parent_message_ts'],
       channelId: x['slack_channel_id'],
       userId: x['user_id'],
+      lastUpdate: x['updated_at'],
       lastUpdateAge: x['last_update_age'],
       volunteerSlackUserId: slackUserId,
       volunteerSlackUserName: x['volunteer_slack_user_name'],
