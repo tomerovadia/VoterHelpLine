@@ -880,7 +880,7 @@ describe('determineVoterState', () => {
         const MD5 = new Hashes.MD5();
         const userId = MD5.hex('+1234567890').substring(0, 5);
         expectNthSlackMessageToChannel('north-carolina-0', 0, [
-          'New North Carolina voter',
+          'New *North Carolina* voter',
           userId,
         ]);
       });
@@ -902,7 +902,7 @@ describe('determineVoterState', () => {
         inboundDbMessageEntry
       ).then(() => {
         expectNthSlackMessageToChannel('north-carolina-3', 0, [
-          'New North Carolina voter',
+          'New *North Carolina* voter',
         ]);
       });
     });
@@ -925,7 +925,7 @@ describe('determineVoterState', () => {
         inboundDbMessageEntry
       ).then(() => {
         expectNthSlackMessageToChannel('north-carolina-5', 0, [
-          'New North Carolina voter',
+          'New *North Carolina* voter',
         ]);
       });
     });
@@ -948,7 +948,7 @@ describe('determineVoterState', () => {
         inboundDbMessageEntry
       ).then(() => {
         expectNthSlackMessageToChannel('north-carolina-3', 0, [
-          'New North Carolina voter',
+          'New *North Carolina* voter',
         ]);
       });
     });
@@ -971,7 +971,7 @@ describe('determineVoterState', () => {
         inboundDbMessageEntry
       ).then(() => {
         expectNthSlackMessageToChannel('north-carolina-10', 0, [
-          'New North Carolina voter',
+          'New *North Carolina* voter',
         ]);
       });
     });
@@ -1027,7 +1027,7 @@ describe('determineVoterState', () => {
       ).then(() => {
         // 53rd demo NC voter goes to #demo-north-carolina-2
         expectNthSlackMessageToChannel('demo-north-carolina-2', 0, [
-          'New North Carolina voter',
+          'New *North Carolina* voter',
         ]);
       });
     });

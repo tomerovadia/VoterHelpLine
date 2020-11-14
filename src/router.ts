@@ -55,10 +55,12 @@ export function prepareUserInfoForNewVoter({
   userOptions,
   twilioPhoneNumber,
   entryPoint,
+  returningVoter,
 }: {
   userOptions: UserOptions & { userId: string; userPhoneNumber: string | null };
   twilioPhoneNumber: string;
   entryPoint: EntryPoint;
+  returningVoter: boolean;
 }): UserInfo {
   let isDemo, confirmedDisclaimer, volunteerEngaged;
   if (entryPoint === LoadBalancer.PULL_ENTRY_POINT) {
@@ -89,6 +91,7 @@ export function prepareUserInfoForNewVoter({
     numStateSelectionAttempts: 0,
     // Start time for this session, with a bit of slop to capture the first message
     sessionStartEpoch: Math.round(Date.now() / 1000) - 10,
+    returningVoter: returningVoter,
   } as UserInfo;
 }
 
@@ -222,8 +225,9 @@ async function introduceNewVoterToSlackChannel(
   let operatorMessage = `*User ID:* ${userInfo.userId}\n*Connected via:* ${twilioPhoneNumber} (${entryPoint})`;
   if (userInfo.stateName) {
     operatorMessage =
-      `<!channel> New *${userInfo.stateName}* voter (known phone number)\n` +
-      operatorMessage;
+      `<!channel> ${userInfo.returningVoter ? 'Returning' : 'New'} *${
+        userInfo.stateName
+      }* voter (known phone number)\n` + operatorMessage;
   }
 
   const slackBlocks = SlackBlockUtil.getVoterStatusBlocks(operatorMessage);
@@ -906,7 +910,13 @@ const routeVoterToSlackChannel = async (
     logger.debug(
       `ROUTER.routeVoterToSlackChannel: Creating a new thread in this channel (${destinationSlackChannelId}), since voter hasn't been here.`
     );
-    let newParentMessageText = `<!channel> New ${userInfo.stateName} voter!\n*User ID:* ${userId}\n*Connected via:* ${twilioPhoneNumber} (${userInfo.entryPoint})`;
+    let newParentMessageText = `<!channel> ${
+      userInfo.returningVoter ? 'Returning' : 'New'
+    } *${
+      userInfo.stateName
+    }* voter!\n*User ID:* ${userId}\n*Connected via:* ${twilioPhoneNumber} (${
+      userInfo.entryPoint
+    })`;
     if (adminCommandParams) {
       newParentMessageText = `<!channel> Voter routed from *${adminCommandParams.previousSlackChannelName}* by *${adminCommandParams.routingSlackUserName}*\n*User ID:* ${userId}\n*Connected via:* ${twilioPhoneNumber} (${userInfo.entryPoint})`;
     }

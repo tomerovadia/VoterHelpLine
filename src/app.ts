@@ -275,12 +275,14 @@ const handleIncomingTwilioMessage = async (
   );
 
   // new session?
+  let returningVoter = false;
   if (userInfo && Router.isStaleSession(userInfo)) {
     logger.info(
       `SERVER.handleIncomingTwilioMessage (${userId}): no sessionStartEpoch, starting with fresh userInfo`
     );
     await Router.endVoterSession(redisClient, userInfo, twilioPhoneNumber);
     userInfo = null;
+    returningVoter = true;
   }
 
   const twilioCallbackURL = TwilioUtil.twilioCallbackURL(req);
@@ -472,6 +474,7 @@ const handleIncomingTwilioMessage = async (
       userOptions,
       twilioPhoneNumber,
       entryPoint,
+      returningVoter,
     });
 
     if (process.env.CLIENT_ORGANIZATION === 'VOTE_AMERICA') {
