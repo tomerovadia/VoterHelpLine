@@ -416,8 +416,10 @@ export async function handleNewVoter(
       userOptions.userPhoneNumber
     );
     if (knownState) {
+      // the knownState value from the db is probably a state abbreviation, so we need to resolve it
       const stateName = StateParser.determineState(knownState);
       if (stateName) {
+        // success, we know the state
         userInfo.stateName = stateName;
         slackChannelName = await LoadBalancer.selectSlackChannel(
           redisClient,
@@ -426,10 +428,12 @@ export async function handleNewVoter(
           userInfo.isDemo
         );
         if (slackChannelName) {
+          // we can route them too
           logger.info(
             `ROUTER.handleNewVoter (${userInfo.userId}): New voter is in known state {stateName}, selected Slack channel {slackChannelName}`
           );
         } else {
+          // that state doesn't route for some reason; go to national
           slackChannelName = userInfo.isDemo ? 'demo-national' : 'national';
           logger.info(
             `ROUTER.handleNewVoter (${userInfo.userId}): New voter is in known state {stateName}, but no channel match`
