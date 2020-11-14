@@ -517,7 +517,7 @@ export async function getTimestampOfLastMessageInThread(
   }
 }
 
-export async function getSlackThreadsForVoter(
+export async function getSlackThreadsForVoterAllSessions(
   userId: string,
   twilioPhoneNumber: string
 ): Promise<SlackThreadInfo[] | null> {
@@ -533,7 +533,6 @@ export async function getSlackThreadsForVoter(
           AND (to_phone_number = $2 OR from_phone_number = $2)
           AND slack_parent_message_ts IS NOT NULL
           AND NOT archived
-          AND session_end_at IS NULL
         GROUP BY slack_parent_message_ts, slack_channel;`,
       [userId, twilioPhoneNumber]
     );

@@ -1131,7 +1131,7 @@ export async function handleResetDemo(
 ): Promise<void> {
   const redisUserInfoKey = `${modalPrivateMetadata.userId}:${modalPrivateMetadata.twilioPhoneNumber}`;
 
-  const slackThreads = (await DbApiUtil.getSlackThreadsForVoter(
+  const slackThreads = (await DbApiUtil.getSlackThreadsForVoterAllSessions(
     modalPrivateMetadata.userId,
     modalPrivateMetadata.twilioPhoneNumber
   )) as SlackThreadInfo[];
