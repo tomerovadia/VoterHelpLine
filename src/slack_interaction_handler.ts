@@ -950,7 +950,7 @@ export async function handleSessionShow(
   const messagePages = SlackMessageFormatter.paginateMessageHistory(
     formattedMessageHistory
   );
-  let buttons = [];
+  const buttons = [];
   if (messagePages.length > 1) {
     for (let i = 0; i < messagePages.length; ++i) {
       // if we have lots of pages, show button for first + last + those adjacent to the current page

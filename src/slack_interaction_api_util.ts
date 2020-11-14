@@ -82,7 +82,10 @@ export async function updateOldSessionBlocks(
   channelId: string,
   threadTs: string
 ): Promise<void> {
-  let blocks = await SlackApiUtil.fetchSlackMessageBlocks(channelId, threadTs);
+  const blocks = await SlackApiUtil.fetchSlackMessageBlocks(
+    channelId,
+    threadTs
+  );
   if (blocks) {
     const closedBlocks = SlackBlockUtil.makeClosedVoterPanelBlocks(
       `This voter helpline session is closed`,
