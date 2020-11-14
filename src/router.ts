@@ -233,7 +233,7 @@ async function introduceNewVoterToSlackChannel(
   let operatorMessage = `*User ID:* ${userInfo.userId}\n*Connected via:* ${twilioPhoneNumber} (${entryPoint})`;
   if (userInfo.stateName) {
     operatorMessage =
-      `New *${userInfo.stateName}* voter (known phone number)\n` +
+      `<!channel> New *${userInfo.stateName}* voter (known phone number)\n` +
       operatorMessage;
   }
 
