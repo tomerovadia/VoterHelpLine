@@ -28,7 +28,9 @@ export async function replaceSlackMessageBlocks({
     );
   } else {
     logger.error(
-      `SLACKINTERACTIONAPIUTIL.replaceSlackMessageBlock: ERROR in replacing Slack message block: ${response.data.error}`
+      `SLACKINTERACTIONAPIUTIL.replaceSlackMessageBlock: ERROR in replacing Slack message block: ${JSON.stringify(
+        response.data
+      )}`
     );
   }
 }
