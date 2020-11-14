@@ -19,7 +19,6 @@ import * as Sentry from '@sentry/node';
 import { isVotedKeyword } from './keyword_parser';
 import { SlackActionId } from './slack_interaction_ids';
 import { SlackFile } from './message_parser';
-import { prettyTimeInterval } from './slack_interaction_handler';
 
 const MINS_BEFORE_WELCOME_BACK_MESSAGE = 60 * 24;
 export const NUM_STATE_SELECTION_ATTEMPTS_LIMIT = 2;
@@ -608,12 +607,12 @@ async function postUserMessageHistoryToSlack(
           thread.channelId,
           thread.historyTs || thread.slackParentMessageTs
         );
+        const lastUpdateEpoch = Date.parse(thread.lastUpdate || '') / 1000;
+        const endTime = `<!date^${lastUpdateEpoch}^{time} {date_short}|${lastUpdateEpoch}>`;
         const description = `*Operator:* Past session in ${SlackApiUtil.linkToSlackChannel(
           thread.channelId,
           slackChannelNames[thread.channelId]
-        )} ended ${prettyTimeInterval(
-          thread.lastUpdateAge || 0
-        )} ago - <${url}|Open>`;
+        )} ended ${endTime} - <${url}|Open>`;
         await SlackApiUtil.sendMessage('', {
           parentMessageTs: destinationSlackParentMessageTs,
           channel: destinationSlackChannelId,
