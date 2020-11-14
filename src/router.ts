@@ -49,6 +49,27 @@ export function isStaleSession(userInfo: UserInfo): boolean {
   return false;
 }
 
+function voterHeader(
+  userInfo: UserInfo,
+  announce: boolean,
+  notice?: string
+): string {
+  let r = '';
+  if (announce) {
+    if (userInfo.returningVoter) {
+      r = `<!channel> Returning *${userInfo.stateName}* voter`;
+    } else {
+      r = `<!channel> New *${userInfo.stateName}* voter`;
+    }
+    if (notice) {
+      r += ` (${notice})`;
+    }
+    r += '\n';
+  }
+  r += `${userInfo.userId} via ${userInfo.twilioPhoneNumber}`;
+  return r;
+}
+
 // prepareUserInfoForNewVoter is used by functions that handle
 // phone numbers not previously seen.
 export function prepareUserInfoForNewVoter({
@@ -77,6 +98,7 @@ export function prepareUserInfoForNewVoter({
 
   return {
     userId: userOptions.userId,
+    twilioPhoneNumber: twilioPhoneNumber,
     // Necessary for admin controls, so userPhoneNumber can be found even though
     // admins specify only userId.
     userPhoneNumber: userOptions.userPhoneNumber,
@@ -222,13 +244,9 @@ async function introduceNewVoterToSlackChannel(
     `ROUTER.introduceNewVoterToSlackChannel: Announcing new voter via new thread in ${slackChannelName}.`
   );
   // In Slack, create entry channel message, followed by voter's message and intro text.
-  let operatorMessage = `*User ID:* ${userInfo.userId}\n*Connected via:* ${twilioPhoneNumber} (${entryPoint})`;
-  if (userInfo.stateName) {
-    operatorMessage =
-      `<!channel> ${userInfo.returningVoter ? 'Returning' : 'New'} *${
-        userInfo.stateName
-      }* voter (known phone number)\n` + operatorMessage;
-  }
+  const operatorMessage = userInfo.stateName
+    ? voterHeader(userInfo, true, 'known phone number')
+    : voterHeader(userInfo, false);
 
   const slackBlocks = SlackBlockUtil.getVoterStatusBlocks(operatorMessage);
 
@@ -857,7 +875,7 @@ const routeVoterToSlackChannel = async (
   let previousParentMessageBlocks;
   if (userInfo.activeChannelId === 'NONEXISTENT_LOBBY') {
     // In Slack, create entry channel message, followed by voter's message and intro text.
-    const operatorMessage = `*User ID:* ${userInfo.userId}\n*Connected via:* ${twilioPhoneNumber} (PULL)`;
+    const operatorMessage = voterHeader(userInfo, false);
     previousParentMessageBlocks = SlackBlockUtil.getVoterStatusBlocks(
       operatorMessage
     );
@@ -910,15 +928,16 @@ const routeVoterToSlackChannel = async (
     logger.debug(
       `ROUTER.routeVoterToSlackChannel: Creating a new thread in this channel (${destinationSlackChannelId}), since voter hasn't been here.`
     );
-    let newParentMessageText = `<!channel> ${
-      userInfo.returningVoter ? 'Returning' : 'New'
-    } *${
-      userInfo.stateName
-    }* voter!\n*User ID:* ${userId}\n*Connected via:* ${twilioPhoneNumber} (${
-      userInfo.entryPoint
-    })`;
+
+    let newParentMessageText = '';
     if (adminCommandParams) {
-      newParentMessageText = `<!channel> Voter routed from *${adminCommandParams.previousSlackChannelName}* by *${adminCommandParams.routingSlackUserName}*\n*User ID:* ${userId}\n*Connected via:* ${twilioPhoneNumber} (${userInfo.entryPoint})`;
+      newParentMessageText = voterHeader(
+        userInfo,
+        true,
+        `routed from *${adminCommandParams.previousSlackChannelName}* by *${adminCommandParams.routingSlackUserName}*`
+      );
+    } else {
+      newParentMessageText = voterHeader(userInfo, true);
     }
 
     // Use the same blocks as from the voter's previous active thread parent message, except for the voter info text.
@@ -1628,7 +1647,7 @@ export async function handleSlackVoterThreadMessage(
         userInfo.activeChannelId,
         userInfo[userInfo.activeChannelId]
       );
-      const operatorMessage = `*User ID:* ${userInfo.userId}\n*Connected via:* ${twilioPhoneNumber} (PULL)`;
+      const operatorMessage = voterHeader(userInfo, false);
       const freshBlocks = SlackBlockUtil.getVoterStatusBlocks(operatorMessage);
       let newBlocks;
       if (oldBlocks) {

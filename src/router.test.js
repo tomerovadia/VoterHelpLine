@@ -118,7 +118,7 @@ const handleNewVoterWrapper = (
         Router.prepareUserInfoForNewVoter({
           userOptions,
           twilioPhoneNumber,
-          entryPoint: LoadBalancer.PULL_ENTRY_POINT
+          entryPoint: LoadBalancer.PULL_ENTRY_POINT,
         }),
         userOptions,
         redisClient,
@@ -161,7 +161,7 @@ describe('handleNewVoter', () => {
   });
 
   test('Announces new voter message in Slack', () => {
-    expect(SlackApiUtil.sendMessage.mock.calls[0][0]).toContain('User ID');
+    expect(SlackApiUtil.sendMessage.mock.calls[0][0]).toContain(' via ');
   });
 
   test('Announces new voter message to Slack #lobby channel if non-demo line', () => {
