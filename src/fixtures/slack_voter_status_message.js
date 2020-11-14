@@ -16,7 +16,7 @@ export const makeVoterStatusMessageWithoutActionIds = () => ({
       text: {
         type: 'mrkdwn',
         text:
-          '<!channel> New Ohio voter!\n*User ID:* f39f57796f6ca7eac2aac2fdd7943758\n*Connected via:* +18559032361 (PULL)',
+          '<!channel> New *Ohio* voter\nf39f57796f6ca7eac2aac2fdd794375 via +18559032361',
         verbatim: false,
       },
     },
