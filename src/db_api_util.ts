@@ -1307,6 +1307,9 @@ export async function getKnownPhoneState(
       [userPhoneNumber]
     );
     return result.rows.length > 0 ? result.rows[0]['state'] : null;
+  } catch (error) {
+    logger.warn(`error querying known_phone_states: ${JSON.stringify(error)}`);
+    return null;
   } finally {
     client.release();
   }
