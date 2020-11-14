@@ -225,11 +225,7 @@ const introduceNewVoterToSlackChannel = async (
       }
     }
   } else {
-    if (userInfo.stateName) {
-      messageToVoter = MessageConstants.FINDING_VOLUNTEER();
-    } else {
-      messageToVoter = MessageConstants.WELCOME_VOTER();
-    }
+    messageToVoter = MessageConstants.WELCOME_VOTER();
   }
 
   if (response) {
