@@ -128,10 +128,10 @@ export async function endVoterSession(
 
   // delete userInfo
   const redisHashKey = `${userInfo.userId}:${twilioPhoneNumber}`;
-  RedisApiUtil.deleteKeys(redisClient, [redisHashKey]);
+  await RedisApiUtil.deleteKeys(redisClient, [redisHashKey]);
 
   // update old session thread's blocks async; do not await
-  SlackInteractionApiUtil.updateOldSessionBlocks(
+  void SlackInteractionApiUtil.updateOldSessionBlocks(
     userInfo.activeChannelId,
     userInfo[userInfo.activeChannelId]
   );
@@ -386,7 +386,7 @@ async function introduceNewVoterToSlackChannel(
     }
 
     if (slackChannelName !== 'lobby' || !skipLobby) {
-      const historyTs = await postUserMessageHistoryToSlack(
+      await postUserMessageHistoryToSlack(
         redisClient,
         userInfo,
         twilioPhoneNumber,
@@ -682,7 +682,7 @@ async function postUserMessageHistoryToSlack(
   logger.debug(
     'ROUTER.postUserMessageHistoryToSlack: Message history found, formatting it by calling SlackMessageFormatter.'
   );
-  let formattedMessageHistory = SlackMessageFormatter.formatMessageHistory(
+  const formattedMessageHistory = SlackMessageFormatter.formatMessageHistory(
     messageHistory,
     userInfo.userId.substring(0, 5)
   ).join('\n\n');

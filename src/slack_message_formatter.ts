@@ -69,7 +69,7 @@ export function formatMessageHistory(
 export function paginateMessageHistory(messages: string[]): string[] {
   // group individual messages into pages
   const maxLength = 2000; // slack limit is ~3000; leave room for blocks etc.
-  let pages = [] as string[];
+  const pages = [] as string[];
   let page = '';
   for (const msg of messages) {
     if (page.length == 0) {
