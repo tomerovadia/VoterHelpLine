@@ -837,7 +837,10 @@ const routeVoterToSlackChannel = async (
       'ROUTER.routeVoterToSlackChannel: Routing of voter should succeed from here on out. Letting the admin (if applicable) know.'
     );
     await SlackApiUtil.sendMessage(
-      `*Operator:* Voter is being routed to *${destinationSlackChannelName}* by *${adminCommandParams.routingSlackUserName}*.`,
+      `*Operator:* Voter is being routed to ${SlackApiUtil.linkToSlackChannel(
+        destinationSlackChannelId,
+        destinationSlackChannelName
+      )} by *${adminCommandParams.routingSlackUserName}*.`,
       {
         channel: userInfo.activeChannelId,
         parentMessageTs: userInfo[userInfo.activeChannelId],
@@ -846,7 +849,10 @@ const routeVoterToSlackChannel = async (
     // Operations for AUTOMATED route of voter.
   } else if (!skipLobby && userInfo.activeChannelId != 'NONEXISTENT_LOBBY') {
     await SlackApiUtil.sendMessage(
-      `*Operator:* Routing voter to *${destinationSlackChannelName}*.`,
+      `*Operator:* Routing voter to ${SlackApiUtil.linkToSlackChannel(
+        destinationSlackChannelId,
+        destinationSlackChannelName
+      )}.`,
       {
         channel: userInfo.activeChannelId,
         parentMessageTs: userInfo[userInfo.activeChannelId],
