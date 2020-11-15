@@ -1297,6 +1297,24 @@ export async function getVoterHasVolunteer(userId: string): Promise<boolean> {
   }
 }
 
+export async function getKnownPhoneState(
+  userPhoneNumber: string
+): Promise<string | null> {
+  const client = await pool.connect();
+  try {
+    const result = await client.query(
+      'SELECT state FROM known_phone_states WHERE phone_number = $1',
+      [userPhoneNumber]
+    );
+    return result.rows.length > 0 ? result.rows[0]['state'] : null;
+  } catch (error) {
+    logger.warn(`error querying known_phone_states: ${JSON.stringify(error)}`);
+    return null;
+  } finally {
+    client.release();
+  }
+}
+
 /**
  * Updates the Twilio status of the given text message in the DB.
  *

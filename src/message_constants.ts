@@ -11,7 +11,7 @@ export function STATE_CONFIRMATION(state: string): string {
   }
 }
 
-export function NO_STATE_FINDING_VOLUNTEER(): string {
+export function FINDING_VOLUNTEER(): string {
   switch (process.env.CLIENT_ORGANIZATION) {
     case 'VOTE_AMERICA':
       return `We are finding a volunteer and will be with you shortly. Meanwhile, please share more about how we can help.`;
@@ -73,6 +73,10 @@ export function CLARIFY_HELPLINE_REQUEST(): string {
 // Only used by VOTE_AMERICA.
 export function WELCOME_AND_STATE_QUESTION(): string {
   return 'Welcome to the VoteAmerica Helpline! In which U.S. state are you looking to vote?\n\nMsg&data rates may apply. Reply STOP to unsubscribe.';
+}
+
+export function WELCOME_FINDING_VOLUNTEER(): string {
+  return `Welcome to the VoteAmerica Helpline! Msg&data rates may apply. Reply STOP to unsubscribe.\n\nWe are finding a volunteer and will be with you shortly. Meanwhile, please share more about how we can help.`;
 }
 
 export function VOTED_WELCOME_RESPONSE(): string {

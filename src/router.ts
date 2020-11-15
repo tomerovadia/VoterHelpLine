@@ -167,7 +167,12 @@ const introduceNewVoterToSlackChannel = async (
     `ROUTER.introduceNewVoterToSlackChannel: Announcing new voter via new thread in ${slackChannelName}.`
   );
   // In Slack, create entry channel message, followed by voter's message and intro text.
-  const operatorMessage = `*User ID:* ${userInfo.userId}\n*Connected via:* ${twilioPhoneNumber} (${entryPoint})`;
+  let operatorMessage = `*User ID:* ${userInfo.userId}\n*Connected via:* ${twilioPhoneNumber} (${entryPoint})`;
+  if (userInfo.stateName) {
+    operatorMessage =
+      `New *${userInfo.stateName}* voter (known phone number)\n` +
+      operatorMessage;
+  }
 
   const slackBlocks = SlackBlockUtil.getVoterStatusBlocks(operatorMessage);
 
@@ -206,10 +211,18 @@ const introduceNewVoterToSlackChannel = async (
   if (process.env.CLIENT_ORGANIZATION === 'VOTE_AMERICA') {
     if (includeWelcome) {
       // Voter initiated conversation with "HELPLINE".
-      messageToVoter = MessageConstants.WELCOME_AND_STATE_QUESTION();
+      if (userInfo.stateName) {
+        messageToVoter = MessageConstants.WELCOME_FINDING_VOLUNTEER();
+      } else {
+        messageToVoter = MessageConstants.WELCOME_AND_STATE_QUESTION();
+      }
     } else {
       // Voter has already received automated welcome and is just now responding with "HELPLINE".
-      messageToVoter = MessageConstants.STATE_QUESTION();
+      if (userInfo.stateName) {
+        messageToVoter = MessageConstants.FINDING_VOLUNTEER();
+      } else {
+        messageToVoter = MessageConstants.STATE_QUESTION();
+      }
     }
   } else {
     messageToVoter = MessageConstants.WELCOME_VOTER();
@@ -395,35 +408,76 @@ export async function handleNewVoter(
     userInfo.isDemo
   );
 
-  let slackChannelName = userInfo.isDemo ? 'demo-lobby' : 'lobby';
-  if (entryPoint === LoadBalancer.PULL_ENTRY_POINT) {
-    logger.debug(
-      `ROUTER.handleNewVoter (${userInfo.userId}): New voter will enter Slack channel: ${slackChannelName}`
-    );
-  } else if (entryPoint === LoadBalancer.PUSH_ENTRY_POINT) {
-    userInfo.stateName = LoadBalancer.getPushPhoneNumberState(
-      twilioPhoneNumber
-    );
-    logger.debug(
-      `ROUTER.handleNewVoter (${userInfo.userId}): Determined that twilioPhoneNumber ${twilioPhoneNumber} corresponds to U.S. state ${userInfo.stateName} based on hard coding in LoadBalancer.`
-    );
-    const selectedChannelName = await LoadBalancer.selectSlackChannel(
-      redisClient,
-      LoadBalancer.PUSH_ENTRY_POINT,
-      userInfo.stateName
-    );
+  let slackChannelName = null as string | null;
 
-    logger.debug(
-      `ROUTER.handleNewVoter (${userInfo.userId}): LoadBalancer returned Slack channel ${selectedChannelName} for new PUSH voter.`
+  // Do we already know the voter's state?
+  if (process.env.CLIENT_ORGANIZATION === 'VOTE_AMERICA') {
+    const knownState = await DbApiUtil.getKnownPhoneState(
+      userOptions.userPhoneNumber
     );
-    if (selectedChannelName) {
-      slackChannelName = selectedChannelName;
-    } else {
-      // If LoadBalancer didn't find a Slack channel, then select #national or #demo-national as fallback.
-      slackChannelName = userInfo.isDemo ? 'demo-national' : 'national';
-      logger.error(
-        `ROUTER.handleNewVoter (${userInfo.userId}): ERROR LoadBalancer did not find a Slack channel for new PUSH voter. Using ${slackChannelName} as fallback.`
+    if (knownState) {
+      // The knownState value from the db is probably a state abbreviation, so we need to resolve it
+      const stateName = StateParser.determineState(knownState);
+      if (stateName) {
+        // Success: we know the state
+        userInfo.stateName = stateName;
+        slackChannelName = await LoadBalancer.selectSlackChannel(
+          redisClient,
+          LoadBalancer.PULL_ENTRY_POINT,
+          stateName,
+          userInfo.isDemo
+        );
+        if (slackChannelName) {
+          // We can route them too
+          logger.info(
+            `ROUTER.handleNewVoter (${userInfo.userId}): New voter is in known state {stateName}, selected Slack channel {slackChannelName}`
+          );
+        } else {
+          // That state doesn't route for some reason; go to national
+          slackChannelName = userInfo.isDemo ? 'demo-national' : 'national';
+          logger.info(
+            `ROUTER.handleNewVoter (${userInfo.userId}): New voter is in known state {stateName}, but no channel match`
+          );
+        }
+      } else {
+        logger.warning(
+          `ROUTER.handleNewVoter (${userInfo.userId}): unable to parse known state '${knownState}`
+        );
+      }
+    }
+  }
+
+  if (!slackChannelName) {
+    slackChannelName = userInfo.isDemo ? 'demo-lobby' : 'lobby';
+    if (entryPoint === LoadBalancer.PULL_ENTRY_POINT) {
+      logger.debug(
+        `ROUTER.handleNewVoter (${userInfo.userId}): New voter will enter Slack channel: ${slackChannelName}`
       );
+    } else if (entryPoint === LoadBalancer.PUSH_ENTRY_POINT) {
+      userInfo.stateName = LoadBalancer.getPushPhoneNumberState(
+        twilioPhoneNumber
+      );
+      logger.debug(
+        `ROUTER.handleNewVoter (${userInfo.userId}): Determined that twilioPhoneNumber ${twilioPhoneNumber} corresponds to U.S. state ${userInfo.stateName} based on hard coding in LoadBalancer.`
+      );
+      const selectedChannelName = await LoadBalancer.selectSlackChannel(
+        redisClient,
+        LoadBalancer.PUSH_ENTRY_POINT,
+        userInfo.stateName
+      );
+
+      logger.debug(
+        `ROUTER.handleNewVoter (${userInfo.userId}): LoadBalancer returned Slack channel ${selectedChannelName} for new PUSH voter.`
+      );
+      if (selectedChannelName) {
+        slackChannelName = selectedChannelName;
+      } else {
+        // If LoadBalancer didn't find a Slack channel, then select #national or #demo-national as fallback.
+        slackChannelName = userInfo.isDemo ? 'demo-national' : 'national';
+        logger.error(
+          `ROUTER.handleNewVoter (${userInfo.userId}): ERROR LoadBalancer did not find a Slack channel for new PUSH voter. Using ${slackChannelName} as fallback.`
+        );
+      }
     }
   }
 
@@ -982,7 +1036,7 @@ export async function determineVoterState(
 
   const messageToVoter =
     userInfo.stateName === 'National'
-      ? MessageConstants.NO_STATE_FINDING_VOLUNTEER()
+      ? MessageConstants.FINDING_VOLUNTEER()
       : MessageConstants.STATE_CONFIRMATION(stateName);
 
   await TwilioApiUtil.sendMessage(
