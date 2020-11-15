@@ -260,18 +260,12 @@ export async function handleVoterStatusUpdate({
         );
       }
 
-      // HACK: work around slack bug updating blocks by adjusting the block_id
-      payload.message.blocks[2]['block_id'] = Math.random()
-        .toString(36)
-        .replace(/[^a-z]+/g, '')
-        .substr(0, 8);
-
-      // Replace the entire block so that the initial option change persists.
-      await SlackInteractionApiUtil.replaceSlackMessageBlocks({
-        slackChannelId: payload.channel.id,
-        slackParentMessageTs: payload.container.thread_ts,
-        newBlocks: payload.message.blocks,
-      });
+      // Update the voter block
+      await SlackInteractionApiUtil.updateVoterStatusBlocks(
+        payload.channel.id,
+        payload.container.thread_ts,
+        payload.message.blocks
+      );
     }
   } else if (
     selectedVoterStatus === 'UNDO' &&
