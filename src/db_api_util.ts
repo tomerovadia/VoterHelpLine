@@ -772,7 +772,8 @@ export async function reactivateThread(
   const client = await pool.connect();
   try {
     await client.query(
-      'UPDATE threads SET needs_attention = $1, active = true WHERE slack_parent_message_ts = $2 AND slack_channel_id = $3;',
+      `UPDATE threads SET needs_attention = $1, active = true
+      WHERE slack_parent_message_ts = $2 AND slack_channel_id = $3`,
       [needsAttention, slackParentMessageTs, slackChannelId]
     );
     logger.info(
@@ -790,7 +791,8 @@ export async function setThreadInactive(
   const client = await pool.connect();
   try {
     await client.query(
-      'UPDATE threads SET needs_attention = false, active = false WHERE slack_parent_message_ts = $1 AND slack_channel_id = $2;',
+      `UPDATE threads SET needs_attention = false, active = false
+      WHERE slack_parent_message_ts = $1 AND slack_channel_id = $2`,
       [slackParentMessageTs, slackChannelId]
     );
     logger.info(
