@@ -1177,7 +1177,7 @@ export async function logInitialVoterStatusToDb(
   const client = await pool.connect();
   try {
     if (process.env.CLIENT_ORGANIZATION === 'VOTE_AMERICA') {
-      // Only insert the UNKNOWN status if there is no existing (ALREADY_VOTED) status
+      // Only insert the UNKNOWN status if there is no existing status
       await client.query(
         `INSERT INTO voter_status_updates (user_id, user_phone_number, twilio_phone_number, voter_status, is_demo)
         SELECT $1, $2, $3, 'UNKNOWN', $4

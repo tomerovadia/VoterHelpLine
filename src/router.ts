@@ -98,7 +98,7 @@ export async function welcomePotentialVoter(
       userPhoneNumber: userInfo.userPhoneNumber,
       twilioPhoneNumber: twilioPhoneNumber,
       isDemo: userInfo.isDemo,
-      voterStatus: 'ALREADY_VOTED',
+      voterStatus: 'VOTED',
       originatingSlackUserName: null,
       originatingSlackUserId: null,
       slackChannelName: null,
@@ -182,7 +182,7 @@ const introduceNewVoterToSlackChannel = async (
     userInfo.userId,
     twilioPhoneNumber
   );
-  if (status === 'ALREADY_VOTED') {
+  if (status === 'VOTED') {
     SlackBlockUtil.populateDropdownNewInitialValue(
       slackBlocks,
       SlackActionId.VOTER_STATUS_DROPDOWN,
@@ -1099,7 +1099,7 @@ export async function clarifyHelplineRequest(
       userPhoneNumber: userInfo.userPhoneNumber,
       twilioPhoneNumber: twilioPhoneNumber,
       isDemo: userInfo.isDemo,
-      voterStatus: 'ALREADY_VOTED',
+      voterStatus: 'VOTED',
       originatingSlackUserName: null,
       originatingSlackUserId: null,
       slackChannelName: null,

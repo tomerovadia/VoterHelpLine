@@ -112,12 +112,7 @@ const getClosedVoterPanelText = (
   // See https://api.slack.com/reference/surfaces/formatting#visual-styles
   const specialSlackTimestamp = `<!date^${timeSinceEpochSecs}^{date_num} {time_secs}|${new Date()}>`;
 
-  switch (selectedVoterStatus) {
-    case 'VOTED':
-      return `*Congratulations!* :tada: This voter was marked as *VOTED* by *${originatingSlackUserName}* on *${specialSlackTimestamp}*. On to the next one! :ballot_box_with_ballot:`;
-    default:
-      return `:no_entry_sign: This voter was marked as *${selectedVoterStatus}* by *${originatingSlackUserName}* on *${specialSlackTimestamp}*. :no_entry_sign:`;
-  }
+  return `:no_entry_sign: This voter was marked as *${selectedVoterStatus}* by *${originatingSlackUserName}* on *${specialSlackTimestamp}*. :no_entry_sign:`;
 };
 
 const handleVoterStatusUpdateHelper = async ({
@@ -264,6 +259,12 @@ export async function handleVoterStatusUpdate({
           'SLACKINTERACTIONHANDLER.handleVoterStatusUpdate: Error updating VOTER_STATUS_DROPDOWN'
         );
       }
+
+      // HACK: work around slack bug updating blocks by adjusting the block_id
+      payload.message.blocks[2]['block_id'] = Math.random()
+        .toString(36)
+        .replace(/[^a-z]+/g, '')
+        .substr(0, 8);
 
       // Replace the entire block so that the initial option change persists.
       await SlackInteractionApiUtil.replaceSlackMessageBlocks({
