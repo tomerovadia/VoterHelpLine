@@ -863,9 +863,10 @@ export async function getCurrentSessionOldestMessageEpoch(
       `SELECT MIN(EXTRACT(EPOCH FROM COALESCE(twilio_receive_timestamp,slack_send_timestamp)::timestamptz)) AS epoch
       FROM messages m, threads t
       WHERE
-        m.slack_parent_message_ts = t.slack_parent_message_ts
+        t.session_end_at IS NULL
+        AND t.archived IS NOT TRUE
+        AND m.slack_parent_message_ts = t.slack_parent_message_ts
         AND m.slack_channel = t.slack_channel_id
-        AND t.session_end_at IS NULL
         AND t.user_id = $1
         AND t.twilio_phone_number = $2`,
       [userId, twilioPhoneNumber]
@@ -897,11 +898,11 @@ export async function getPastSessionThreads(
         , EXTRACT(EPOCH FROM now() - t.updated_at) as last_update_age
       FROM threads t
       WHERE
-        archived IS NOT TRUE
-        AND active
+        active
+        AND session_end_at IS NOT NULL
+        AND archived IS NOT TRUE
         AND user_id = $1
         AND twilio_phone_number = $2
-        AND session_end_at IS NOT NULL
       ORDER BY t.updated_at`,
       [userId, twilioPhoneNumber]
     );
@@ -950,8 +951,10 @@ export async function getUnclaimedVoters(
       LEFT JOIN latest_status s ON (t.user_id = s.user_id)
       WHERE
         t.needs_attention
-        AND t.slack_channel_id = $1
+        AND t.active
         AND t.session_end_at IS NULL
+        AND t.archived IS NOT TRUE
+        AND t.slack_channel_id = $1
         AND NOT EXISTS (
           SELECT FROM volunteer_voter_claims c
           WHERE t.user_id=c.user_id
@@ -1000,7 +1003,9 @@ export async function getUnclaimedVotersByChannel(): Promise<ChannelStat[]> {
       LEFT JOIN latest_status s ON (t.user_id = s.user_id)
       WHERE
         needs_attention
-        AND session_end_at IS NULL
+        AND t.active
+        AND t.session_end_at IS NULL
+        AND t.archived IS NOT TRUE
         AND s.voter_status NOT IN ('REFUSED', 'SPAM')
         AND NOT EXISTS (
           SELECT FROM volunteer_voter_claims c
@@ -1037,7 +1042,9 @@ export async function getThreadsNeedingAttentionByChannel(): Promise<
         FROM threads t
         WHERE
           needs_attention
+          AND active
           AND session_end_at IS NULL
+          AND archived IS NOT TRUE
         GROUP BY slack_channel_id
         ORDER BY max_last_update_age DESC`
     );
@@ -1078,7 +1085,9 @@ export async function getThreadsNeedingAttentionByVolunteer(): Promise<
         FROM threads t, claims c
         WHERE
           needs_attention
-          AND session_end_at IS NULL
+          AND t.active
+          AND t.session_end_at IS NULL
+          AND t.archived IS NOT TRUE
           AND t.user_id=c.user_id
           AND c.rn=1
         GROUP BY volunteer_slack_user_id, volunteer_slack_user_name
@@ -1128,10 +1137,12 @@ export async function getThreadsNeedingAttentionForChannel(
         FROM threads t, claims c
         WHERE
           needs_attention
+          AND t.active
+          AND t.session_end_at IS NULL
+          AND t.archived IS NOT TRUE
           AND t.user_id=c.user_id
           AND c.rn=1
           AND slack_channel_id = $1
-          AND session_end_at IS NULL
         ORDER BY updated_at`,
       [channelId]
     );
@@ -1181,8 +1192,10 @@ export async function getThreadsNeedingAttentionFor(
         FROM threads t, claims c
         WHERE
           needs_attention
-          AND t.user_id=c.user_id
+          AND t.active
           AND t.session_end_at IS NULL
+          AND t.archived IS NOT TRUE
+          AND t.user_id=c.user_id
           AND c.rn=1
           AND c.volunteer_slack_user_id=$1
         ORDER BY updated_at`,
@@ -1265,14 +1278,14 @@ export async function getThreadsNeedingFollowUp(
         FROM threads t, latest_claims c, latest_statuses s
         WHERE
           active
+          AND t.session_end_at IS NULL
+          AND t.archived IS NOT TRUE
           AND updated_at <= NOW() - interval '${days} days'
           AND t.user_id = c.user_id
           AND t.is_demo = c.is_demo
           AND c.volunteer_slack_user_id = $1
           AND s.user_id = t.user_id
           AND s.is_demo = t.is_demo
-          AND t.archived IS NOT TRUE
-          AND t.session_end_at IS NULL
         ORDER BY updated_at`,
       [slackUserId]
     );
