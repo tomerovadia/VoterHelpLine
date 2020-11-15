@@ -838,8 +838,6 @@ export async function getThreadLatestMessageTs(
       WHERE
         t.slack_parent_message_ts=$1
         AND t.slack_channel_id=$2
-        AND t.archived IS NOT TRUE
-        AND t.session_end_at IS NULL
       ORDER BY COALESCE(m.slack_send_timestamp, m.slack_receive_timestamp) DESC
       LIMIT 1`,
       [slackParentMessageTs, slackChannelId]
