@@ -1645,6 +1645,8 @@ export async function handleSlackVoterThreadMessage(
       for (const name in slackChannelIds) {
         slackChannelNames[slackChannelIds[name]] = name;
       }
+      // Mark that a volunteer has engaged (by routing them!)
+      userInfo.volunteerEngaged = true;
       await routeVoterToSlackChannel(
         userInfo,
         redisClient,
@@ -1999,6 +2001,8 @@ export async function handleSlackAdminCommand(
           logger.debug(
             `Router.handleSlackAdminCommand: Routing voter from ${userInfo.activeChannelName} to ${adminCommandArgs.destinationSlackChannelName}.`
           );
+          // Mark that a volunteer has engaged (by routing them!)
+          userInfo.volunteerEngaged = true;
           await routeVoterToSlackChannel(
             userInfo,
             redisClient,
