@@ -1067,7 +1067,7 @@ const routeVoterToSlackChannel = async (
     await SlackApiUtil.addSlackMessageReaction(
       adminCommandParams.commandChannel,
       adminCommandParams.commandMessageTs,
-      'white_check_mark'
+      'heavy_check_mark'
     );
   }
 };
@@ -1590,7 +1590,7 @@ export async function handleSlackVoterThreadMessage(
       await SlackApiUtil.addSlackMessageReaction(
         reqBody.event.channel,
         reqBody.event.ts,
-        'white_check_mark'
+        'heavy_check_mark'
       );
       return;
     }
@@ -1950,7 +1950,7 @@ export async function handleSlackAdminCommand(
         await SlackApiUtil.addSlackMessageReaction(
           process.env.ADMIN_CONTROL_ROOM_SLACK_CHANNEL_ID!,
           reqBody.event.ts,
-          'white_check_mark'
+          'heavy_check_mark'
         );
       }
       return;
