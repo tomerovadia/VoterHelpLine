@@ -424,7 +424,7 @@ const MESSAGE_HISTORY_SQL_SCRIPT = `
     twilio_attachments
   FROM messages
   WHERE user_id = $1
-    AND NOT archived
+    AND archived IS NOT TRUE
     AND (to_phone_number = $2 OR from_phone_number = $2)
     AND (
       CASE
@@ -485,7 +485,7 @@ const LAST_TIMESTAMP_SQL_SCRIPT = `
   FROM messages
   WHERE
     slack_parent_message_ts = $1
-    AND NOT archived
+    AND archived IS NOT TRUE
   ORDER BY timestamp DESC
   LIMIT 1;`;
 
@@ -532,7 +532,7 @@ export async function getSlackThreadsForVoterAllSessions(
         WHERE user_id = $1
           AND (to_phone_number = $2 OR from_phone_number = $2)
           AND slack_parent_message_ts IS NOT NULL
-          AND NOT archived
+          AND archived IS NOT TRUE
         GROUP BY slack_parent_message_ts, slack_channel;`,
       [userId, twilioPhoneNumber]
     );
@@ -831,6 +831,7 @@ export async function getThreadLatestMessageTs(
       WHERE
         t.slack_parent_message_ts=$1
         AND t.slack_channel_id=$2
+        AND t.archived IS NOT TRUE
         AND t.session_end_at IS NULL
       ORDER BY COALESCE(m.slack_send_timestamp, m.slack_receive_timestamp) DESC
       LIMIT 1`,
