@@ -1589,3 +1589,30 @@ export async function logSessionTopicsToDb(
     client.release();
   }
 }
+
+export async function getThreadTopics(
+  channelId: string,
+  parentMessageTs: string
+): Promise<string[] | null> {
+  const client = await pool.connect();
+  try {
+    const result = await client.query(
+      `SELECT topics FROM session_topics st, threads t
+      WHERE
+        t.slack_channel_id = $1
+        AND t.slack_parent_message_ts = $2
+        AND st.user_id = t.user_id
+        AND st.twilio_phone_number = t.twilio_phone_number
+        AND st.session_start_at = t.session_start_at
+      ORDER BY created_at DESC limit 1
+      `,
+      [channelId, parentMessageTs]
+    );
+    logger.info(
+      `DBAPIUTIL.getThreadTopics: Successfully fetched thread topics from database.`
+    );
+    return result.rowCount > 0 ? result.rows[0]['topics'] : null;
+  } finally {
+    client.release();
+  }
+}

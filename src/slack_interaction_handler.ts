@@ -293,10 +293,16 @@ export async function handleVoterStatusUpdate({
       twilioPhoneNumber,
     });
 
+    const topics =
+      (await DbApiUtil.getThreadTopics(
+        payload.channel.id,
+        payload.container.thread_ts
+      )) || [];
     await SlackInteractionApiUtil.addBackVoterStatusPanel({
       slackChannelId: payload.channel.id,
       slackParentMessageTs: payload.container.thread_ts,
       oldBlocks: payload.message.blocks,
+      topics: topics,
     });
 
     // For code simplicity, this executes even if "VOTED" is the button clicked before "UNDO".
