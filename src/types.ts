@@ -53,3 +53,11 @@ export type SlackThreadInfo = {
 };
 
 export type Request = express.Request & { rawBody: string };
+
+export const SessionTopics = {
+  VERIFY: 'How to verify voter registration',
+  REGISTER: 'How to register to vote',
+  REQUEST_BALLOT: 'How to request an absentee ballot',
+  RETURN_BALLOT: 'How to return a ballot',
+  WHERE_TO_VOTE: 'Where to vote',
+} as Record<string, string>;

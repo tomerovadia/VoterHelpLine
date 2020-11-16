@@ -1563,3 +1563,29 @@ export async function logCommandToDb(
     client.release();
   }
 }
+
+export async function logSessionTopicsToDb(
+  userInfo: UserInfo,
+  twilioPhoneNumber: string,
+  topics: string[]
+): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query(
+      'INSERT INTO session_topics (created_at, user_id, user_phone_number, twilio_phone_number, session_start_at, is_demo, archived, topics) VALUES (now(), $1, $2, $3, TO_TIMESTAMP($4), $5, false, $6)',
+      [
+        userInfo.userId,
+        userInfo.userPhoneNumber,
+        twilioPhoneNumber,
+        userInfo.sessionStartEpoch,
+        userInfo.isDemo,
+        JSON.stringify(topics),
+      ]
+    );
+    logger.info(
+      `DBAPIUTIL.logTopicsToDb: Successfully stored topics in database.`
+    );
+  } finally {
+    client.release();
+  }
+}

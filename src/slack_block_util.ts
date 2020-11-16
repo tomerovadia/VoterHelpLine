@@ -1,6 +1,6 @@
 import logger from './logger';
 import { SlackActionId } from './slack_interaction_ids';
-import type { VoterStatus } from './types';
+import { SessionTopics, VoterStatus } from './types';
 import { SlackModalPrivateMetadata } from './slack_interaction_handler';
 import { cloneDeep } from 'lodash';
 
@@ -273,6 +273,32 @@ export const voterStatusPanel: SlackBlock = {
   ],
 };
 
+export const voterTopicPanel: SlackBlock = {
+  type: 'section',
+  block_id: 'votertopic',
+  text: {
+    type: 'mrkdwn',
+    text: 'Voter questions, topics discussed',
+  },
+  accessory: {
+    action_id: SlackActionId.SESSION_TOPICS,
+    type: 'multi_static_select',
+    placeholder: {
+      type: 'plain_text',
+      text: 'Select',
+    },
+    options: Object.entries(SessionTopics).map(([k, v]) => {
+      return {
+        text: {
+          type: 'plain_text',
+          text: v,
+        },
+        value: k,
+      };
+    }),
+  },
+};
+
 export function loadingSlackView(): SlackView {
   return {
     title: {
@@ -349,6 +375,7 @@ export function getVoterStatusBlocks(messageText: string): SlackBlock[] {
     voterInfoSection(messageText),
     volunteerSelectionPanel,
     voterStatusPanel,
+    voterTopicPanel,
   ]);
 }
 
