@@ -652,6 +652,10 @@ async function postUserMessageHistoryToSlack(
     );
     return null;
   }
+  if (messageHistory.length == 0) {
+    messageHistoryContext =
+      'This helpline session has no message history (yet).';
+  }
 
   logger.debug(
     'ROUTER.postUserMessageHistoryToSlack: Message history found, formatting it by calling SlackMessageFormatter.'
