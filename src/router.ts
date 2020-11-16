@@ -1552,6 +1552,213 @@ export async function handleClearedVoter(
   );
 }
 
+export async function handleSlackThreadCommand(
+  userInfo: UserInfo,
+  message: string,
+  redisClient: PromisifiedRedisClient,
+  twilioPhoneNumber: string,
+  reqBody: SlackEventRequestBody,
+  originatingSlackUserName: string,
+  twilioCallbackURL: string
+): Promise<boolean> {
+  // Not a command? (Messages to voters should not start with ! unlesss they are all !, like "!!!")
+  if (message[0] != '!' || message.split('').every((char) => char === '!')) {
+    return false;
+  }
+
+  // Commands are admin-only!
+  if (!SlackApiUtil.isMemberOfAdminChannel(userInfo.userId)) {
+    await SlackApiUtil.addSlackMessageReaction(
+      reqBody.event.channel,
+      reqBody.event.ts,
+      'x'
+    );
+    return true;
+  }
+
+  if (message.startsWith('!route ')) {
+    // Route a voter to another channel.
+    const channel = message.substr('!route '.length);
+    const slackChannelIds = await RedisApiUtil.getHash(
+      redisClient,
+      'slackPodChannelIds'
+    );
+    const slackChannelNames: Record<string, string> = {};
+    for (const name in slackChannelIds) {
+      slackChannelNames[slackChannelIds[name]] = name;
+    }
+    // Mark that a volunteer has engaged (by routing them!)
+    userInfo.volunteerEngaged = true;
+    await routeVoterToSlackChannel(
+      userInfo,
+      redisClient,
+      {
+        userId: userInfo.userId,
+        twilioPhoneNumber: twilioPhoneNumber,
+        destinationSlackChannelName: channel,
+      } as CommandUtil.ParsedCommandRouteVoter,
+      {
+        commandParentMessageTs: reqBody.event.thread_ts,
+        commandChannel: reqBody.event.channel,
+        commandMessageTs: reqBody.event.ts,
+        previousSlackChannelName: slackChannelNames[reqBody.event.channel],
+        routingSlackUserName: originatingSlackUserName,
+      }
+    );
+    return true;
+  }
+
+  if (message === '!fake-old-session') {
+    // This simulates the situation of a pre-2020 thread that has no sessionStartEpoch value.
+    await RedisApiUtil.deleteHashField(
+      redisClient,
+      `${userInfo.userId}:${twilioPhoneNumber}`,
+      'sessionStartEpoch'
+    );
+    await SlackApiUtil.addSlackMessageReaction(
+      reqBody.event.channel,
+      reqBody.event.ts,
+      'white_check_mark'
+    );
+    return true;
+  }
+
+  if (message === '!resume-session') {
+    // Continue a stale session in the existing thread.
+    // NOTE: right now we only handle the "no session start epoch" cause for stale-ness
+    if (userInfo.sessionStartEpoch) {
+      await SlackApiUtil.addSlackMessageReaction(
+        reqBody.event.channel,
+        reqBody.event.ts,
+        'x'
+      );
+      return true;
+    }
+    const oldest = await DbApiUtil.getCurrentSessionOldestMessageEpoch(
+      userInfo.userId,
+      twilioPhoneNumber
+    );
+    if (!oldest) {
+      await SlackApiUtil.sendMessage(
+        '*Operator:* Unable to identify start of session',
+        {
+          parentMessageTs: reqBody.event.thread_ts,
+          channel: reqBody.event.channel,
+        }
+      );
+      await SlackApiUtil.addSlackMessageReaction(
+        reqBody.event.channel,
+        reqBody.event.ts,
+        'x'
+      );
+      return true;
+    }
+    userInfo.sessionStartEpoch = oldest;
+
+    // Refresh the voter blocks
+    const oldBlocks = await SlackApiUtil.fetchSlackMessageBlocks(
+      userInfo.activeChannelId,
+      userInfo[userInfo.activeChannelId]
+    );
+    const operatorMessage = voterHeader(userInfo, false);
+    const freshBlocks = SlackBlockUtil.getVoterStatusBlocks(operatorMessage);
+    let newBlocks;
+    if (oldBlocks) {
+      newBlocks = SlackBlockUtil.replaceVoterPanelBlocks(oldBlocks, [
+        freshBlocks[2],
+      ]);
+    } else {
+      newBlocks = freshBlocks;
+    }
+    const status = await DbApiUtil.getLatestVoterStatus(
+      userInfo.userId,
+      twilioPhoneNumber
+    );
+    if (status !== 'UNKNOWN') {
+      SlackBlockUtil.populateDropdownNewInitialValue(
+        newBlocks,
+        SlackActionId.VOTER_STATUS_DROPDOWN,
+        status
+      );
+    }
+    await SlackInteractionApiUtil.replaceSlackMessageBlocks({
+      slackChannelId: userInfo.activeChannelId,
+      slackParentMessageTs: userInfo[userInfo.activeChannelId],
+      newBlocks: newBlocks,
+    });
+    await RedisApiUtil.setHash(
+      redisClient,
+      `${userInfo.userId}:${twilioPhoneNumber}`,
+      userInfo
+    );
+    await SlackApiUtil.sendMessage(
+      '*Operator:* This session is no longer stale',
+      {
+        parentMessageTs: reqBody.event.thread_ts,
+        channel: reqBody.event.channel,
+      }
+    );
+    return true;
+  }
+
+  if (message.startsWith('!new-session ')) {
+    // Open a new session + thread for this voter.
+    const channel = message.substr('!new-session '.length);
+    await endVoterSession(redisClient, userInfo, twilioPhoneNumber);
+    userInfo.sessionStartEpoch = Math.round(Date.now() / 1000);
+    userInfo.volunteerEngaged = false;
+    userInfo.numStateSelectionAttempts = 0;
+    const ts = await introduceNewVoterToSlackChannel(
+      {
+        userInfo: userInfo as UserInfo,
+        userMessage: '',
+        userAttachments: [],
+      },
+      redisClient,
+      twilioPhoneNumber,
+      null,
+      'PULL',
+      channel,
+      twilioCallbackURL,
+      false,
+      true /* noWelcome */
+    );
+    if (ts) {
+      const slackChannelIds = await RedisApiUtil.getHash(
+        redisClient,
+        'slackPodChannelIds'
+      );
+      const url = await SlackApiUtil.getThreadPermalink(
+        slackChannelIds[channel],
+        ts
+      );
+      await SlackApiUtil.sendMessage(
+        `*Operator:* New session created: <${url}|Open>`,
+        {
+          parentMessageTs: reqBody.event.thread_ts,
+          channel: reqBody.event.channel,
+        }
+      );
+    }
+    return true;
+  }
+
+  // Unrecognized command
+  await SlackApiUtil.addSlackMessageReaction(
+    reqBody.event.channel,
+    reqBody.event.ts,
+    'x'
+  );
+  await SlackApiUtil.sendMessage(
+    '*Operator:* Unrecognized command (messages to voters should not start with `!`)',
+    {
+      parentMessageTs: reqBody.event.thread_ts,
+      channel: reqBody.event.channel,
+    }
+  );
+  return true;
+}
+
 export async function handleSlackVoterThreadMessage(
   reqBody: SlackEventRequestBody,
   redisClient: PromisifiedRedisClient,
@@ -1639,211 +1846,17 @@ export async function handleSlackVoterThreadMessage(
     userInfo[userInfo.activeChannelId] === reqBody.event.thread_ts
   ) {
     // is it a command?
-    if (messageToSend.startsWith('!route ')) {
-      if (!SlackApiUtil.isMemberOfAdminChannel(userId)) {
-        await SlackApiUtil.addSlackMessageReaction(
-          reqBody.event.channel,
-          reqBody.event.ts,
-          'x'
-        );
-        return;
-      }
-      const channel = messageToSend.substr('!route '.length);
-      const slackChannelIds = await RedisApiUtil.getHash(
-        redisClient,
-        'slackPodChannelIds'
-      );
-      const slackChannelNames: Record<string, string> = {};
-      for (const name in slackChannelIds) {
-        slackChannelNames[slackChannelIds[name]] = name;
-      }
-      // Mark that a volunteer has engaged (by routing them!)
-      userInfo.volunteerEngaged = true;
-      await routeVoterToSlackChannel(
+    if (
+      await handleSlackThreadCommand(
         userInfo,
-        redisClient,
-        {
-          userId: userInfo.userId,
-          twilioPhoneNumber: twilioPhoneNumber,
-          destinationSlackChannelName: channel,
-        } as CommandUtil.ParsedCommandRouteVoter,
-        {
-          commandParentMessageTs: reqBody.event.thread_ts,
-          commandChannel: reqBody.event.channel,
-          commandMessageTs: reqBody.event.ts,
-          previousSlackChannelName: slackChannelNames[reqBody.event.channel],
-          routingSlackUserName: originatingSlackUserName,
-        }
-      );
-      return;
-    }
-    if (messageToSend === '!fake-old-session') {
-      // this simulates the situation of a pre-2020 thread that has no sessionStartEpoch value.
-      if (!SlackApiUtil.isMemberOfAdminChannel(userId)) {
-        await SlackApiUtil.addSlackMessageReaction(
-          reqBody.event.channel,
-          reqBody.event.ts,
-          'x'
-        );
-        return;
-      }
-      await RedisApiUtil.deleteHashField(
-        redisClient,
-        `${userInfo.userId}:${twilioPhoneNumber}`,
-        'sessionStartEpoch'
-      );
-      await SlackApiUtil.addSlackMessageReaction(
-        reqBody.event.channel,
-        reqBody.event.ts,
-        'white_check_mark'
-      );
-      return;
-    }
-    if (messageToSend === '!resume-session') {
-      if (
-        !SlackApiUtil.isMemberOfAdminChannel(userId) ||
-        userInfo.sessionStartEpoch
-      ) {
-        await SlackApiUtil.addSlackMessageReaction(
-          reqBody.event.channel,
-          reqBody.event.ts,
-          'x'
-        );
-        return;
-      }
-      // NOTE: right now we only handle the "no session start epoch" cause for stale-ness
-      const oldest = await DbApiUtil.getCurrentSessionOldestMessageEpoch(
-        userInfo.userId,
-        twilioPhoneNumber
-      );
-      if (!oldest) {
-        await SlackApiUtil.sendMessage(
-          '*Operator:* Unable to identify start of session',
-          {
-            parentMessageTs: reqBody.event.thread_ts,
-            channel: reqBody.event.channel,
-          }
-        );
-        await SlackApiUtil.addSlackMessageReaction(
-          reqBody.event.channel,
-          reqBody.event.ts,
-          'x'
-        );
-        return;
-      }
-      userInfo.sessionStartEpoch = oldest;
-
-      // refresh the voter blocks
-      const oldBlocks = await SlackApiUtil.fetchSlackMessageBlocks(
-        userInfo.activeChannelId,
-        userInfo[userInfo.activeChannelId]
-      );
-      const operatorMessage = voterHeader(userInfo, false);
-      const freshBlocks = SlackBlockUtil.getVoterStatusBlocks(operatorMessage);
-      let newBlocks;
-      if (oldBlocks) {
-        newBlocks = SlackBlockUtil.replaceVoterPanelBlocks(oldBlocks, [
-          freshBlocks[2],
-        ]);
-      } else {
-        newBlocks = freshBlocks;
-      }
-      const status = await DbApiUtil.getLatestVoterStatus(
-        userInfo.userId,
-        twilioPhoneNumber
-      );
-      if (status !== 'UNKNOWN') {
-        SlackBlockUtil.populateDropdownNewInitialValue(
-          newBlocks,
-          SlackActionId.VOTER_STATUS_DROPDOWN,
-          status
-        );
-      }
-      await SlackInteractionApiUtil.replaceSlackMessageBlocks({
-        slackChannelId: userInfo.activeChannelId,
-        slackParentMessageTs: userInfo[userInfo.activeChannelId],
-        newBlocks: newBlocks,
-      });
-      await RedisApiUtil.setHash(
-        redisClient,
-        `${userInfo.userId}:${twilioPhoneNumber}`,
-        userInfo
-      );
-      await SlackApiUtil.sendMessage(
-        '*Operator:* This session is no longer stale',
-        {
-          parentMessageTs: reqBody.event.thread_ts,
-          channel: reqBody.event.channel,
-        }
-      );
-      return;
-    }
-    if (messageToSend.startsWith('!new-session ')) {
-      if (!SlackApiUtil.isMemberOfAdminChannel(userId)) {
-        await SlackApiUtil.addSlackMessageReaction(
-          reqBody.event.channel,
-          reqBody.event.ts,
-          'x'
-        );
-        return;
-      }
-      const channel = messageToSend.substr('!new-session '.length);
-      await endVoterSession(redisClient, userInfo, twilioPhoneNumber);
-      userInfo.sessionStartEpoch = Math.round(Date.now() / 1000);
-      userInfo.volunteerEngaged = false;
-      userInfo.numStateSelectionAttempts = 0;
-      const ts = await introduceNewVoterToSlackChannel(
-        {
-          userInfo: userInfo as UserInfo,
-          userMessage: '',
-          userAttachments: [],
-        },
+        messageToSend,
         redisClient,
         twilioPhoneNumber,
-        null,
-        'PULL',
-        channel,
-        twilioCallbackURL,
-        false,
-        true /* noWelcome */
-      );
-      if (ts) {
-        const slackChannelIds = await RedisApiUtil.getHash(
-          redisClient,
-          'slackPodChannelIds'
-        );
-        const url = await SlackApiUtil.getThreadPermalink(
-          slackChannelIds[channel],
-          ts
-        );
-        await SlackApiUtil.sendMessage(
-          `*Operator:* New session created: <${url}|Open>`,
-          {
-            parentMessageTs: reqBody.event.thread_ts,
-            channel: reqBody.event.channel,
-          }
-        );
-      }
-      return;
-    }
-
-    // mistyped command? ('!' '!!!' are okay, but starting with '!' and ending with not-'!' is probably a typo)
-    if (
-      messageToSend.startsWith('!') &&
-      messageToSend[messageToSend.length - 1] !== '!'
+        reqBody,
+        originatingSlackUserName,
+        twilioCallbackURL
+      )
     ) {
-      await SlackApiUtil.addSlackMessageReaction(
-        reqBody.event.channel,
-        reqBody.event.ts,
-        'x'
-      );
-      await SlackApiUtil.sendMessage(
-        '*Operator:* Messages to voters should not start with `!`',
-        {
-          parentMessageTs: reqBody.event.thread_ts,
-          channel: reqBody.event.channel,
-        }
-      );
       return;
     }
 
