@@ -114,6 +114,7 @@ export type ThreadInfo = {
   voterStatus?: string;
   sessionStartEpoch: number;
   sessionEndEpoch: number | null;
+  topics?: string[];
 };
 
 export type ChannelStat = {
@@ -896,6 +897,11 @@ export async function getPastSessionThreads(
         , EXTRACT(EPOCH FROM t.session_start_at) as session_start_epoch
         , EXTRACT(EPOCH FROM t.session_end_at) as session_end_epoch
         , EXTRACT(EPOCH FROM now() - t.updated_at) as last_update_age
+        , (
+          SELECT DISTINCT ON (user_id, twilio_phone_number, session_start_at) topics FROM session_topics st
+          WHERE st.user_id = t.user_id AND st.twilio_phone_number = t.twilio_phone_number AND st.session_start_at = t.session_start_at
+          ORDER BY user_id, twilio_phone_number, session_start_at, created_at DESC
+        ) as topics
       FROM threads t
       WHERE
         active
@@ -917,6 +923,7 @@ export async function getPastSessionThreads(
       historyTs: x['history_ts'],
       sessionStartEpoch: x['session_start_epoch'],
       sessionEndEpoch: x['session_end_epoch'],
+      topics: x['topics'],
     }));
   } finally {
     client.release();

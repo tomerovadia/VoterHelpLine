@@ -13,7 +13,7 @@ import * as CommandUtil from './command_util';
 import * as MessageParser from './message_parser';
 import * as SlackInteractionApiUtil from './slack_interaction_api_util';
 import logger from './logger';
-import { EntryPoint, UserInfo, VoterStatus } from './types';
+import { EntryPoint, SessionTopics, UserInfo, VoterStatus } from './types';
 import { PromisifiedRedisClient } from './redis_client';
 import * as Sentry from '@sentry/node';
 import { isVotedKeyword } from './keyword_parser';
@@ -614,10 +614,19 @@ async function postUserMessageHistoryToSlack(
         );
         const lastUpdateEpoch = Date.parse(thread.lastUpdate || '') / 1000;
         const endTime = `<!date^${lastUpdateEpoch}^{time} {date_short}|${lastUpdateEpoch}>`;
-        const description = `Past session in ${SlackApiUtil.linkToSlackChannel(
+        let description = `Past session in ${SlackApiUtil.linkToSlackChannel(
           thread.channelId,
           slackChannelNames[thread.channelId]
         )} ended ${endTime} - <${url}|Open>`;
+        if (thread?.topics) {
+          description +=
+            '\nTopics: ' +
+            thread.topics
+              .map((k) => {
+                return SessionTopics[k];
+              })
+              .join(', ');
+        }
         await SlackApiUtil.sendMessage('', {
           parentMessageTs: destinationSlackParentMessageTs,
           channel: destinationSlackChannelId,
