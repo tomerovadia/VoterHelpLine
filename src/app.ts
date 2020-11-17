@@ -726,6 +726,7 @@ app.post(
         SlackCallbackId.RESET_DEMO,
         SlackCallbackId.MANAGE_ENTRY_POINTS,
         SlackCallbackId.SHOW_NEEDS_ATTENTION,
+        SlackCallbackId.ROUTE_TO_JOURNEY,
       ].includes(payload.callback_id as SlackCallbackId)
     ) {
       logger.info(

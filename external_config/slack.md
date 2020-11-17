@@ -50,11 +50,10 @@ Important: The Slack bot must be given access to each of these channels.
 - north-carolina-0
 - demo-north-carolina-0
 
-You must also create these channels and note their channel IDs (use Copy Link and get the `Cxxxxxx` part).  Set the appropriate values in .env:
+You must also create these channels and note their channel IDs (use Copy Link and get the `Cxxxxxx` part). Set the appropriate values in .env:
 
-- admin-control-room  (ADMIN_CONTROL_ROOM_SLACK_CHANNEL_ID)
-- attachments  (ATTACHMENTS_SLACK_CHANNEL_ID)
-
+- admin-control-room (ADMIN_CONTROL_ROOM_SLACK_CHANNEL_ID)
+- attachments (ATTACHMENTS_SLACK_CHANNEL_ID)
 
 #### Redis
 
@@ -108,9 +107,9 @@ HMSET stateRegionConfig "Alabama" "Central" "Alaska" "Pacific" "Arizona" "Arizon
 
 #### OAuth Tokens & Redirect URLs
 
-Create an **OAuth Access Token** and put it in `.env` as `SLACK_USER_ACCESS_TOKEN`.  It should start with `xoxp-`.
+Create an **OAuth Access Token** and put it in `.env` as `SLACK_USER_ACCESS_TOKEN`. It should start with `xoxp-`.
 
-Create a **Bot User OAuth Access Token** and put it in `.env` as `SLACK_BOT_ACCESS_TOKEN`.  It should start with `xoxb-`.
+Create a **Bot User OAuth Access Token** and put it in `.env` as `SLACK_BOT_ACCESS_TOKEN`. It should start with `xoxb-`.
 
 #### Scopes
 
@@ -184,6 +183,12 @@ This should be added as a **global** shortcut.
 - **Name:** Manage Entry Points
 - **Short Description:** Manage entry points by state or region
 - **Callback ID:** manage_entry_points
+
+This should be added as a **messages** shortcut.
+
+- **Name:** Route to Journey
+- **Short Description:** Routes this voter to a new channel for follow-up
+- **Callback ID:** route_to_journey
 
 ### Slash commands
 

@@ -2,6 +2,7 @@ import Hashes from 'jshashes';
 import * as DbApiUtil from './db_api_util';
 import * as SlackApiUtil from './slack_api_util';
 import * as LoadBalancer from './load_balancer';
+import * as Router from './router';
 import * as PodUtil from './pod_util';
 import * as SlackBlockUtil from './slack_block_util';
 import * as SlackBlockEntrypointUtil from './slack_block_entrypoint_util';
@@ -104,6 +105,7 @@ export type SlackModalPrivateMetadata = {
   twilioPhoneNumber: string;
   slackChannelId: string;
   slackParentMessageTs: string;
+  destinationSlackChannelName: string;
   originatingSlackUserName: string;
   originatingSlackUserId: string;
   slackChannelName: string;
@@ -1113,7 +1115,7 @@ export async function handleSessionHide(
 }
 
 // This function receives the initial request to reset a demo
-// and response by creating a modal populated with data needed
+// and responds by creating a modal populated with data needed
 // to reset the demo if the Slack user confirms.
 export async function receiveResetDemo({
   payload,
@@ -1178,10 +1180,129 @@ export async function receiveResetDemo({
 
       // Store the relevant information in the modal so that when the requested action is confirmed
       // the data needed for the necessary actions is available.
-      slackView = SlackBlockUtil.resetConfirmationSlackView(
+      slackView = SlackBlockUtil.confirmationSlackView(
         SlackCallbackId.RESET_DEMO,
-        modalPrivateMetadata
+        modalPrivateMetadata,
+        'Are you sure you want to end your demo conversation with this volunteer?\n\nYou will no longer be able to send messages to or receive messages from them, and they will be treated as a new demo voter the next time they send a text to this phone number.'
       );
+    }
+
+    await SlackApiUtil.updateModal(viewId, slackView);
+  } catch (e) {
+    // Update the modal to say that there was an error, then re-throw the
+    // error so it ends up in Sentry / the logs
+    await SlackApiUtil.updateModal(
+      viewId,
+      SlackBlockUtil.getErrorSlackView(
+        'internal_server_error',
+        'Sorry, something went wrong. Please try again.'
+      )
+    );
+    throw e;
+  }
+}
+
+// This function receives the initial request to route to journey
+// and responds by creating a modal populated with data needed
+// to route the voter to journey if the Slack user confirms.
+export async function receiveRouteToJourney({
+  payload,
+  redisClient,
+  modalPrivateMetadata,
+  twilioPhoneNumber,
+  userId,
+  viewId,
+}: {
+  payload: SlackInteractionEventPayload;
+  redisClient: PromisifiedRedisClient;
+  modalPrivateMetadata: SlackModalPrivateMetadata;
+  twilioPhoneNumber: string;
+  userId: string;
+  viewId: string;
+}): Promise<void> {
+  logger.info(`Entering SLACKINTERACTIONHANDLER.receiveRouteToJourney`);
+  let slackView;
+
+  try {
+    const redisUserInfoKey = `${userId}:${twilioPhoneNumber}`;
+    const userInfo = (await RedisApiUtil.getHash(
+      redisClient,
+      redisUserInfoKey
+    )) as UserInfo;
+
+    if (!userInfo) {
+      modalPrivateMetadata.success = false;
+      modalPrivateMetadata.failureReason = 'no_user_info';
+      await DbApiUtil.logCommandToDb(modalPrivateMetadata);
+      throw new Error(
+        `SLACKINTERACTIONHANDLER.receiveRouteToJourney: Interaction received for voter who has redisData but not userInfo: active redisData key is ${payload.channel.id}:${payload.message.ts}, userInfo key is ${redisUserInfoKey}.`
+      );
+    }
+
+    if (!(payload.channel.id === userInfo.activeChannelId)) {
+      modalPrivateMetadata.success = false;
+      modalPrivateMetadata.failureReason = 'non_active_thread';
+      await DbApiUtil.logCommandToDb(modalPrivateMetadata);
+      logger.info(
+        `SLACKINTERACTIONHANDLER.receiveRouteToJourney: Volunteer issued route to journey command from #${payload.channel.id} but voter active channel is ${userInfo.activeChannelId}.`
+      );
+      slackView = SlackBlockUtil.getErrorSlackView(
+        'demo_reset_error_not_active_thread',
+        `This voter is no longer active in this thread. Please reach out to the folks at *#${userInfo.activeChannelName}*.`
+      );
+    } else {
+      const activeSlackChannelName = userInfo.activeChannelName;
+      const activeStateName = LoadBalancer.convertSlackChannelNameToStateOrRegionName(
+        activeSlackChannelName
+      );
+
+      if (!activeStateName) {
+        slackView = SlackBlockUtil.getErrorSlackView(
+          'route_to_journey_error_no_state_name_parsed',
+          `Failed to parse state name from channel: *#${activeSlackChannelName}*. Please contact an admin.`
+        );
+      } else {
+        const selectedSlackChannelName = await LoadBalancer.selectSlackChannel(
+          redisClient,
+          // We use PUSH to store open journey pods (PULL = frontline).
+          'PUSH',
+          activeStateName,
+          userInfo.isDemo
+        );
+
+        // Either a stateName wasn't valid or Redis didn't provide open pods for the given stateName.
+        if (
+          !selectedSlackChannelName ||
+          ['demo-national-0', 'national-0'].includes(selectedSlackChannelName)
+        ) {
+          slackView = SlackBlockUtil.getErrorSlackView(
+            'route_to_journey_error_no_pods_found',
+            `No journey pods found for U.S. state name: *${activeStateName}*. Please contact an admin.`
+          );
+        } else if (
+          activeSlackChannelName === selectedSlackChannelName
+        ) {
+          slackView = SlackBlockUtil.getErrorSlackView(
+            'route_to_journey_error_routing_to_same_channel',
+            `The voter is already in an open journey pod for this U.S. state.`
+          );
+        } else {
+          logger.info(
+            `SLACKINTERACTIONHANDLER.receiveRouteToJourney: Route to journey command is valid.`
+          );
+
+          // Store the destinationSlackChannelName for when the modal is confirmed.
+          modalPrivateMetadata.destinationSlackChannelName = selectedSlackChannelName;
+
+          // Store the relevant information in the modal so that when the requested action is confirmed
+          // the data needed for the necessary actions is available.
+          slackView = SlackBlockUtil.confirmationSlackView(
+            SlackCallbackId.ROUTE_TO_JOURNEY,
+            modalPrivateMetadata,
+            'Are you sure you want to route this voter to a journey pod?\n\nPlease remember to let the voter know that someone will be following up with them.'
+          );
+        }
+      }
     }
 
     await SlackApiUtil.updateModal(viewId, slackView);
@@ -1295,6 +1416,55 @@ export async function handleResetDemo(
     modalPrivateMetadata.slackParentMessageTs,
     modalPrivateMetadata.slackChannelId,
     false
+  );
+
+  modalPrivateMetadata.success = true;
+  await DbApiUtil.logCommandToDb(modalPrivateMetadata);
+
+  return;
+}
+
+// This function receives the confirmation of the routing of
+// a voter and does the actual routing work.
+export async function handleRouteToJourney(
+  redisClient: PromisifiedRedisClient,
+  modalPrivateMetadata: SlackModalPrivateMetadata
+): Promise<void> {
+  const redisUserInfoKey = `${modalPrivateMetadata.userId}:${modalPrivateMetadata.twilioPhoneNumber}`;
+
+  logger.debug(
+    `SLACKINTERACTIONHANDLER.handleRouteToJourney: Looking up ${redisUserInfoKey} in Redis.`
+  );
+  const userInfo = (await RedisApiUtil.getHash(
+    redisClient,
+    redisUserInfoKey
+  )) as UserInfo;
+
+  logger.debug(
+    `Router.handleSlackAdminCommand: Routing voter from ${userInfo.activeChannelName} to ${modalPrivateMetadata.destinationSlackChannelName}.`
+  );
+
+  const adminCommandArgs = {
+    userId: modalPrivateMetadata.userId,
+    twilioPhoneNumber: modalPrivateMetadata.twilioPhoneNumber,
+    destinationSlackChannelName:
+      modalPrivateMetadata.destinationSlackChannelName,
+  };
+
+  const adminCommandParams = {
+    // commandParentMessageTs and commandMessageTs are omitted because this isn't an admin command.
+    // so no confirmation needs to be posted.
+    previousSlackChannelName: userInfo.activeChannelName,
+    routingSlackUserName: modalPrivateMetadata.originatingSlackUserName,
+  } as Router.AdminCommandParams;
+
+  // Mark that a volunteer has engaged (by routing them!)
+  userInfo.volunteerEngaged = true;
+  await Router.routeVoterToSlackChannel(
+    userInfo,
+    redisClient,
+    adminCommandArgs,
+    adminCommandParams
   );
 
   modalPrivateMetadata.success = true;

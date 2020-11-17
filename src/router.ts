@@ -29,10 +29,10 @@ type UserOptions = {
   userPhoneNumber: string;
 };
 
-type AdminCommandParams = {
-  commandParentMessageTs: string;
-  commandMessageTs: string; // if command is in a thread, this is the in-thread message
-  commandChannel: string;
+export type AdminCommandParams = {
+  commandParentMessageTs: string | null;
+  commandMessageTs: string | null; // if command is in a thread, this is the in-thread message
+  commandChannel: string | null;
   routingSlackUserName: string;
   previousSlackChannelName: string;
 };
@@ -773,7 +773,7 @@ const routeVoterToSlackChannelHelper = async (
 
 // This function routes a voter to a new channel WHETHER OR NOT they have
 // previously been to that channel before, creating a new thread if needed.
-const routeVoterToSlackChannel = async (
+export async function routeVoterToSlackChannel(
   userInfo: UserInfo,
   redisClient: PromisifiedRedisClient,
   {
@@ -785,8 +785,8 @@ const routeVoterToSlackChannel = async (
     twilioPhoneNumber: string;
     destinationSlackChannelName: string;
   },
-  adminCommandParams?: AdminCommandParams /* only for admin re-routes (not automated)*/
-) => {
+  adminCommandParams?: AdminCommandParams /* only for admin rerouteVoterToSlackChannel-routes or Route to Journey shortcut (not automated)*/
+) {
   const skipLobby =
     (await RedisApiUtil.getKey(redisClient, 'skipLobby')) === 'true';
 
@@ -823,26 +823,33 @@ const routeVoterToSlackChannel = async (
     );
   }
 
-  // Operations for successful ADMIN route of voter.
+  // Operations for successful ADMIN route of voter (admin command or Route to Journey).
   if (adminCommandParams) {
     // Error catching for admin command: destination channel not found.
     if (!destinationSlackChannelId) {
       logger.debug(
         'ROUTER.routeVoterToSlackChannel: destinationSlackChannelId not found. Did you forget to add it to slackPodChannelIds in Redis? Or if this is an admin action, did the admin type it wrong?'
       );
-      await SlackApiUtil.sendMessage(
-        `*Operator:* Slack channel ${destinationSlackChannelName} not found.`,
-        {
-          channel: adminCommandParams.commandChannel,
-          parentMessageTs: adminCommandParams.commandParentMessageTs,
-        }
-      );
-      await SlackApiUtil.addSlackMessageReaction(
-        adminCommandParams.commandChannel,
-        adminCommandParams.commandMessageTs,
-        'x'
-      );
-      return;
+      // Only respond to the admin command if it's a admin control room command (not Route to Journey shortcut).
+      if (
+        adminCommandParams.commandChannel &&
+        adminCommandParams.commandParentMessageTs &&
+        adminCommandParams.commandMessageTs
+      ) {
+        await SlackApiUtil.sendMessage(
+          `*Operator:* Slack channel ${destinationSlackChannelName} not found.`,
+          {
+            channel: adminCommandParams.commandChannel,
+            parentMessageTs: adminCommandParams.commandParentMessageTs,
+          }
+        );
+        await SlackApiUtil.addSlackMessageReaction(
+          adminCommandParams.commandChannel,
+          adminCommandParams.commandMessageTs,
+          'x'
+        );
+        return;
+      }
     }
 
     // TODO: This should probably be a lot later in the routing of the voter.
@@ -915,7 +922,7 @@ const routeVoterToSlackChannel = async (
   );
 
   // Note: It's important not to modify previousParentMessageBlocks here because it may be used again below.
-  // Its panel is modified in its origin and it's message is modified to move its panel to destination.
+  // Its panel is modified in its origin and its message is modified to move its panel to destination.
   const newPrevParentMessageBlocks = [previousParentMessageBlocks[0]].concat(
     closedVoterPanelBlocks
   );
@@ -1084,14 +1091,18 @@ const routeVoterToSlackChannel = async (
 
   await DbApiUtil.setThreadInactive(oldSlackParentMessageTs, oldChannelId);
 
-  if (adminCommandParams) {
+  if (
+    adminCommandParams &&
+    adminCommandParams.commandChannel &&
+    adminCommandParams.commandMessageTs
+  ) {
     await SlackApiUtil.addSlackMessageReaction(
       adminCommandParams.commandChannel,
       adminCommandParams.commandMessageTs,
       'heavy_check_mark'
     );
   }
-};
+}
 
 export async function recordVotedStatus(
   userInfo: UserInfo,

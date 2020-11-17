@@ -49,9 +49,6 @@ async function isValidStateOrRegionName(
 }
 
 export const getEntrypointTypes = (): EntryPoint[] => {
-  if (process.env.CLIENT_ORGANIZATION === 'VOTE_AMERICA') {
-    return ['PULL'];
-  }
   return ['PULL', 'PUSH'];
 };
 
