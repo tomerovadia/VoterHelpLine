@@ -786,7 +786,7 @@ export async function routeVoterToSlackChannel(
     destinationSlackChannelName: string;
   },
   adminCommandParams?: AdminCommandParams /* only for admin rerouteVoterToSlackChannel-routes or Route to Journey shortcut (not automated)*/
-) {
+): Promise<void> {
   const skipLobby =
     (await RedisApiUtil.getKey(redisClient, 'skipLobby')) === 'true';
 
