@@ -201,7 +201,7 @@ export async function getOpenCloseModal({
         type: 'header',
         text: {
           type: 'plain_text',
-          text: 'Pull',
+          text: 'Frontline',
         },
       });
       rows = rows.concat(pullBlocks);
@@ -211,7 +211,7 @@ export async function getOpenCloseModal({
         type: 'header',
         text: {
           type: 'plain_text',
-          text: 'Push',
+          text: 'Journey',
         },
       });
       rows = rows.concat(pushBlocks);

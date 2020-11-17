@@ -1279,9 +1279,7 @@ export async function receiveRouteToJourney({
             'route_to_journey_error_no_pods_found',
             `No journey pods found for U.S. state name: *${activeStateName}*. Please contact an admin.`
           );
-        } else if (
-          activeSlackChannelName === selectedSlackChannelName
-        ) {
+        } else if (activeSlackChannelName === selectedSlackChannelName) {
           slackView = SlackBlockUtil.getErrorSlackView(
             'route_to_journey_error_routing_to_same_channel',
             `The voter is already in an open journey pod for this U.S. state.`
