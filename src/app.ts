@@ -359,7 +359,10 @@ const handleIncomingTwilioMessage = async (
 
       // Always update the status if user texts VOTED, regardless of what mode
       // we are in below.
-      if (KeywordParser.isVotedKeyword(userMessage)) {
+      if (
+        process.env.CLIENT_ORGANIZATION === 'VOTE_AMERICA' &&
+        KeywordParser.isVotedKeyword(userMessage)
+      ) {
         await Router.recordVotedStatus(userInfo, twilioPhoneNumber);
       }
 
@@ -386,7 +389,10 @@ const handleIncomingTwilioMessage = async (
           twilioCallbackURL
         );
         // Voter texted VOTED during the state determination
-      } else if (KeywordParser.isVotedKeyword(userMessage)) {
+      } else if (
+        process.env.CLIENT_ORGANIZATION === 'VOTE_AMERICA' &&
+        KeywordParser.isVotedKeyword(userMessage)
+      ) {
         await Router.replyToVoted(
           userInfo,
           twilioPhoneNumber,
