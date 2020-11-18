@@ -260,7 +260,7 @@ export async function handleVoterStatusUpdate({
         );
       }
 
-      // Replace the entire block so that the initial option change persists.
+      // Update voter panel
       await SlackInteractionApiUtil.updateVoterStatusBlocks(
         payload.channel.id,
         payload.container.thread_ts,
