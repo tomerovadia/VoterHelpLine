@@ -502,10 +502,13 @@ async function slackInteractivityHandler(
       }
 
       case SlackCallbackId.ROUTE_TO_JOURNEY: {
-        const modalPrivateMetadata = JSON.parse(
+        const modalPrivateMetadata = SlackInteractionHandler.parseSlackModalPrivateMetadata(
           payload.view.private_metadata
-        ) as SlackModalPrivateMetadata;
-        if (modalPrivateMetadata.commandType !== 'ROUTE_TO_JOURNEY') {
+        );
+        if (
+          modalPrivateMetadata &&
+          modalPrivateMetadata.commandType !== 'ROUTE_TO_JOURNEY'
+        ) {
           throw new Error(
             `Got callback ID ROUTE_TO_JOURNEY but private commandType was ${modalPrivateMetadata.commandType}`
           );

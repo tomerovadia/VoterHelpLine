@@ -114,6 +114,23 @@ export type SlackModalPrivateMetadata = {
   failureReason?: string;
 };
 
+export function parseSlackModalPrivateMetadata(
+  modalPrivateMetadataString: string
+): SlackModalPrivateMetadata {
+  let modalPrivateMetadataObject;
+  try {
+    modalPrivateMetadataObject = JSON.parse(
+      modalPrivateMetadataString
+    ) as SlackModalPrivateMetadata;
+  } catch (e) {
+    logger.error(
+      'SLACKINTERACTIONHANDLER.parseSlackModalPrivateMetadata: Error parsing slackModalPrivateMetadata'
+    );
+    throw e;
+  }
+  return modalPrivateMetadataObject;
+}
+
 const getClosedVoterPanelText = (
   selectedVoterStatus: VoterStatusUpdate,
   originatingSlackUserName: string
@@ -1162,7 +1179,7 @@ export async function receiveResetDemo({
         'demo_reset_error_not_demo',
         'This shortcut is strictly for demo conversations only. Please reach out to an admin for assistance.'
       );
-    } else if (!(payload.channel.id === userInfo.activeChannelId)) {
+    } else if (payload.channel.id !== userInfo.activeChannelId) {
       modalPrivateMetadata.success = false;
       modalPrivateMetadata.failureReason = 'non_active_thread';
       await DbApiUtil.logCommandToDb(modalPrivateMetadata);
