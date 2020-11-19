@@ -528,11 +528,6 @@ async function slackMessageEventHandler(
     logger.info(
       'SERVER POST /slack: Server received non-bot Slack message OUTSIDE a voter thread. Doing nothing.'
     );
-    await SlackApiUtil.addSlackMessageReaction(
-      reqBody.event.channel,
-      reqBody.event.ts,
-      'zombie'
-    );
   }
 }
 
