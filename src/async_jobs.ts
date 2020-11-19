@@ -102,6 +102,21 @@ async function slackInteractivityHandler(
     );
   }
 
+  // ignore all actions on inactive threads (archived, re-routed, or old session)
+  const thread_ts = payload.message?.thread_ts || payload.message?.ts;
+  if (
+    thread_ts &&
+    !(await DbApiUtil.isActiveSessionThread(thread_ts, payload.channel.id))
+  ) {
+    logger.info('slackInteractivityHandler: ignoring event on inactive thread');
+    await SlackApiUtil.addSlackMessageReaction(
+      payload.channel.id,
+      thread_ts,
+      'zombie'
+    );
+    return;
+  }
+
   // Global shortcut
   if (payload.type === 'shortcut') {
     // Technically it's possible to have a shortcut that doesn't open a global but all of ours
@@ -255,7 +270,17 @@ async function slackInteractivityHandler(
   // Block action
   if (payload.type === 'block_actions') {
     const actionId = payload.actions[0]?.action_id;
+    // match the *prefix* for the expand action, since we have multiple page buttons and
+    // the action_ids have to be unique
+    if (actionId?.startsWith(SlackActionId.VOTER_SESSION_EXPAND)) {
+      await SlackInteractionHandler.handleSessionShow(payload);
+      return;
+    }
     switch (actionId) {
+      case SlackActionId.VOTER_SESSION_HIDE: {
+        await SlackInteractionHandler.handleSessionHide(payload);
+        return;
+      }
       case SlackActionId.MANAGE_ENTRY_POINTS_FILTER_STATE:
       case SlackActionId.MANAGE_ENTRY_POINTS_FILTER_TYPE: {
         logger.info(
@@ -502,6 +527,11 @@ async function slackMessageEventHandler(
     // Hash doesn't exist (this message is likely outside of a voter thread).
     logger.info(
       'SERVER POST /slack: Server received non-bot Slack message OUTSIDE a voter thread. Doing nothing.'
+    );
+    await SlackApiUtil.addSlackMessageReaction(
+      reqBody.event.channel,
+      reqBody.event.ts,
+      'zombie'
     );
   }
 }

@@ -25,7 +25,7 @@ const formatMessageBlock = (
 export function formatMessageHistory(
   messageObjects: HistoricalMessage[],
   userId: string
-): string {
+): string[] {
   logger.info('ENTERING SLACKMESSAGEFORMATTER.formatMessageHistory');
   const formattedMessages = messageObjects.map((messageObject) => {
     const timeSinceEpochSecs = Date.parse(messageObject.timestamp) / 1000;
@@ -63,5 +63,28 @@ export function formatMessageHistory(
     }
   });
 
-  return formattedMessages.join('\n\n');
+  return formattedMessages;
+}
+
+export function paginateMessageHistory(messages: string[]): string[] {
+  // group individual messages into pages
+  const maxLength = 2000; // slack limit is ~3000; leave room for blocks etc.
+  const pages = [] as string[];
+  let page = '';
+  for (const msg of messages) {
+    if (page.length == 0) {
+      page = msg;
+    } else if (page.length + 2 + msg.length >= maxLength) {
+      pages.push(page);
+      page = msg;
+    } else {
+      page += '\n\n' + msg;
+    }
+  }
+  if (page.length) {
+    pages.push(page);
+  } else {
+    pages.push('No history available');
+  }
+  return pages;
 }

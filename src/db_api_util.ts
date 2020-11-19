@@ -92,22 +92,28 @@ export type DatabaseCommandEntry = {
 };
 
 export type DatabaseThreadEntry = {
-  slackParentMessageTs: string | null;
-  channelId: string | null;
-  userId: string | null;
-  userPhoneNumber: string | null;
-  needsAttention: boolean | null;
+  slackParentMessageTs: string;
+  channelId: string;
+  userId: string;
+  userPhoneNumber: string;
+  twilioPhoneNumber: string;
+  needsAttention: boolean;
   isDemo: boolean;
+  sessionStartEpoch: number | null;
 };
 
 export type ThreadInfo = {
   slackParentMessageTs: string;
   channelId: string;
   userId: string | null;
+  lastUpdate: string | null;
   lastUpdateAge: number | null;
   volunteerSlackUserId: string | null;
   volunteerSlackUserName: string | null;
+  historyTs: string | null;
   voterStatus?: string;
+  sessionStartEpoch: number;
+  sessionEndEpoch: number | null;
 };
 
 export type ChannelStat = {
@@ -122,6 +128,12 @@ export type VolunteerStat = {
   count: number;
   maxLastUpdateAge: number;
 };
+
+export function epochToPostgresTimestamp(epoch: number): string {
+  const d = new Date(0);
+  d.setUTCSeconds(epoch - new Date().getTimezoneOffset() * 60);
+  return d.toISOString().replace('T', ' ').replace('Z', '');
+}
 
 export async function logMessageToDb(
   databaseMessageEntry: DatabaseMessageEntry
@@ -412,7 +424,7 @@ const MESSAGE_HISTORY_SQL_SCRIPT = `
     twilio_attachments
   FROM messages
   WHERE user_id = $1
-    AND NOT archived
+    AND archived IS NOT TRUE
     AND (to_phone_number = $2 OR from_phone_number = $2)
     AND (
       CASE
@@ -420,28 +432,40 @@ const MESSAGE_HISTORY_SQL_SCRIPT = `
       WHEN slack_receive_timestamp IS NOT NULL THEN slack_receive_timestamp
       ELSE twilio_send_timestamp
       END
-    ) > $3
+    ) >= $3
+    AND (
+      CASE
+      WHEN twilio_receive_timestamp IS NOT NULL THEN twilio_receive_timestamp
+      WHEN slack_receive_timestamp IS NOT NULL THEN slack_receive_timestamp
+      ELSE twilio_send_timestamp
+      END
+    ) <= $4
   ORDER BY timestamp ASC;`;
 
 export async function getMessageHistoryFor(
   userId: string,
   twilioPhoneNumber: string,
-  timestampSince: string
+  timestampSince: string,
+  timestampEnd?: string
 ): Promise<HistoricalMessage[]> {
   logger.info(`ENTERING DBAPIUTIL.getMessageHistoryFor`);
   logger.info(
-    `DBAPIUTIL.getMessageHistoryFor: Looking up user:${userId}, ${twilioPhoneNumber}, message history since timestamp: ${timestampSince}.`
+    `DBAPIUTIL.getMessageHistoryFor: Looking up user:${userId}, ${twilioPhoneNumber}, message history since timestamp: ${timestampSince} to ${timestampEnd}.`
   );
 
   const client = await pool.connect();
   try {
+    if (!timestampEnd) {
+      timestampEnd = '2100-01-01 00:00:00';
+    }
     const result = await client.query(MESSAGE_HISTORY_SQL_SCRIPT, [
       userId,
       twilioPhoneNumber,
       timestampSince,
+      timestampEnd,
     ]);
     logger.info(
-      `DBAPIUTIL.getMessageHistoryFor: Successfully looked up message history in PostgreSQL.`
+      `DBAPIUTIL.getMessageHistoryFor: Successfully looked up message history in PostgreSQL (${result.rowCount})`
     );
     return result.rows;
   } finally {
@@ -461,7 +485,7 @@ const LAST_TIMESTAMP_SQL_SCRIPT = `
   FROM messages
   WHERE
     slack_parent_message_ts = $1
-    AND NOT archived
+    AND archived IS NOT TRUE
   ORDER BY timestamp DESC
   LIMIT 1;`;
 
@@ -493,7 +517,7 @@ export async function getTimestampOfLastMessageInThread(
   }
 }
 
-export async function getSlackThreadsForVoter(
+export async function getSlackThreadsForVoterAllSessions(
   userId: string,
   twilioPhoneNumber: string
 ): Promise<SlackThreadInfo[] | null> {
@@ -508,7 +532,7 @@ export async function getSlackThreadsForVoter(
         WHERE user_id = $1
           AND (to_phone_number = $2 OR from_phone_number = $2)
           AND slack_parent_message_ts IS NOT NULL
-          AND NOT archived
+          AND archived IS NOT TRUE
         GROUP BY slack_parent_message_ts, slack_channel;`,
       [userId, twilioPhoneNumber]
     );
@@ -570,12 +594,59 @@ export async function archiveDemoVoter(
       SET archived = true
       WHERE
         is_demo = true
-        AND user_id = $1`,
-      [userId]
+        AND user_id = $1
+        AND twilio_phone_number = $2`,
+      [userId, twilioPhoneNumber]
     );
     logger.info(
       `DBAPIUTIL.archiveDemoVoter: Successfully archived demo voter.`
     );
+  } finally {
+    client.release();
+  }
+}
+
+export async function setSessionEnd(
+  userId: string,
+  twilioPhoneNumber: string
+): Promise<void> {
+  logger.info(`ENTERING DBAPIUTIL.setSessionEnd`);
+  const client = await pool.connect();
+  try {
+    await client.query(
+      `UPDATE threads SET session_end_at = (
+        SELECT MAX(updated_at) + interval '1 second' FROM threads
+        WHERE
+          user_id = $1
+          AND twilio_phone_number = $2
+          AND session_end_at IS NULL
+          AND archived IS NOT TRUE
+      )
+      WHERE user_id = $1 AND twilio_phone_number = $2 AND session_end_at IS NULL`,
+      [userId, twilioPhoneNumber]
+    );
+  } finally {
+    client.release();
+  }
+}
+
+export async function isActiveSessionThread(
+  threadTs: string,
+  channelId: string
+): Promise<boolean> {
+  const client = await pool.connect();
+  try {
+    const result = await client.query(
+      `SELECT COUNT(*) FROM threads
+      WHERE
+        slack_parent_message_ts = $1
+        AND slack_channel_id = $2
+        AND active = true
+        AND session_end_at IS NULL
+        AND archived IS NOT TRUE`,
+      [threadTs, channelId]
+    );
+    return result.rowCount > 0 && result.rows[0]['count'] > 0;
   } finally {
     client.release();
   }
@@ -587,19 +658,19 @@ export async function logThreadToDb(
   const client = await pool.connect();
   try {
     await client.query(
-      'INSERT INTO threads (slack_parent_message_ts, slack_channel_id, user_id, user_phone_number, needs_attention, is_demo, updated_at, active) VALUES ($1, $2, $3, $4, $5, $6, NOW(), true)',
+      'INSERT INTO threads (slack_parent_message_ts, slack_channel_id, user_id, user_phone_number, twilio_phone_number, session_start_at, needs_attention, is_demo, updated_at, active) VALUES ($1, $2, $3, $4, $5, TO_TIMESTAMP($6), $7, $8, NOW(), true)',
       [
         databaseThreadEntry.slackParentMessageTs,
         databaseThreadEntry.channelId,
         databaseThreadEntry.userId,
         databaseThreadEntry.userPhoneNumber,
+        databaseThreadEntry.twilioPhoneNumber,
+        databaseThreadEntry.sessionStartEpoch || 0,
         databaseThreadEntry.needsAttention,
         databaseThreadEntry.isDemo,
       ]
     );
     logger.info('DBAPIUTIL.logThreadToDb: Successfully created thread');
-  } catch (error) {
-    logger.info('Failed to update threads; ignoring for now!');
   } finally {
     client.release();
   }
@@ -659,11 +730,14 @@ export async function updateThreadStatusFromMessage(
           databaseMessageEntry.direction === 'INBOUND'
             ? databaseMessageEntry.fromPhoneNumber
             : databaseMessageEntry.toPhoneNumber,
+        twilioPhoneNumber:
+          databaseMessageEntry.direction === 'INBOUND'
+            ? databaseMessageEntry.toPhoneNumber
+            : databaseMessageEntry.fromPhoneNumber,
         needsAttention: databaseMessageEntry.direction === 'INBOUND',
+        sessionStartEpoch: 0 /* kludge but this code path is so rare */,
       } as DatabaseThreadEntry);
     }
-  } catch (error) {
-    logger.info('Failed to update threads; ignoring for now!');
   } finally {
     // Make sure to release the client before any error handling,
     // just in case the error handling itself throws an error.
@@ -685,8 +759,6 @@ export async function setThreadNeedsAttentionToDb(
     logger.info(
       `DBAPIUTIL.setThreadNeedsAttentionToDb: Set thread ${slackParentMessageTs} needs_attention=${needsAttention}`
     );
-  } catch (error) {
-    logger.info('Failed to update threads; ignoring for now!');
   } finally {
     client.release();
   }
@@ -700,7 +772,8 @@ export async function reactivateThread(
   const client = await pool.connect();
   try {
     await client.query(
-      'UPDATE threads SET needs_attention = $1, active = true WHERE slack_parent_message_ts = $2 AND slack_channel_id = $3;',
+      `UPDATE threads SET needs_attention = $1, active = true
+      WHERE slack_parent_message_ts = $2 AND slack_channel_id = $3`,
       [needsAttention, slackParentMessageTs, slackChannelId]
     );
     logger.info(
@@ -718,7 +791,8 @@ export async function setThreadInactive(
   const client = await pool.connect();
   try {
     await client.query(
-      'UPDATE threads SET needs_attention = false, active = false WHERE slack_parent_message_ts = $1 AND slack_channel_id = $2;',
+      `UPDATE threads SET needs_attention = false, active = false
+      WHERE slack_parent_message_ts = $1 AND slack_channel_id = $2`,
       [slackParentMessageTs, slackChannelId]
     );
     logger.info(
@@ -740,8 +814,6 @@ export async function setThreadHistoryTs(
       'UPDATE threads SET history_ts = $1 WHERE slack_parent_message_ts = $2 AND slack_channel_id = $3;',
       [historyTs, slackParentMessageTs, slackChannelId]
     );
-  } catch (error) {
-    logger.info('Failed to update threads; ignoring for now!');
   } finally {
     client.release();
   }
@@ -774,9 +846,78 @@ export async function getThreadLatestMessageTs(
       return result.rows[0]['slack_message_ts'] || result.rows[0]['history_ts'];
     }
     return null;
-  } catch (error) {
-    logger.info('Failed to query threads; ignoring for now!');
+  } finally {
+    client.release();
+  }
+}
+
+export async function getCurrentSessionOldestMessageEpoch(
+  userId: string,
+  twilioPhoneNumber: string
+): Promise<number | null> {
+  const client = await pool.connect();
+  try {
+    // NOTE: we cast to timestamptz because these columns aren't timestamptz, and if we don't we get an epoch
+    // value offset by our timezone.
+    const result = await client.query(
+      `SELECT MIN(EXTRACT(EPOCH FROM COALESCE(twilio_receive_timestamp,slack_send_timestamp)::timestamptz)) AS epoch
+      FROM messages m, threads t
+      WHERE
+        t.session_end_at IS NULL
+        AND t.archived IS NOT TRUE
+        AND m.slack_parent_message_ts = t.slack_parent_message_ts
+        AND m.slack_channel = t.slack_channel_id
+        AND t.user_id = $1
+        AND t.twilio_phone_number = $2`,
+      [userId, twilioPhoneNumber]
+    );
+    if (result.rows.length > 0) {
+      return result.rows[0]['epoch'];
+    }
     return null;
+  } finally {
+    client.release();
+  }
+}
+
+export async function getPastSessionThreads(
+  userId: string,
+  twilioPhoneNumber: string
+): Promise<ThreadInfo[]> {
+  const client = await pool.connect();
+  try {
+    const result = await client.query(
+      `SELECT
+        t.slack_parent_message_ts
+        , t.slack_channel_id
+        , t.user_id
+        , t.history_ts
+        , t.updated_at
+        , EXTRACT(EPOCH FROM t.session_start_at) as session_start_epoch
+        , EXTRACT(EPOCH FROM t.session_end_at) as session_end_epoch
+        , EXTRACT(EPOCH FROM now() - t.updated_at) as last_update_age
+      FROM threads t
+      WHERE
+        active
+        AND session_end_at IS NOT NULL
+        AND archived IS NOT TRUE
+        AND user_id = $1
+        AND twilio_phone_number = $2
+      ORDER BY t.updated_at`,
+      [userId, twilioPhoneNumber]
+    );
+    return result.rows.map((x) => ({
+      slackParentMessageTs: x['slack_parent_message_ts'],
+      channelId: x['slack_channel_id'],
+      userId: x['user_id'],
+      lastUpdate: x['updated_at'],
+      lastUpdateAge: x['last_update_age'],
+      volunteerSlackUserId: null,
+      volunteerSlackUserName: null,
+      historyTs: x['history_ts'],
+      sessionStartEpoch: x['session_start_epoch'],
+      sessionEndEpoch: x['session_end_epoch'],
+    }));
   } finally {
     client.release();
   }
@@ -801,11 +942,18 @@ export async function getUnclaimedVoters(
         t.slack_parent_message_ts
         , t.slack_channel_id
         , t.user_id
+        , t.history_ts
+        , t.updated_at
+        , EXTRACT(EPOCH FROM t.session_start_at) as session_start_epoch
+        , EXTRACT(EPOCH FROM t.session_end_at) as session_end_epoch
         , EXTRACT(EPOCH FROM now() - t.updated_at) as last_update_age
       FROM threads t
       LEFT JOIN latest_status s ON (t.user_id = s.user_id)
       WHERE
         t.needs_attention
+        AND t.active
+        AND t.session_end_at IS NULL
+        AND t.archived IS NOT TRUE
         AND t.slack_channel_id = $1
         AND NOT EXISTS (
           SELECT FROM volunteer_voter_claims c
@@ -820,13 +968,14 @@ export async function getUnclaimedVoters(
       slackParentMessageTs: x['slack_parent_message_ts'],
       channelId: x['slack_channel_id'],
       userId: x['user_id'],
+      lastUpdate: x['updated_at'],
       lastUpdateAge: x['last_update_age'],
       volunteerSlackUserId: null,
       volunteerSlackUserName: null,
+      historyTs: x['history_ts'],
+      sessionStartEpoch: x['session_start_epoch'],
+      sessionEndEpoch: x['session_end_epoch'],
     }));
-  } catch (error) {
-    logger.info('Failed to query unclaimed threads; ignoring for now!');
-    return [];
   } finally {
     client.release();
   }
@@ -854,6 +1003,9 @@ export async function getUnclaimedVotersByChannel(): Promise<ChannelStat[]> {
       LEFT JOIN latest_status s ON (t.user_id = s.user_id)
       WHERE
         needs_attention
+        AND t.active
+        AND t.session_end_at IS NULL
+        AND t.archived IS NOT TRUE
         AND s.voter_status NOT IN ('REFUSED', 'SPAM')
         AND NOT EXISTS (
           SELECT FROM volunteer_voter_claims c
@@ -871,9 +1023,6 @@ export async function getUnclaimedVotersByChannel(): Promise<ChannelStat[]> {
           maxLastUpdateAge: x['max_last_update_age'],
         } as ChannelStat)
     );
-  } catch (error) {
-    logger.info('Failed to query all threads for channel; ignoring for now!');
-    return [];
   } finally {
     client.release();
   }
@@ -893,6 +1042,9 @@ export async function getThreadsNeedingAttentionByChannel(): Promise<
         FROM threads t
         WHERE
           needs_attention
+          AND active
+          AND session_end_at IS NULL
+          AND archived IS NOT TRUE
         GROUP BY slack_channel_id
         ORDER BY max_last_update_age DESC`
     );
@@ -904,9 +1056,6 @@ export async function getThreadsNeedingAttentionByChannel(): Promise<
           maxLastUpdateAge: x['max_last_update_age'],
         } as ChannelStat)
     );
-  } catch (error) {
-    logger.info('Failed to query all threads for channel; ignoring for now!');
-    return [];
   } finally {
     client.release();
   }
@@ -936,6 +1085,9 @@ export async function getThreadsNeedingAttentionByVolunteer(): Promise<
         FROM threads t, claims c
         WHERE
           needs_attention
+          AND t.active
+          AND t.session_end_at IS NULL
+          AND t.archived IS NOT TRUE
           AND t.user_id=c.user_id
           AND c.rn=1
         GROUP BY volunteer_slack_user_id, volunteer_slack_user_name
@@ -950,9 +1102,6 @@ export async function getThreadsNeedingAttentionByVolunteer(): Promise<
           maxLastUpdateAge: x['max_last_update_age'],
         } as VolunteerStat)
     );
-  } catch (error) {
-    logger.info('Failed to query all threads for channel; ignoring for now!');
-    return [];
   } finally {
     client.release();
   }
@@ -978,12 +1127,19 @@ export async function getThreadsNeedingAttentionForChannel(
         slack_parent_message_ts
         , slack_channel_id
         , t.user_id
+        , t.updated_at
         , EXTRACT(EPOCH FROM now() - updated_at) as last_update_age
         , c.volunteer_slack_user_id
         , c.volunteer_slack_user_name
+        , t.history_ts
+        , EXTRACT(EPOCH FROM t.session_start_at) as session_start_epoch
+        , EXTRACT(EPOCH FROM t.session_end_at) as session_end_epoch
         FROM threads t, claims c
         WHERE
           needs_attention
+          AND t.active
+          AND t.session_end_at IS NULL
+          AND t.archived IS NOT TRUE
           AND t.user_id=c.user_id
           AND c.rn=1
           AND slack_channel_id = $1
@@ -994,14 +1150,14 @@ export async function getThreadsNeedingAttentionForChannel(
       slackParentMessageTs: x['slack_parent_message_ts'],
       channelId: x['slack_channel_id'],
       userId: x['user_id'],
+      lastUpdate: x['updated_at'],
       lastUpdateAge: x['last_update_age'],
       volunteerSlackUserId: x['volunteer_slack_user_id'],
       volunteerSlackUserName: x['volunteer_slack_user_name'],
+      historyTs: x['history_ts'],
+      sessionStartEpoch: x['session_start_epoch'],
+      sessionEndEpoch: x['session_end_epoch'],
     }));
-  } catch (error) {
-    logger.info('Failed to query threads; ignoring for now!');
-    throw error;
-    return [];
   } finally {
     client.release();
   }
@@ -1029,9 +1185,16 @@ export async function getThreadsNeedingAttentionFor(
         , t.user_id
         , EXTRACT(EPOCH FROM now() - updated_at) as last_update_age
         , c.volunteer_slack_user_name
+        , t.history_ts
+        , t.updated_at
+        , EXTRACT(EPOCH FROM t.session_start_at) as session_start_epoch
+        , EXTRACT(EPOCH FROM t.session_end_at) as session_end_epoch
         FROM threads t, claims c
         WHERE
           needs_attention
+          AND t.active
+          AND t.session_end_at IS NULL
+          AND t.archived IS NOT TRUE
           AND t.user_id=c.user_id
           AND c.rn=1
           AND c.volunteer_slack_user_id=$1
@@ -1042,13 +1205,14 @@ export async function getThreadsNeedingAttentionFor(
       slackParentMessageTs: x['slack_parent_message_ts'],
       channelId: x['slack_channel_id'],
       userId: x['user_id'],
+      lastUpdate: x['updated_at'],
       lastUpdateAge: x['last_update_age'],
       volunteerSlackUserId: slackUserId,
       volunteerSlackUserName: x['volunteer_slack_user_name'],
+      historyTs: x['history_ts'],
+      sessionStartEpoch: x['session_start_epoch'],
+      sessionEndEpoch: x['session_end_epoch'],
     }));
-  } catch (error) {
-    logger.info('Failed to query threads; ignoring for now!');
-    return [];
   } finally {
     client.release();
   }
@@ -1077,9 +1241,6 @@ export async function getThreadNeedsAttentionFor(
       return result.rows[0].needs_attention;
     }
     return false;
-  } catch (error) {
-    logger.info('Failed to query threads; assuming needs_attention for now!');
-    return true;
   } finally {
     client.release();
   }
@@ -1107,19 +1268,24 @@ export async function getThreadsNeedingFollowUp(
         t.slack_parent_message_ts
         , t.slack_channel_id
         , t.user_id
+        , t.history_ts
+        , t.updated_at
         , EXTRACT(EPOCH FROM now() - updated_at) as last_update_age
         , c.volunteer_slack_user_name
         , s.voter_status
+        , EXTRACT(EPOCH FROM t.session_start_at) as session_start_epoch
+        , EXTRACT(EPOCH FROM t.session_end_at) as session_end_epoch
         FROM threads t, latest_claims c, latest_statuses s
         WHERE
           active
+          AND t.session_end_at IS NULL
+          AND t.archived IS NOT TRUE
           AND updated_at <= NOW() - interval '${days} days'
           AND t.user_id = c.user_id
           AND t.is_demo = c.is_demo
           AND c.volunteer_slack_user_id = $1
           AND s.user_id = t.user_id
           AND s.is_demo = t.is_demo
-          AND t.archived IS NOT TRUE
         ORDER BY updated_at`,
       [slackUserId]
     );
@@ -1127,10 +1293,14 @@ export async function getThreadsNeedingFollowUp(
       slackParentMessageTs: x['slack_parent_message_ts'],
       channelId: x['slack_channel_id'],
       userId: x['user_id'],
+      lastUpdate: x['updated_at'],
       lastUpdateAge: x['last_update_age'],
       volunteerSlackUserId: slackUserId,
       volunteerSlackUserName: x['volunteer_slack_user_name'],
       voterStatus: x['voter_status'],
+      historyTs: x['history_ts'],
+      sessionStartEpoch: x['session_start_epoch'],
+      sessionEndEpoch: x['session_end_epoch'],
     }));
   } finally {
     client.release();

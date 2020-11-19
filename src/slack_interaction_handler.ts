@@ -13,6 +13,7 @@ import { VoterStatus } from './types';
 import { PromisifiedRedisClient } from './redis_client';
 import { ChannelType, UserInfo, SlackThreadInfo } from './types';
 import redisClient from './redis_client';
+import * as SlackMessageFormatter from './slack_message_formatter';
 
 const maxCommandLines = 50; // if we go bigger slack tends to truncate the msg
 
@@ -47,6 +48,7 @@ export type SlackInteractionEventPayload = {
   };
   container: {
     thread_ts: string;
+    channel_id: string;
   };
   channel: {
     id: string;
@@ -925,6 +927,115 @@ export async function handleShortcutShowNeedsAttention({
   await SlackApiUtil.updateModal(viewId, slackView);
 }
 
+export async function handleSessionShow(
+  payload: SlackInteractionEventPayload
+): Promise<void> {
+  const v = payload.actions[0].value?.split(' ') || [];
+  const userId = v[0];
+  const twilioPhoneNumber = v[1];
+  const startEpoch = parseInt(v[2]);
+  const endEpoch = parseInt(v[3]);
+  const page = parseInt(v[4]);
+
+  const messageHistory = await DbApiUtil.getMessageHistoryFor(
+    userId,
+    twilioPhoneNumber,
+    DbApiUtil.epochToPostgresTimestamp(startEpoch),
+    DbApiUtil.epochToPostgresTimestamp(endEpoch)
+  );
+  const formattedMessageHistory = SlackMessageFormatter.formatMessageHistory(
+    messageHistory,
+    userId.substring(0, 5)
+  );
+  const messagePages = SlackMessageFormatter.paginateMessageHistory(
+    formattedMessageHistory
+  );
+  const buttons = [];
+  if (messagePages.length > 1) {
+    for (let i = 0; i < messagePages.length; ++i) {
+      // if we have lots of pages, show button for first + last + those adjacent to the current page
+      if (
+        (i < page - 1 && i > 0) ||
+        (i > page + 1 && i < messagePages.length - 1)
+      ) {
+        continue;
+      }
+      buttons.push({
+        type: 'button',
+        style: 'primary',
+        text: {
+          type: 'plain_text',
+          text: i == page ? `*${i + 1}*` : `${i + 1}`,
+          emoji: true,
+        },
+        action_id: `${SlackActionId.VOTER_SESSION_EXPAND} ${i}`,
+        value: `${userId} ${twilioPhoneNumber} ${startEpoch} ${endEpoch} ${i}`,
+      });
+    }
+  }
+  buttons.push({
+    type: 'button',
+    style: 'primary',
+    text: {
+      type: 'plain_text',
+      text: 'Hide',
+      emoji: true,
+    },
+    action_id: SlackActionId.VOTER_SESSION_HIDE,
+    value: payload.actions[0].value,
+  });
+  const blocks = [
+    payload.message.blocks[0],
+    {
+      type: 'section',
+      text: {
+        type: 'mrkdwn',
+        text: messagePages[page],
+      },
+    },
+    {
+      type: 'actions',
+      elements: buttons,
+    },
+  ];
+
+  logger.info(JSON.stringify(blocks));
+  await SlackInteractionApiUtil.replaceSlackMessageBlocks({
+    slackChannelId: payload.channel.id,
+    slackParentMessageTs: payload.message.ts,
+    newBlocks: blocks,
+  });
+}
+
+export async function handleSessionHide(
+  payload: SlackInteractionEventPayload
+): Promise<void> {
+  const blocks = [
+    payload.message.blocks[0],
+    {
+      type: 'actions',
+      elements: [
+        {
+          type: 'button',
+          style: 'primary',
+          text: {
+            type: 'plain_text',
+            text: 'Show',
+            emoji: true,
+          },
+          action_id: SlackActionId.VOTER_SESSION_EXPAND,
+          value: payload.actions[0].value,
+        },
+      ],
+    },
+  ];
+  await SlackInteractionApiUtil.replaceSlackMessageBlocks({
+    slackChannelId: payload.channel.id,
+    slackParentMessageTs: payload.message.ts,
+    newBlocks: blocks,
+  });
+}
+
 // This function receives the initial request to reset a demo
 // and response by creating a modal populated with data needed
 // to reset the demo if the Slack user confirms.
@@ -1020,7 +1131,7 @@ export async function handleResetDemo(
 ): Promise<void> {
   const redisUserInfoKey = `${modalPrivateMetadata.userId}:${modalPrivateMetadata.twilioPhoneNumber}`;
 
-  const slackThreads = (await DbApiUtil.getSlackThreadsForVoter(
+  const slackThreads = (await DbApiUtil.getSlackThreadsForVoterAllSessions(
     modalPrivateMetadata.userId,
     modalPrivateMetadata.twilioPhoneNumber
   )) as SlackThreadInfo[];

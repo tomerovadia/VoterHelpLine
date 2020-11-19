@@ -45,6 +45,7 @@ const requireModules = () => {
   DbApiUtil.getLatestVoterStatus = jest.fn();
   DbApiUtil.setThreadInactive = jest.fn();
   DbApiUtil.getKnownPhoneState = jest.fn();
+  DbApiUtil.getPastSessionThreads = jest.fn();
 
   SlackBlockUtil.populateDropdownWithLatestVoterStatus = jest.fn();
 };
@@ -114,6 +115,11 @@ const handleNewVoterWrapper = (
   return new Promise((resolve) => {
     resolve(
       Router.handleNewVoter(
+        Router.prepareUserInfoForNewVoter({
+          userOptions,
+          twilioPhoneNumber,
+          entryPoint: LoadBalancer.PULL_ENTRY_POINT,
+        }),
         userOptions,
         redisClient,
         twilioPhoneNumber,
@@ -155,7 +161,7 @@ describe('handleNewVoter', () => {
   });
 
   test('Announces new voter message in Slack', () => {
-    expect(SlackApiUtil.sendMessage.mock.calls[0][0]).toContain('User ID');
+    expect(SlackApiUtil.sendMessage.mock.calls[0][0]).toContain(' via ');
   });
 
   test('Announces new voter message to Slack #lobby channel if non-demo line', () => {
@@ -874,7 +880,7 @@ describe('determineVoterState', () => {
         const MD5 = new Hashes.MD5();
         const userId = MD5.hex('+1234567890').substring(0, 5);
         expectNthSlackMessageToChannel('north-carolina-0', 0, [
-          'New North Carolina voter',
+          'New *North Carolina* voter',
           userId,
         ]);
       });
@@ -896,7 +902,7 @@ describe('determineVoterState', () => {
         inboundDbMessageEntry
       ).then(() => {
         expectNthSlackMessageToChannel('north-carolina-3', 0, [
-          'New North Carolina voter',
+          'New *North Carolina* voter',
         ]);
       });
     });
@@ -919,7 +925,7 @@ describe('determineVoterState', () => {
         inboundDbMessageEntry
       ).then(() => {
         expectNthSlackMessageToChannel('north-carolina-5', 0, [
-          'New North Carolina voter',
+          'New *North Carolina* voter',
         ]);
       });
     });
@@ -942,7 +948,7 @@ describe('determineVoterState', () => {
         inboundDbMessageEntry
       ).then(() => {
         expectNthSlackMessageToChannel('north-carolina-3', 0, [
-          'New North Carolina voter',
+          'New *North Carolina* voter',
         ]);
       });
     });
@@ -965,7 +971,7 @@ describe('determineVoterState', () => {
         inboundDbMessageEntry
       ).then(() => {
         expectNthSlackMessageToChannel('north-carolina-10', 0, [
-          'New North Carolina voter',
+          'New *North Carolina* voter',
         ]);
       });
     });
@@ -1021,7 +1027,7 @@ describe('determineVoterState', () => {
       ).then(() => {
         // 53rd demo NC voter goes to #demo-north-carolina-2
         expectNthSlackMessageToChannel('demo-north-carolina-2', 0, [
-          'New North Carolina voter',
+          'New *North Carolina* voter',
         ]);
       });
     });
