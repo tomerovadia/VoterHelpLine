@@ -11,11 +11,11 @@ import logger from './logger';
 
 describe('SlackInteractionHandler', () => {
   describe('handleVoterStatusUpdate', () => {
-    let error, replaceSlackMessageBlocks, sendMessage, logVoterStatusToDb;
+    let error, updateVoterStatusBlocks, sendMessage, logVoterStatusToDb;
     beforeEach(() => {
       error = jest.spyOn(logger, 'error');
-      replaceSlackMessageBlocks = jest
-        .spyOn(SlackInteractionApiUtil, 'replaceSlackMessageBlocks')
+      updateVoterStatusBlocks = jest
+        .spyOn(SlackInteractionApiUtil, 'updateVoterStatusBlocks')
         .mockImplementation(() => {});
       sendMessage = jest
         .spyOn(SlackApiUtil, 'sendMessage')
@@ -79,10 +79,10 @@ describe('SlackInteractionHandler', () => {
             slackParentMessageTs: expect.any(String),
           })
         );
-        expect(replaceSlackMessageBlocks).toHaveBeenCalledWith({
-          slackChannelId: expect.any(String),
-          slackParentMessageTs: expect.any(String),
-          newBlocks: expect.arrayContaining([
+        expect(updateVoterStatusBlocks).toHaveBeenCalledWith(
+          expect.any(String),
+          expect.any(String),
+          expect.arrayContaining([
             expect.objectContaining({
               type: 'actions',
               elements: expect.arrayContaining([
@@ -97,8 +97,8 @@ describe('SlackInteractionHandler', () => {
                 }),
               ]),
             }),
-          ]),
-        });
+          ])
+        );
       }
     );
   });

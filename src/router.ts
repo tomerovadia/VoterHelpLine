@@ -13,7 +13,7 @@ import * as CommandUtil from './command_util';
 import * as MessageParser from './message_parser';
 import * as SlackInteractionApiUtil from './slack_interaction_api_util';
 import logger from './logger';
-import { EntryPoint, UserInfo } from './types';
+import { EntryPoint, UserInfo, VoterStatus } from './types';
 import { PromisifiedRedisClient } from './redis_client';
 import * as Sentry from '@sentry/node';
 import { isVotedKeyword } from './keyword_parser';
@@ -915,6 +915,94 @@ const routeVoterToSlackChannel = async (
   await DbApiUtil.setThreadInactive(oldSlackParentMessageTs, oldChannelId);
 };
 
+export async function recordVotedStatus(
+  userInfo: UserInfo,
+  twilioPhoneNumber: string
+): Promise<void> {
+  // Log the VOTED status
+  await DbApiUtil.logVoterStatusToDb({
+    userId: userInfo.userId,
+    userPhoneNumber: userInfo.userPhoneNumber,
+    twilioPhoneNumber: twilioPhoneNumber,
+    isDemo: userInfo.isDemo,
+    voterStatus: 'VOTED',
+    originatingSlackUserName: null,
+    originatingSlackUserId: null,
+    slackChannelName: null,
+    slackChannelId: null,
+    slackParentMessageTs: null,
+    actionTs: null,
+  });
+  await SlackApiUtil.sendMessage(
+    `*Operator:* Voter status changed to *VOTED* by user text.`,
+    {
+      channel: userInfo.activeChannelId,
+      parentMessageTs: userInfo[userInfo.activeChannelId],
+    }
+  );
+
+  // Update voter status blocks
+  const blocks = await SlackApiUtil.fetchSlackMessageBlocks(
+    userInfo.activeChannelId,
+    userInfo[userInfo.activeChannelId]
+  );
+  if (blocks) {
+    if (
+      !SlackBlockUtil.populateDropdownNewInitialValue(
+        blocks,
+        SlackActionId.VOTER_STATUS_DROPDOWN,
+        'VOTED' as VoterStatus
+      )
+    ) {
+      logger.error(
+        'ROUTER.handleClearedVoter: unable to modify status dropdown'
+      );
+    }
+    await SlackInteractionApiUtil.updateVoterStatusBlocks(
+      userInfo.activeChannelId,
+      userInfo[userInfo.activeChannelId],
+      blocks
+    );
+  } else {
+    logger.error('ROUTER.handleClearedVoter: unable to fetch old blocks');
+  }
+}
+
+export async function replyToVoted(
+  userInfo: UserInfo,
+  twilioPhoneNumber: string,
+  twilioCallbackURL: string,
+  userMessage: string,
+  inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry
+): Promise<void> {
+  // record the incoming user message
+  await SlackApiUtil.sendMessage(
+    userMessage,
+    {
+      parentMessageTs: userInfo[userInfo.activeChannelId],
+      channel: userInfo.activeChannelId,
+      isVoterMessage: true,
+    },
+    inboundDbMessageEntry,
+    userInfo
+  );
+  const replyMessage = MessageConstants.VOTED_RESPONSE();
+  await TwilioApiUtil.sendMessage(
+    replyMessage,
+    {
+      userPhoneNumber: userInfo.userPhoneNumber,
+      twilioPhoneNumber,
+      twilioCallbackURL,
+    },
+    DbApiUtil.populateAutomatedDbMessageEntry(userInfo)
+  );
+  await SlackApiUtil.sendMessage(replyMessage, {
+    parentMessageTs: userInfo[userInfo.activeChannelId],
+    channel: userInfo.activeChannelId,
+    isAutomatedMessage: true,
+  });
+}
+
 export async function determineVoterState(
   userOptions: UserOptions & { userInfo: UserInfo },
   redisClient: PromisifiedRedisClient,
@@ -1266,9 +1354,14 @@ export async function handleClearedVoter(
         nowSecondsEpoch - lastVoterMessageSecsFromEpoch
       } > : ${MINS_BEFORE_WELCOME_BACK_MESSAGE}), sending welcome back message.`
     );
-    const welcomeBackMessage = MessageConstants.WELCOME_BACK();
+    let userMessage = null as string | null;
+    if (isVotedKeyword(userOptions.userMessage)) {
+      userMessage = MessageConstants.VOTED_RESPONSE();
+    } else {
+      userMessage = MessageConstants.WELCOME_BACK();
+    }
     await TwilioApiUtil.sendMessage(
-      welcomeBackMessage,
+      userMessage,
       {
         userPhoneNumber: userOptions.userPhoneNumber,
         twilioPhoneNumber,
@@ -1276,7 +1369,7 @@ export async function handleClearedVoter(
       },
       DbApiUtil.populateAutomatedDbMessageEntry(userInfo)
     );
-    await SlackApiUtil.sendMessage(welcomeBackMessage, {
+    await SlackApiUtil.sendMessage(userMessage, {
       ...activeChannelMessageParams,
       isAutomatedMessage: true,
     });

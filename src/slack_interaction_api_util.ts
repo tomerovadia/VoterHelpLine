@@ -58,6 +58,25 @@ export function addBackVoterStatusPanel({
   });
 }
 
+export async function updateVoterStatusBlocks(
+  channelId: string,
+  parentMessageTs: string,
+  blocks: SlackBlock[]
+): Promise<void> {
+  // HACK: work around slack bug updating blocks: we need to update the block_id
+  blocks[2].block_id = Math.random()
+    .toString(36)
+    .replace(/[^a-z]+/g, '')
+    .substr(0, 8);
+
+  // Replace the entire block so that the initial option change persists.
+  await replaceSlackMessageBlocks({
+    slackChannelId: channelId,
+    slackParentMessageTs: parentMessageTs,
+    newBlocks: blocks,
+  });
+}
+
 // This function is used in app.js for automated refusals.
 export async function handleAutomatedCollapseOfVoterStatusPanel({
   userInfo,

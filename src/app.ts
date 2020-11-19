@@ -356,6 +356,16 @@ const handleIncomingTwilioMessage = async (
       logger.info(
         `SERVER.handleIncomingTwilioMessage (${userId}): Voter has previously confirmed the disclaimer, or one is not required for this organization.`
       );
+
+      // Always update the status if user texts VOTED, regardless of what mode
+      // we are in below.
+      if (
+        process.env.CLIENT_ORGANIZATION === 'VOTE_AMERICA' &&
+        KeywordParser.isVotedKeyword(userMessage)
+      ) {
+        await Router.recordVotedStatus(userInfo, twilioPhoneNumber);
+      }
+
       // Voter has a state determined. The U.S. state name is used for
       // operator messages as well as to know whether a U.S. state is known
       // for the voter. This may not be ideal (create separate bool?).
@@ -377,6 +387,18 @@ const handleIncomingTwilioMessage = async (
           twilioPhoneNumber,
           inboundDbMessageEntry,
           twilioCallbackURL
+        );
+        // Voter texted VOTED during the state determination
+      } else if (
+        process.env.CLIENT_ORGANIZATION === 'VOTE_AMERICA' &&
+        KeywordParser.isVotedKeyword(userMessage)
+      ) {
+        await Router.replyToVoted(
+          userInfo,
+          twilioPhoneNumber,
+          twilioCallbackURL,
+          userMessage,
+          inboundDbMessageEntry
         );
         // Voter has no state determined
       } else {
