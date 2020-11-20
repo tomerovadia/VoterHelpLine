@@ -57,7 +57,15 @@ export type Request = express.Request & { rawBody: string };
 export const SessionTopics = {
   VERIFY: 'How to verify voter registration',
   REGISTER: 'How to register to vote',
-  REQUEST_BALLOT: 'How to request an absentee ballot',
-  RETURN_BALLOT: 'How to return a ballot',
+  ABSENTEE_REQUEST: 'How to request an absentee ballot',
+  ABSENTEE_BALLOT_DID_NOT_ARRIVE: 'Absentee ballot did not arrive',
+  ABSENTEE_BALLOT_DAMAGED: 'Absentee ballot was damaged',
+  ABSENTEE_BALLOT_MULTIPLE: 'Multiple absentee ballots arrived',
+  ABSENTEE_BALLOT_RETURN: 'How to return a ballot',
+  ABSENTEE_BALLOT_TRACK: 'How to track my ballot',
   WHERE_TO_VOTE: 'Where to vote',
+  VOTE_EARLY: 'How to vote early',
+  ABSENTEE_VOTE_IN_PERSON:
+    'How to vote in person despite having absentee ballot',
+  UNUSUAL_QUESTION: 'Unusual and/or uncategorized question',
 } as Record<string, string>;
