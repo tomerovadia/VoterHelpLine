@@ -54,18 +54,15 @@ function voterHeader(
   announce: boolean,
   notice?: string
 ): string {
-  let r = '';
-  if (announce) {
-    if (userInfo.returningVoter) {
-      r = `<!channel> Returning *${userInfo.stateName}* voter`;
-    } else {
-      r = `<!channel> New *${userInfo.stateName}* voter`;
-    }
-    if (notice) {
-      r += ` (${notice})`;
-    }
-    r += '\n';
+  let r = announce ? '<!channel> ' : '';
+  // NOTE: we have to be careful here because returningVoter may be a boolean or string
+  r += `${String(userInfo.returningVoter) == 'true' ? 'Returning' : 'New'} ${
+    userInfo.stateName ? '*' + userInfo.stateName + '* ' : ''
+  }voter`;
+  if (notice) {
+    r += ` (${notice})`;
   }
+  r += '\n';
   r += `${userInfo.userId} via ${userInfo.twilioPhoneNumber}`;
   return r;
 }
