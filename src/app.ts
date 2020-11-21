@@ -156,7 +156,7 @@ export async function handleKnownVoterBlockLogic(
     userPhoneNumber
   );
 
-  if (userMessage.toLowerCase().trim() === 'stop') {
+  if (KeywordParser.isStopKeyword(userMessage)) {
     logger.info(
       `SERVER.handleIncomingTwilioMessage: Received STOP text from phone number: ${userPhoneNumber}.`
     );
