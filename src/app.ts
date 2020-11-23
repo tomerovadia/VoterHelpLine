@@ -274,7 +274,7 @@ const handleIncomingTwilioMessage = async (
     )}`
   );
 
-  // new session?
+  // New session?
   let returningVoter = false;
   if (userInfo && Router.isStaleSession(userInfo)) {
     logger.info(
@@ -286,6 +286,32 @@ const handleIncomingTwilioMessage = async (
   }
 
   const twilioCallbackURL = TwilioUtil.twilioCallbackURL(req);
+
+  // Rejoin?
+  if (KeywordParser.isJoinKeyword(userMessage)) {
+    const outboundTextsBlocked = await RedisApiUtil.getHashField(
+      redisClient,
+      'slackBlockedUserPhoneNumbers',
+      userPhoneNumber
+    );
+    if (outboundTextsBlocked) {
+      logger.info(
+        `SERVER.handleIncomingTwilioMessage: Received JOIN from refused phone number: ${userPhoneNumber}, unblocking.`
+      );
+        // Start allowing texts to this voter
+      await RedisApiUtil.deleteHashField(
+        redisClient,
+        'slackBlockedUserPhoneNumbers',
+        userPhoneNumber
+      );
+      if (userInfo) {
+        // Treat this as a new session
+        await Router.endVoterSession(redisClient, userInfo, twilioPhoneNumber);
+        userInfo = null;
+        returningVoter = true;
+      }
+    }
+  }
 
   // Seen this voter before
   if (userInfo != null) {

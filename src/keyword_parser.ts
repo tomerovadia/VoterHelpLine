@@ -9,6 +9,10 @@ export function isStopKeyword(userMessage: string): boolean {
   return userMessage.toLowerCase().trim() === 'stop';
 }
 
+export function isJoinKeyword(userMessage: string): boolean {
+  return userMessage.toLowerCase().trim() === 'join';
+}
+
 export function isVotedKeyword(userMessage: string): boolean {
   return [
     'voted',
