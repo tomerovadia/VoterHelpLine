@@ -87,6 +87,10 @@ export function VOTED_RESPONSE(): string {
   return 'Thank you for voting!';
 }
 
+export function HELPLINE_AFTER_STOP_RESPONSE(): string {
+  return 'You have previously opted out of VoteAmerica text messages. To access the voter helpline, first text JOIN to resubscribe to VoteAmerica election alerts, and then text HELPLINE again to reach a volunteer. Msg&data rates apply.';
+}
+
 export function STATE_QUESTION(): string {
   switch (process.env.CLIENT_ORGANIZATION) {
     case 'VOTE_AMERICA':
