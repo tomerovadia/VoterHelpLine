@@ -1418,6 +1418,7 @@ const LAST_VOTER_STATUS_SQL_SCRIPT = `SELECT voter_status
                                         WHERE user_id = $1
                                           AND twilio_phone_number = $2
                                           AND archived IS NOT TRUE
+                                          AND voter_status NOT IN ('REFUSED', 'SPAM', 'REJOIN')
                                         ORDER BY created_at DESC
                                         LIMIT 1;`;
 
