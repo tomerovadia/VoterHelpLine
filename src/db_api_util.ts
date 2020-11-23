@@ -1393,6 +1393,25 @@ export async function logInitialVoterStatusToDb(
   }
 }
 
+export async function logRejoinStatusToDb(
+  userId: string,
+  userPhoneNumber: string,
+  twilioPhoneNumber: string,
+  isDemo: boolean
+): Promise<void> {
+  logger.info(`ENTERING DBAPIUTIL.logRejoinStatusToDb`);
+  const client = await pool.connect();
+  try {
+    await client.query(
+      `INSERT INTO voter_status_updates (user_id, user_phone_number, twilio_phone_number, voter_status, is_demo)
+      VALUES ($1, $2, $3, 'REJOIN', $4)`,
+      [userId, userPhoneNumber, twilioPhoneNumber, isDemo]
+    );
+  } finally {
+    client.release();
+  }
+}
+
 const LAST_VOTER_STATUS_SQL_SCRIPT = `SELECT voter_status
                                         FROM voter_status_updates
                                         WHERE user_id = $1

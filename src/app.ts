@@ -299,11 +299,18 @@ const handleIncomingTwilioMessage = async (
       logger.info(
         `SERVER.handleIncomingTwilioMessage: Received JOIN from refused phone number: ${userPhoneNumber}, unblocking.`
       );
-        // Start allowing texts to this voter
+      // Start allowing texts to this voter
       await RedisApiUtil.deleteHashField(
         redisClient,
         'slackBlockedUserPhoneNumbers',
         userPhoneNumber
+      );
+      const MD5 = new Hashes.MD5();
+      await DbApiUtil.logRejoinStatusToDb(
+        MD5.hex(userPhoneNumber),
+        userPhoneNumber,
+        twilioPhoneNumber,
+        LoadBalancer.phoneNumbersAreDemo(twilioPhoneNumber, userPhoneNumber)
       );
       if (userInfo) {
         // Treat this as a new session
