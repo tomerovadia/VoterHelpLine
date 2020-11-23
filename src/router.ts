@@ -1669,32 +1669,35 @@ export async function handleSlackThreadCommand(
       userInfo.activeChannelId,
       userInfo[userInfo.activeChannelId]
     );
-    const operatorMessage = voterHeader(userInfo, false);
-    const freshBlocks = SlackBlockUtil.getVoterStatusBlocks(operatorMessage);
-    let newBlocks;
-    if (oldBlocks) {
-      newBlocks = SlackBlockUtil.replaceVoterPanelBlocks(oldBlocks, [
-        freshBlocks[2],
-      ]);
-    } else {
-      newBlocks = freshBlocks;
+    if (!oldBlocks) {
+      await SlackApiUtil.sendMessage('*Operator:* Unable to fetch old blocks', {
+        parentMessageTs: reqBody.event.thread_ts,
+        channel: reqBody.event.channel,
+      });
+      await SlackApiUtil.addSlackMessageReaction(
+        reqBody.event.channel,
+        reqBody.event.ts,
+        'x'
+      );
+      return true;
     }
-    const status = await DbApiUtil.getLatestVoterStatus(
+    const status = ((await DbApiUtil.getLatestVoterStatus(
       userInfo.userId,
       twilioPhoneNumber
-    );
-    if (status !== 'UNKNOWN') {
-      SlackBlockUtil.populateDropdownNewInitialValue(
-        newBlocks,
-        SlackActionId.VOTER_STATUS_DROPDOWN,
-        status
-      );
-    }
-    await SlackInteractionApiUtil.replaceSlackMessageBlocks({
+    )) || 'UNKNOWN') as VoterStatus;
+    const topics =
+      (await DbApiUtil.getThreadTopics(
+        reqBody.event.channel,
+        reqBody.event.ts
+      )) || [];
+    await SlackInteractionApiUtil.addBackVoterStatusPanel({
       slackChannelId: userInfo.activeChannelId,
       slackParentMessageTs: userInfo[userInfo.activeChannelId],
-      newBlocks: newBlocks,
+      oldBlocks: oldBlocks,
+      status: status,
+      topics: topics,
     });
+
     await RedisApiUtil.setHash(
       redisClient,
       `${userInfo.userId}:${twilioPhoneNumber}`,
