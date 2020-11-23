@@ -292,16 +292,22 @@ export async function handleVoterStatusUpdate({
       userPhoneNumber,
       twilioPhoneNumber,
     });
-
+    const MD5 = new Hashes.MD5();
+    const userId = MD5.hex(userPhoneNumber);
     const topics =
       (await DbApiUtil.getThreadTopics(
         payload.channel.id,
         payload.container.thread_ts
       )) || [];
+    const status = ((await DbApiUtil.getLatestVoterStatus(
+      userId,
+      twilioPhoneNumber
+    )) || 'UNKNOWN') as VoterStatus;
     await SlackInteractionApiUtil.addBackVoterStatusPanel({
       slackChannelId: payload.channel.id,
       slackParentMessageTs: payload.container.thread_ts,
       oldBlocks: payload.message.blocks,
+      status: status,
       topics: topics,
     });
 
