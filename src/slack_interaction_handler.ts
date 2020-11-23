@@ -303,16 +303,20 @@ export async function handleVoterStatusUpdate({
     logger.info(
       `SLACKINTERACTIONHANDLER.handleVoterStatusUpdate: Determined user interaction is UNDO of voter status update`
     );
+    const MD5 = new Hashes.MD5();
+    const userId = MD5.hex(userPhoneNumber);
+    const previousStatus = ((await DbApiUtil.getLatestVoterStatus(
+      userId,
+      twilioPhoneNumber
+    )) || 'UNKNOWN') as VoterStatusUpdate;
     await handleVoterStatusUpdateHelper({
       payload,
-      selectedVoterStatus: 'UNKNOWN',
+      selectedVoterStatus: previousStatus,
       originatingSlackUserName,
       slackChannelName,
       userPhoneNumber,
       twilioPhoneNumber,
     });
-    const MD5 = new Hashes.MD5();
-    const userId = MD5.hex(userPhoneNumber);
     const topics =
       (await DbApiUtil.getThreadTopics(
         payload.channel.id,
