@@ -370,6 +370,16 @@ async function slackInteractivityHandler(
         userPhoneNumber: redisData ? redisData.userPhoneNumber : null,
         twilioPhoneNumber: redisData ? redisData.twilioPhoneNumber : null,
       });
+    } else if (payload.actions[0].action_id === SlackActionId.SESSION_TOPICS) {
+      logger.info(
+        `SERVER POST /slack-interactivity: Determined user interaction is a session topics update.`
+      );
+      const MD5 = new Hashes.MD5();
+      await SlackInteractionHandler.handleSessionTopicUpdate({
+        payload: payload,
+        userId: MD5.hex(redisData.userPhoneNumber),
+        twilioPhoneNumber: redisData.twilioPhoneNumber,
+      });
     } else {
       throw Error(`Unrecognized action_id ${payload.actions[0].action_id}`);
     }

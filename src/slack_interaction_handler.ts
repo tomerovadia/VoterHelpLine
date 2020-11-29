@@ -64,6 +64,10 @@ export type SlackInteractionEventPayload = {
   };
   action_ts: string;
 
+  state?: {
+    values: SlackInteractionEventValuesPayload;
+  };
+
   // Not a Slack prop.
   automatedButtonSelection: boolean | undefined;
 
@@ -86,6 +90,9 @@ export type SlackSyntheticPayload = {
     blocks: SlackBlockUtil.SlackBlock[];
   };
   automatedButtonSelection: boolean | undefined;
+  state?: {
+    values: SlackInteractionEventValuesPayload;
+  };
 };
 
 type Payload = SlackInteractionEventPayload | SlackSyntheticPayload;
@@ -285,11 +292,23 @@ export async function handleVoterStatusUpdate({
       userPhoneNumber,
       twilioPhoneNumber,
     });
-
+    const MD5 = new Hashes.MD5();
+    const userId = MD5.hex(userPhoneNumber);
+    const topics =
+      (await DbApiUtil.getThreadTopics(
+        payload.channel.id,
+        payload.container.thread_ts
+      )) || [];
+    const status = ((await DbApiUtil.getLatestVoterStatus(
+      userId,
+      twilioPhoneNumber
+    )) || 'UNKNOWN') as VoterStatus;
     await SlackInteractionApiUtil.addBackVoterStatusPanel({
       slackChannelId: payload.channel.id,
       slackParentMessageTs: payload.container.thread_ts,
       oldBlocks: payload.message.blocks,
+      status: status,
+      topics: topics,
     });
 
     // For code simplicity, this executes even if "VOTED" is the button clicked before "UNDO".
@@ -403,6 +422,63 @@ export async function handleVolunteerUpdate({
     slackParentMessageTs: payload.container.thread_ts,
     newBlocks: payload.message.blocks,
   });
+}
+
+export async function handleSessionTopicUpdate({
+  payload,
+  userId,
+  twilioPhoneNumber,
+}: {
+  payload: Payload;
+  userId: string;
+  twilioPhoneNumber: string;
+}): Promise<void> {
+  logger.info(
+    `SLACKINTERACTIONHANDLER.handleSessionTopicUpdate: Determined user interaction is a volunteer update`
+  );
+  logger.info(JSON.stringify(payload));
+
+  const redisHashKey = `${userId}:${twilioPhoneNumber}`;
+  const userInfo = (await RedisApiUtil.getHash(
+    redisClient,
+    redisHashKey
+  )) as UserInfo | null;
+  if (!userInfo) {
+    logger.debug(
+      `SLACKINTERACTIONHANDLER.handleSessionTopicUpdate: unable to find user ${redisHashKey} in Redis.`
+    );
+    return;
+  }
+
+  const multiSelect =
+    payload.state?.values[SlackBlockUtil.voterTopicPanel.block_id][
+      SlackActionId.SESSION_TOPICS
+    ];
+  if (!multiSelect) {
+    logger.error(
+      'SLACKINTERACTIONHANDLER.handleSessionTopicUpdate: unable to find selector result in payload'
+    );
+    return;
+  }
+  const topics =
+    multiSelect?.selected_options?.map((option) => {
+      return option['value'];
+    }) || [];
+  logger.info(
+    `SLACKINTERACTIONHANDLER.handleSessionTopicUpdate: updated ${userInfo.userId} topics to ${topics}`
+  );
+  await DbApiUtil.logSessionTopicsToDb(userInfo, twilioPhoneNumber, topics);
+
+  payload.message.blocks[3].accessory.initial_options =
+    multiSelect?.selected_options;
+
+  // Replace the entire block so that the initial user change persists.
+  await SlackInteractionApiUtil.replaceSlackMessageBlocks({
+    slackChannelId: payload.channel.id,
+    slackParentMessageTs: payload.container.thread_ts,
+    newBlocks: payload.message.blocks,
+  });
+  return;
 }
 
 export function prettyTimeInterval(seconds: number): string {

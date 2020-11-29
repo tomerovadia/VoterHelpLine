@@ -1,10 +1,16 @@
-import { voterStatusPanel, SlackBlock } from './slack_block_util';
+import {
+  voterStatusPanel,
+  voterTopicPanel,
+  SlackBlock,
+} from './slack_block_util';
 import logger from './logger';
-import { UserInfo } from './types';
+import { UserInfo, SessionTopics, VoterStatus } from './types';
 import * as SlackApiUtil from './slack_api_util';
 import * as SlackInteractionHandler from './slack_interaction_handler';
 import { PromisifiedRedisClient } from './redis_client';
 import * as SlackBlockUtil from './slack_block_util';
+import { cloneDeep } from 'lodash';
+import { SlackActionId } from './slack_interaction_ids';
 
 export async function replaceSlackMessageBlocks({
   slackChannelId,
@@ -40,10 +46,14 @@ export function addBackVoterStatusPanel({
   slackChannelId,
   slackParentMessageTs,
   oldBlocks,
+  status,
+  topics,
 }: {
   slackChannelId: string;
   slackParentMessageTs: string;
   oldBlocks: SlackBlock[];
+  status: VoterStatus;
+  topics: string[];
 }): Promise<void> {
   logger.info('ENTERING SLACKINTERACTIONAPIUTIL.addBackVoterStatusPanel');
 
@@ -52,6 +62,28 @@ export function addBackVoterStatusPanel({
   const newBlocks = [voterInfoBlock, volunteerDropdownBlock];
   newBlocks.push(voterStatusPanel);
 
+  if (status !== 'UNKNOWN') {
+    SlackBlockUtil.populateDropdownNewInitialValue(
+      newBlocks,
+      SlackActionId.VOTER_STATUS_DROPDOWN,
+      status
+    );
+  }
+
+  const topicBlock = cloneDeep(voterTopicPanel);
+  if (topics.length > 0) {
+    topicBlock.accessory.initial_options = topics.map((topic) => {
+      return {
+        text: {
+          type: 'plain_text',
+          text: SessionTopics[topic],
+        },
+        value: topic,
+      };
+    });
+  }
+  newBlocks.push(topicBlock);
+  logger.info(JSON.stringify(newBlocks));
   return replaceSlackMessageBlocks({
     slackChannelId,
     slackParentMessageTs,

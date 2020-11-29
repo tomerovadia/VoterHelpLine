@@ -114,6 +114,7 @@ export type ThreadInfo = {
   voterStatus?: string;
   sessionStartEpoch: number;
   sessionEndEpoch: number | null;
+  topics?: string[];
 };
 
 export type ChannelStat = {
@@ -598,6 +599,15 @@ export async function archiveDemoVoter(
         AND twilio_phone_number = $2`,
       [userId, twilioPhoneNumber]
     );
+    await client.query(
+      `UPDATE session_topics
+      SET archived = true
+      WHERE
+        is_demo = true
+        AND user_id = $1
+        AND twilio_phone_number = $2`,
+      [userId, twilioPhoneNumber]
+    );
     logger.info(
       `DBAPIUTIL.archiveDemoVoter: Successfully archived demo voter.`
     );
@@ -896,6 +906,11 @@ export async function getPastSessionThreads(
         , EXTRACT(EPOCH FROM t.session_start_at) as session_start_epoch
         , EXTRACT(EPOCH FROM t.session_end_at) as session_end_epoch
         , EXTRACT(EPOCH FROM now() - t.updated_at) as last_update_age
+        , (
+          SELECT DISTINCT ON (user_id, twilio_phone_number, session_start_at) topics FROM session_topics st
+          WHERE st.user_id = t.user_id AND st.twilio_phone_number = t.twilio_phone_number AND st.session_start_at = t.session_start_at
+          ORDER BY user_id, twilio_phone_number, session_start_at, created_at DESC
+        ) as topics
       FROM threads t
       WHERE
         active
@@ -917,6 +932,7 @@ export async function getPastSessionThreads(
       historyTs: x['history_ts'],
       sessionStartEpoch: x['session_start_epoch'],
       sessionEndEpoch: x['session_end_epoch'],
+      topics: x['topics'],
     }));
   } finally {
     client.release();
@@ -1559,6 +1575,59 @@ export async function logCommandToDb(
     logger.info(
       `DBAPIUTIL.logCommandToDb: Successfully inserted command into PostgreSQL database.`
     );
+  } finally {
+    client.release();
+  }
+}
+
+export async function logSessionTopicsToDb(
+  userInfo: UserInfo,
+  twilioPhoneNumber: string,
+  topics: string[]
+): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query(
+      'INSERT INTO session_topics (created_at, user_id, user_phone_number, twilio_phone_number, session_start_at, is_demo, archived, topics) VALUES (now(), $1, $2, $3, TO_TIMESTAMP($4), $5, false, $6)',
+      [
+        userInfo.userId,
+        userInfo.userPhoneNumber,
+        twilioPhoneNumber,
+        userInfo.sessionStartEpoch,
+        userInfo.isDemo,
+        JSON.stringify(topics),
+      ]
+    );
+    logger.info(
+      `DBAPIUTIL.logTopicsToDb: Successfully stored topics in database.`
+    );
+  } finally {
+    client.release();
+  }
+}
+
+export async function getThreadTopics(
+  channelId: string,
+  parentMessageTs: string
+): Promise<string[] | null> {
+  const client = await pool.connect();
+  try {
+    const result = await client.query(
+      `SELECT topics FROM session_topics st, threads t
+      WHERE
+        t.slack_channel_id = $1
+        AND t.slack_parent_message_ts = $2
+        AND st.user_id = t.user_id
+        AND st.twilio_phone_number = t.twilio_phone_number
+        AND st.session_start_at = t.session_start_at
+      ORDER BY created_at DESC limit 1
+      `,
+      [channelId, parentMessageTs]
+    );
+    logger.info(
+      `DBAPIUTIL.getThreadTopics: Successfully fetched thread topics from database.`
+    );
+    return result.rowCount > 0 ? result.rows[0]['topics'] : null;
   } finally {
     client.release();
   }

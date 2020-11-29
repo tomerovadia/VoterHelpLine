@@ -29,6 +29,8 @@ export enum SlackActionId {
 
   VOTER_SESSION_EXPAND = 'VOTER_SESSION_EXPAND',
   VOTER_SESSION_HIDE = 'VOTER_SESSION_HIDE',
+
+  SESSION_TOPICS = 'SESSION_TOPICS',
 }
 
 // Prefixes per-state blocks in open-close channel modal
