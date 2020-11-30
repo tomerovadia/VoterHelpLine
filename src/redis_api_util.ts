@@ -1,7 +1,7 @@
 import bluebird from 'bluebird';
 import { Multi } from 'redis';
 import logger from './logger';
-import type { PromisifiedRedisClient } from './redis_client';
+import { PromisifiedRedisClient } from './redis_client';
 
 const fieldTypes: {
   [fieldName: string]: 'string' | 'boolean' | 'integer' | undefined;

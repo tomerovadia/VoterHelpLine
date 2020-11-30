@@ -243,12 +243,61 @@ async function slackInteractivityHandler(
           );
           await SlackApiUtil.updateModal(viewId, slackView);
           logger.info(
-            `SLACKINTERACTIONHANDLER.receiveResetDemo: Volunteer used a shortcut on an invalid message.`
+            `ASYNCJOBS.slackInteractivityHandler: Volunteer used a reset demo shortcut on an invalid message.`
           );
           return;
         }
 
         await SlackInteractionHandler.receiveResetDemo({
+          payload,
+          redisClient,
+          modalPrivateMetadata,
+          twilioPhoneNumber: redisData.twilioPhoneNumber,
+          userId: MD5.hex(redisData.userPhoneNumber),
+          viewId,
+        });
+        return;
+      }
+
+      case SlackCallbackId.ROUTE_TO_JOURNEY: {
+        const { viewId } = interactivityMetadata;
+        if (!viewId) {
+          throw new Error(
+            'slackInteractivityHandler called for message_action without viewId'
+          );
+        }
+
+        const MD5 = new Hashes.MD5();
+
+        // Ignore Prettier formatting because this object needs to adhere to JSON strigify requirements.
+        // prettier-ignore
+        const modalPrivateMetadata = {
+          "commandType": 'ROUTE_TO_JOURNEY',
+          "userId": redisData ? MD5.hex(redisData.userPhoneNumber) : null,
+          "twilioPhoneNumber": redisData ? redisData.twilioPhoneNumber : null,
+          "originatingSlackUserName": originatingSlackUserName,
+          "originatingSlackUserId": payload.user.id,
+          "slackChannelId": payload.channel.id,
+          "slackParentMessageTs": thread_ts,
+          // destinationSlackChannelName is populated later
+        } as SlackModalPrivateMetadata;
+
+        if (!originatingSlackChannelName || !redisData) {
+          modalPrivateMetadata.success = false;
+          modalPrivateMetadata.failureReason = 'invalid_shortcut_use';
+          await DbApiUtil.logCommandToDb(modalPrivateMetadata);
+          const slackView = SlackBlockUtil.getErrorSlackView(
+            'not_active_voter_parent_thread',
+            'This shortcut is not valid on this message.'
+          );
+          await SlackApiUtil.updateModal(viewId, slackView);
+          logger.info(
+            `ASYNCJOBS.slackInteractivityHandler: Volunteer used a route to journey shortcut on an invalid message.`
+          );
+          return;
+        }
+
+        await SlackInteractionHandler.receiveRouteToJourney({
           payload,
           redisClient,
           modalPrivateMetadata,
@@ -449,6 +498,25 @@ async function slackInteractivityHandler(
           );
         }
         await SlackInteractionHandler.handleResetDemo(
+          redisClient,
+          modalPrivateMetadata
+        );
+        return;
+      }
+
+      case SlackCallbackId.ROUTE_TO_JOURNEY: {
+        const modalPrivateMetadata = SlackInteractionHandler.parseSlackModalPrivateMetadata(
+          payload.view.private_metadata
+        );
+        if (
+          modalPrivateMetadata &&
+          modalPrivateMetadata.commandType !== 'ROUTE_TO_JOURNEY'
+        ) {
+          throw new Error(
+            `Got callback ID ROUTE_TO_JOURNEY but private commandType was ${modalPrivateMetadata.commandType}`
+          );
+        }
+        await SlackInteractionHandler.handleRouteToJourney(
           redisClient,
           modalPrivateMetadata
         );

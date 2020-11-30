@@ -33,6 +33,24 @@ export function getPushPhoneNumberState(
   }
 }
 
+export function convertSlackChannelNameToStateOrRegionName(
+  slackChannelName: string
+): string {
+  const slackChannelNameLowercase = slackChannelName
+    .replace(/[0-9]|demo/g, '')
+    .replace(/-/g, ' ')
+    .trim();
+  return slackChannelNameLowercase
+    .split(' ')
+    .map((word) => {
+      // Because 'of' is not capitalized in District of Columbia.
+      // TODO: capitalize it, so this edge case doesn't need to be caught.
+      if (word === 'of') return word;
+      return word[0].toUpperCase() + word.substring(1);
+    })
+    .join(' ');
+}
+
 export async function selectSlackChannel(
   redisClient: PromisifiedRedisClient,
   entryPoint: EntryPoint,
@@ -44,8 +62,8 @@ export async function selectSlackChannel(
     `LOADBALANCER.selectSlackChannel: LoadBalancer given the following arguments: entryPoint: ${entryPoint}, stateName: ${stateName}, isDemo: ${isDemo}`
   );
   // If for some reason there's no stateName, Redis won't be able to provide
-  // the needed info for determining a Slack channel. Caller should default
-  // to #national-0 or #demo-national-0.
+  // the needed info for determining a Slack channel. Caller should consider defaulting
+  // to #national-0 or #demo-national-0 if PULL (or give modal error if PUSH).
   if (!stateName) {
     logger.error(
       'LOADBALANCER.selectSlackChannel: U.S. state not provided, LoadBalancer returning null.'
@@ -63,12 +81,15 @@ export async function selectSlackChannel(
     if (stateRegionConfig && stateRegionConfig[stateName]) {
       stateOrRegionName = stateRegionConfig[stateName];
     } else {
-      // Leave stateOrRegionName = stateName as fallback.
-      logger.error(
-        `LOADBALANCER.selectSlackChannel: ERROR with stateToRegionMap: no stateRegionConfig in Redis or no value found for key (${stateName}). stateRegionConfig: ${JSON.stringify(
-          stateRegionConfig
-        )}.`
-      );
+      // If stateName is a region (possible when routing voter to journey),
+      // then all is well. Otherwise, error and leave stateOrRegionName = stateName as fallback.
+      if (stateRegionConfig && !stateRegionConfig.values.includes(stateName)) {
+        logger.error(
+          `LOADBALANCER.selectSlackChannel: ERROR with stateToRegionMap: no stateRegionConfig in Redis or no value found for key (${stateName}). stateRegionConfig: ${JSON.stringify(
+            stateRegionConfig
+          )}.`
+        );
+      }
     }
   }
 

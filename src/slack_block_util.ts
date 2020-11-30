@@ -318,9 +318,10 @@ export function loadingSlackView(): SlackView {
   };
 }
 
-export function resetConfirmationSlackView(
+export function confirmationSlackView(
   callbackId: string,
-  modalPrivateMetadata: SlackModalPrivateMetadata
+  modalPrivateMetadata: SlackModalPrivateMetadata,
+  modalMessage: string
 ): SlackView {
   return {
     callback_id: callbackId,
@@ -338,8 +339,7 @@ export function resetConfirmationSlackView(
         type: 'section',
         text: {
           type: 'mrkdwn',
-          text:
-            'Are you sure you want to end your demo conversation with this volunteer?\n\nYou will no longer be able to send messages to or receive messages from them, and they will be treated as a new demo voter the next time they send a text to this phone number.',
+          text: modalMessage,
         },
       },
     ],
