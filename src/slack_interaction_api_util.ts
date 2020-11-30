@@ -61,14 +61,11 @@ export function addBackVoterStatusPanel({
   const volunteerDropdownBlock = oldBlocks[1];
   const newBlocks = [voterInfoBlock, volunteerDropdownBlock];
   newBlocks.push(voterStatusPanel);
-
-  if (status !== 'UNKNOWN') {
-    SlackBlockUtil.populateDropdownNewInitialValue(
-      newBlocks,
-      SlackActionId.VOTER_STATUS_DROPDOWN,
-      status
-    );
-  }
+  SlackBlockUtil.populateDropdownNewInitialValue(
+    newBlocks,
+    SlackActionId.VOTER_STATUS_DROPDOWN,
+    status
+  );
 
   const topicBlock = cloneDeep(voterTopicPanel);
   if (topics.length > 0) {
@@ -83,7 +80,7 @@ export function addBackVoterStatusPanel({
     });
   }
   newBlocks.push(topicBlock);
-  logger.info(JSON.stringify(newBlocks));
+
   return replaceSlackMessageBlocks({
     slackChannelId,
     slackParentMessageTs,

@@ -12,6 +12,7 @@ export type VoterStatus =
   | 'IN_PERSON'
   | 'VOTED'
   | 'REFUSED'
+  | 'REJOIN'
   | 'SPAM';
 
 type UserInfoCore = {

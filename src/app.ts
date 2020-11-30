@@ -6,6 +6,7 @@ import morgan from 'morgan';
 import axios, { AxiosResponse } from 'axios';
 import { Pool } from 'pg';
 
+import * as MessageConstants from './message_constants';
 import * as SlackApiUtil from './slack_api_util';
 import * as SlackInteractionHandler from './slack_interaction_handler';
 import * as TwilioApiUtil from './twilio_api_util';
@@ -156,7 +157,7 @@ export async function handleKnownVoterBlockLogic(
     userPhoneNumber
   );
 
-  if (userMessage.toLowerCase().trim() === 'stop') {
+  if (KeywordParser.isStopKeyword(userMessage)) {
     logger.info(
       `SERVER.handleIncomingTwilioMessage: Received STOP text from phone number: ${userPhoneNumber}.`
     );
@@ -274,7 +275,7 @@ const handleIncomingTwilioMessage = async (
     )}`
   );
 
-  // new session?
+  // New session?
   let returningVoter = false;
   if (userInfo && Router.isStaleSession(userInfo)) {
     logger.info(
@@ -286,6 +287,103 @@ const handleIncomingTwilioMessage = async (
   }
 
   const twilioCallbackURL = TwilioUtil.twilioCallbackURL(req);
+
+  // Rejoin?
+  if (KeywordParser.isJoinKeyword(userMessage)) {
+    const outboundTextsBlocked = await RedisApiUtil.getHashField(
+      redisClient,
+      'slackBlockedUserPhoneNumbers',
+      userPhoneNumber
+    );
+    if (outboundTextsBlocked) {
+      logger.info(
+        `SERVER.handleIncomingTwilioMessage: Received JOIN from refused phone number: ${userPhoneNumber}, unblocking.`
+      );
+      // Start allowing texts to this voter
+      await RedisApiUtil.deleteHashField(
+        redisClient,
+        'slackBlockedUserPhoneNumbers',
+        userPhoneNumber
+      );
+      const MD5 = new Hashes.MD5();
+      await DbApiUtil.logRejoinStatusToDb(
+        MD5.hex(userPhoneNumber),
+        userPhoneNumber,
+        twilioPhoneNumber,
+        LoadBalancer.phoneNumbersAreDemo(twilioPhoneNumber, userPhoneNumber)
+      );
+      if (userInfo) {
+        // Treat this as a new session
+        await Router.endVoterSession(redisClient, userInfo, twilioPhoneNumber);
+        userInfo = null;
+        returningVoter = true;
+      }
+    }
+  } else if (
+    process.env.CLIENT_ORGANIZATION === 'VOTE_AMERICA' &&
+    KeywordParser.isHelplineKeyword(userMessage)
+  ) {
+    // If the voter has previously opted out and then texts HELPLINE, instruct
+    // them to JOIN.
+    const outboundTextsBlocked = await RedisApiUtil.getHashField(
+      redisClient,
+      'slackBlockedUserPhoneNumbers',
+      userPhoneNumber
+    );
+    if (outboundTextsBlocked) {
+      if (!userInfo) {
+        // Voters that have opted out should always have a residual userInfo.  However,
+        // provide this (somewhat kludgey) fallback so that they still get the message just
+        // in case they don't.
+        logger.info(
+          `SERVER.handleIncomingTwilioMessage: Received HELPLINE on refused phone number ${userPhoneNumber}; creating missing UserInfo`
+        );
+        const userOptions = {
+          userPhoneNumber,
+          userMessage,
+          userAttachments,
+          userId,
+        };
+        userInfo = Router.prepareUserInfoForNewVoter({
+          userOptions,
+          twilioPhoneNumber,
+          entryPoint,
+          returningVoter,
+        });
+      }
+      logger.info(
+        `SERVER.handleIncomingTwilioMessage: Received HELPLINE on refused phone number ${userPhoneNumber}; instructing them to re-JOIN`
+      );
+      // Log incoming message
+      await SlackApiUtil.sendMessage(
+        userMessage,
+        {
+          parentMessageTs: userInfo[userInfo.activeChannelId],
+          channel: userInfo.activeChannelId,
+          isVoterMessage: true,
+        },
+        inboundDbMessageEntry,
+        userInfo
+      );
+      // Reply
+      const replyMessage = MessageConstants.HELPLINE_AFTER_STOP_RESPONSE();
+      await TwilioApiUtil.sendMessage(
+        replyMessage,
+        {
+          userPhoneNumber: userPhoneNumber,
+          twilioPhoneNumber,
+          twilioCallbackURL,
+        },
+        DbApiUtil.populateAutomatedDbMessageEntry(userInfo)
+      );
+      await SlackApiUtil.sendMessage(replyMessage, {
+        parentMessageTs: userInfo[userInfo.activeChannelId],
+        channel: userInfo.activeChannelId,
+        isAutomatedMessage: true,
+      });
+      return;
+    }
+  }
 
   // Seen this voter before
   if (userInfo != null) {
