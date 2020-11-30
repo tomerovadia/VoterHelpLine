@@ -1727,6 +1727,29 @@ export async function handleSlackThreadCommand(
   if (message.startsWith('!new-session ')) {
     // Open a new session + thread for this voter.
     const channel = message.substr('!new-session '.length);
+
+    // Make sure the destination channel exists before we end their old session!
+    const slackChannelIds = await RedisApiUtil.getHash(
+      redisClient,
+      'slackPodChannelIds'
+    );
+    if (!(channel in slackChannelIds)) {
+      await SlackApiUtil.sendMessage(
+        `*Operator:* Channel ${channel} does not exist`,
+        {
+          parentMessageTs: reqBody.event.thread_ts,
+          channel: reqBody.event.channel,
+        }
+      );
+      await SlackApiUtil.addSlackMessageReaction(
+        reqBody.event.channel,
+        reqBody.event.ts,
+        'x'
+      );
+      return true;
+    }
+
+    // End old session, and then reintroduce them in the new channel
     await endVoterSession(redisClient, userInfo, twilioPhoneNumber);
     userInfo.sessionStartEpoch = Math.round(Date.now() / 1000);
     userInfo.volunteerEngaged = false;
@@ -1747,6 +1770,7 @@ export async function handleSlackThreadCommand(
       true /* noWelcome */
     );
     if (ts) {
+      // Link to the new session's thread from the old thread.
       const slackChannelIds = await RedisApiUtil.getHash(
         redisClient,
         'slackPodChannelIds'
