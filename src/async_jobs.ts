@@ -276,6 +276,9 @@ async function slackInteractivityHandler(
           "userId": redisData ? MD5.hex(redisData.userPhoneNumber) : null,
           "twilioPhoneNumber": redisData ? redisData.twilioPhoneNumber : null,
           "originatingSlackUserName": originatingSlackUserName,
+          "originatingSlackUserId": payload.user.id,
+          "slackChannelId": payload.channel.id,
+          "slackParentMessageTs": thread_ts,
           // destinationSlackChannelName is populated later
         } as SlackModalPrivateMetadata;
 

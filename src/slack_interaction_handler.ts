@@ -1473,6 +1473,46 @@ export async function handleRouteToJourney(
     routingSlackUserName: modalPrivateMetadata.originatingSlackUserName,
   } as Router.AdminCommandParams;
 
+  // Clear the volunteer
+  const blocks = await SlackApiUtil.fetchSlackMessageBlocks(
+    modalPrivateMetadata.slackChannelId,
+    modalPrivateMetadata.slackParentMessageTs
+  );
+  logger.info(JSON.stringify(blocks));
+  if (!blocks) {
+    logger.warn(
+      'Router.handleSlackAdminCommand: unable to fetch blocks to clear volunteer'
+    );
+    return;
+  }
+  await DbApiUtil.logVolunteerVoterClaimToDb({
+    userId: modalPrivateMetadata.userId,
+    userPhoneNumber: modalPrivateMetadata.userPhoneNumber,
+    twilioPhoneNumber: modalPrivateMetadata.twilioPhoneNumber,
+    isDemo: LoadBalancer.phoneNumbersAreDemo(
+      modalPrivateMetadata.twilioPhoneNumber,
+      modalPrivateMetadata.userPhoneNumber
+    ),
+    volunteerSlackUserName: null,
+    volunteerSlackUserId: null,
+    originatingSlackUserName: modalPrivateMetadata.originatingSlackUserName,
+    originatingSlackUserId: modalPrivateMetadata.originatingSlackUserId,
+    slackChannelName: modalPrivateMetadata.slackChannelName,
+    slackChannelId: modalPrivateMetadata.slackChannelId,
+    slackParentMessageTs: modalPrivateMetadata.slackParentMessageTs,
+    actionTs: null,
+  });
+  SlackBlockUtil.populateDropdownNewInitialValue(
+    blocks,
+    SlackActionId.VOLUNTEER_DROPDOWN,
+    null
+  );
+  await SlackInteractionApiUtil.replaceSlackMessageBlocks({
+    slackChannelId: modalPrivateMetadata.slackChannelId,
+    slackParentMessageTs: modalPrivateMetadata.slackParentMessageTs,
+    newBlocks: blocks,
+  });
+
   // Mark that a volunteer has engaged (by routing them!)
   userInfo.volunteerEngaged = true;
   await Router.routeVoterToSlackChannel(
