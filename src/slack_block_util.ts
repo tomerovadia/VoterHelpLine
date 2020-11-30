@@ -123,17 +123,6 @@ const volunteerSelectionPanel: SlackBlock = {
         emoji: true,
       },
     },
-    {
-      type: 'button',
-      style: 'primary',
-      text: {
-        type: 'plain_text',
-        text: 'Clear volunteer',
-        emoji: true,
-      },
-      action_id: SlackActionId.VOLUNTEER_RELEASE_CLAIM,
-      value: 'RELEASE_CLAIM',
-    },
   ],
 };
 
@@ -448,6 +437,32 @@ export function replaceVoterPanelBlocks(
     newBlocks.push(replacementBlocks[idx]);
   }
   return newBlocks;
+}
+
+// Adjust whether the 'Clear volunteer' button is present or not.
+export function updateClearVolunteerButton(
+  blocks: SlackBlock[],
+  visible: boolean
+): void {
+  if (visible) {
+    if (blocks[1].elements.length == 1) {
+      blocks[1].elements.push({
+        type: 'button',
+        style: 'primary',
+        text: {
+          type: 'plain_text',
+          text: 'Clear volunteer',
+          emoji: true,
+        },
+        action_id: SlackActionId.VOLUNTEER_RELEASE_CLAIM,
+        value: 'RELEASE_CLAIM',
+      });
+    }
+  } else {
+    if (blocks[1].elements.length > 1) {
+      blocks[1].elements.pop();
+    }
+  }
 }
 
 export function formatMessageWithAttachmentLinks(

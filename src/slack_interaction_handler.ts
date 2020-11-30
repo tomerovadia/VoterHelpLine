@@ -435,6 +435,12 @@ export async function handleVolunteerUpdate({
     );
   }
 
+  // only show the 'Clear volunteer' button if a volunteer is selected
+  SlackBlockUtil.updateClearVolunteerButton(
+    payload.message.blocks,
+    Boolean(selectedVolunteerSlackUserId)
+  );
+
   // Replace the entire block so that the initial user change persists.
   await SlackInteractionApiUtil.replaceSlackMessageBlocks({
     slackChannelId: payload.channel.id,
@@ -1507,6 +1513,7 @@ export async function handleRouteToJourney(
     SlackActionId.VOLUNTEER_DROPDOWN,
     null
   );
+  SlackBlockUtil.updateClearVolunteerButton(blocks, false);
   await SlackInteractionApiUtil.replaceSlackMessageBlocks({
     slackChannelId: modalPrivateMetadata.slackChannelId,
     slackParentMessageTs: modalPrivateMetadata.slackParentMessageTs,
