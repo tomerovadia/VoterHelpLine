@@ -1513,6 +1513,7 @@ export async function handleRouteToJourney(
     SlackActionId.VOLUNTEER_DROPDOWN,
     null
   );
+  SlackBlockUtil.updateClearVolunteerButton(blocks, false);
   await SlackInteractionApiUtil.replaceSlackMessageBlocks({
     slackChannelId: modalPrivateMetadata.slackChannelId,
     slackParentMessageTs: modalPrivateMetadata.slackParentMessageTs,
