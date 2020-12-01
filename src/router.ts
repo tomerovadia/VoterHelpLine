@@ -54,15 +54,18 @@ function voterHeader(
   announce: boolean,
   notice?: string
 ): string {
-  let r = announce ? '<!channel> ' : '';
-  // NOTE: we have to be careful here because returningVoter may be a boolean or string
-  r += `${String(userInfo.returningVoter) == 'true' ? 'Returning' : 'New'} ${
-    userInfo.stateName ? '*' + userInfo.stateName + '* ' : ''
-  }voter`;
-  if (notice) {
-    r += ` (${notice})`;
+  let r = '';
+  if (announce || userInfo.stateName || notice) {
+    r = announce ? '<!channel> ' : '';
+    // NOTE: we have to be careful here because returningVoter may be a boolean or string
+    r += `${String(userInfo.returningVoter) == 'true' ? 'Returning' : 'New'} ${
+      userInfo.stateName ? '*' + userInfo.stateName + '* ' : ''
+    }voter`;
+    if (notice) {
+      r += ` (${notice})`;
+    }
+    r += '\n';
   }
-  r += '\n';
   r += `${userInfo.userId} via ${userInfo.twilioPhoneNumber}`;
   return r;
 }
@@ -241,9 +244,12 @@ async function introduceNewVoterToSlackChannel(
     `ROUTER.introduceNewVoterToSlackChannel: Announcing new voter via new thread in ${slackChannelName}.`
   );
   // In Slack, create entry channel message, followed by voter's message and intro text.
-  const operatorMessage = userInfo.stateName
-    ? voterHeader(userInfo, true, 'known phone number')
-    : voterHeader(userInfo, false);
+  const operatorMessage = voterHeader(
+    userInfo,
+    // Notify channel if we are not in the lobby
+    slackChannelName != 'lobby' && slackChannelName != 'demo-lobby',
+    userInfo.panelMessage
+  );
 
   const slackBlocks = SlackBlockUtil.getVoterStatusBlocks(operatorMessage);
 
@@ -497,6 +503,7 @@ export async function handleNewVoter(
       if (stateName) {
         // Success: we know the state
         userInfo.stateName = stateName;
+        userInfo.panelmessage = 'known phone number';
         slackChannelName = await LoadBalancer.selectSlackChannel(
           redisClient,
           LoadBalancer.PULL_ENTRY_POINT,
