@@ -1625,6 +1625,76 @@ export async function handleSlackThreadCommand(
     return true;
   }
 
+  if (message.startsWith('!state ')) {
+    const arg = message.substr('!state '.length);
+    const stateName = StateParser.determineState(arg);
+    if (!stateName) {
+      await SlackApiUtil.sendMessage(
+        `*Operator:* Unrecognized state '${arg}'`,
+        {
+          parentMessageTs: reqBody.event.thread_ts,
+          channel: reqBody.event.channel,
+        }
+      );
+      await SlackApiUtil.addSlackMessageReaction(
+        reqBody.event.channel,
+        reqBody.event.ts,
+        'x'
+      );
+      return true;
+    }
+    const slackChannelName = await LoadBalancer.selectSlackChannel(
+      redisClient,
+      LoadBalancer.PULL_ENTRY_POINT,
+      stateName,
+      userInfo.isDemo
+    );
+    if (!slackChannelName) {
+      await SlackApiUtil.sendMessage(
+        `*Operator:* No frontline channel for '${stateName}'`,
+        {
+          parentMessageTs: reqBody.event.thread_ts,
+          channel: reqBody.event.channel,
+        }
+      );
+      await SlackApiUtil.addSlackMessageReaction(
+        reqBody.event.channel,
+        reqBody.event.ts,
+        'x'
+      );
+      return true;
+    }
+
+    const slackChannelIds = await RedisApiUtil.getHash(
+      redisClient,
+      'slackPodChannelIds'
+    );
+    const slackChannelNames: Record<string, string> = {};
+    for (const name in slackChannelIds) {
+      slackChannelNames[slackChannelIds[name]] = name;
+    }
+
+    userInfo.stateName = stateName;
+    userInfo.volunteerEngaged = true; // Mark that a volunteer has engaged (by routing them!)
+    await routeVoterToSlackChannel(
+      userInfo,
+      redisClient,
+      {
+        userId: userInfo.userId,
+        twilioPhoneNumber: twilioPhoneNumber,
+        destinationSlackChannelName: slackChannelName,
+      } as CommandUtil.ParsedCommandRouteVoter,
+      {
+        commandParentMessageTs: reqBody.event.thread_ts,
+        commandChannel: reqBody.event.channel,
+        commandMessageTs: reqBody.event.ts,
+        previousSlackChannelName: slackChannelNames[reqBody.event.channel],
+        routingSlackUserName: originatingSlackUserName,
+      }
+    );
+    return true;
+  }
+
   if (message === '!fake-old-session') {
     // This simulates the situation of a pre-2020 thread that has no sessionStartEpoch value.
     await RedisApiUtil.deleteHashField(
