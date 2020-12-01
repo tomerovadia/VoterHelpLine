@@ -1207,58 +1207,33 @@ export async function receiveRouteToJourney({
         `This voter is no longer active in this thread. Please reach out to the folks at *#${userInfo.activeChannelName}*.`
       );
     } else {
-      const activeSlackChannelName = userInfo.activeChannelName;
-      const activeStateName = LoadBalancer.convertSlackChannelNameToStateOrRegionName(
-        activeSlackChannelName
-      );
-
-      if (!activeStateName) {
-        slackView = SlackBlockUtil.getErrorSlackView(
-          'route_to_journey_error_no_state_name_parsed',
-          `Failed to parse state name from channel: *#${activeSlackChannelName}*. Please contact an admin.`
-        );
-      } else {
-        const selectedSlackChannelName = await LoadBalancer.selectSlackChannel(
+      try {
+        const selectedSlackChannelName = await LoadBalancer.getJourneyChannel(
           redisClient,
-          // We use PUSH to store open journey pods (PULL = frontline).
-          'PUSH',
-          activeStateName,
-          userInfo.isDemo
+          userInfo
+        );
+        logger.info(
+          `SLACKINTERACTIONHANDLER.receiveRouteToJourney: Route to journey command is valid.`
         );
 
-        // Either a stateName wasn't valid or Redis didn't provide open pods for the given stateName.
-        if (
-          !selectedSlackChannelName ||
-          ['demo-national-0', 'national-0'].includes(selectedSlackChannelName)
-        ) {
-          slackView = SlackBlockUtil.getErrorSlackView(
-            'route_to_journey_error_no_pods_found',
-            `No journey pods found for U.S. state name: *${activeStateName}*. Please contact an admin.`
-          );
-        } else if (activeSlackChannelName === selectedSlackChannelName) {
-          slackView = SlackBlockUtil.getErrorSlackView(
-            'route_to_journey_error_routing_to_same_channel',
-            `The voter is already in an open journey pod for this U.S. state.`
-          );
-        } else {
-          logger.info(
-            `SLACKINTERACTIONHANDLER.receiveRouteToJourney: Route to journey command is valid.`
-          );
+        // Store the destinationSlackChannelName for when the modal is confirmed.
+        modalPrivateMetadata.destinationSlackChannelName = selectedSlackChannelName;
 
-          // Store the destinationSlackChannelName for when the modal is confirmed.
-          modalPrivateMetadata.destinationSlackChannelName = selectedSlackChannelName;
-
-          // Store the relevant information in the modal so that when the requested action is confirmed
-          // the data needed for the necessary actions is available.
-          slackView = SlackBlockUtil.confirmationSlackView(
-            SlackCallbackId.ROUTE_TO_JOURNEY,
-            modalPrivateMetadata,
-            'Are you sure you want to route this voter to a journey pod?\n\nPlease remember to let the voter know that someone will be following up with them.'
-          );
-        }
+        // Store the relevant information in the modal so that when the requested action is confirmed
+        // the data needed for the necessary actions is available.
+        slackView = SlackBlockUtil.confirmationSlackView(
+          SlackCallbackId.ROUTE_TO_JOURNEY,
+          modalPrivateMetadata,
+          'Are you sure you want to route this voter to a journey pod?\n\nPlease remember to let the voter know that someone will be following up with them.'
+        );
+      } catch (error) {
+        logger.warn(error);
+        slackView = SlackBlockUtil.getErrorSlackView(
+          'route_to_journey_error',
+          error
+        );
       }
     }
-
     await SlackApiUtil.updateModal(viewId, slackView);
   } catch (e) {
     // Update the modal to say that there was an error, then re-throw the

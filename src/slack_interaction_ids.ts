@@ -33,6 +33,7 @@ export enum SlackActionId {
 
   SESSION_TOPICS = 'SESSION_TOPICS',
   RESET_DEMO = 'RESET_DEMO',
+  ROUTE_TO_JOURNEY = 'ROUTE_TO_JOURNEY',
 }
 
 // Prefixes per-state blocks in open-close channel modal

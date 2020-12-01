@@ -19,6 +19,7 @@ import Hashes from 'jshashes';
 import * as DbApiUtil from './db_api_util';
 import * as SlackBlockUtil from './slack_block_util';
 import { cloneDeep } from 'lodash';
+import * as LoadBalancer from './load_balancer';
 
 import {
   SlackInteractionEventPayload,
@@ -346,6 +347,39 @@ async function slackInteractivityHandler(
           redisClient,
           modalPrivateMetadata
         );
+        return;
+      }
+      case SlackActionId.ROUTE_TO_JOURNEY: {
+        const redisHashKey = `${payload.channel.id}:${payload.message.ts}`;
+        const redisData = await RedisApiUtil.getHash(redisClient, redisHashKey);
+        const userId = MD5.hex(redisData.userPhoneNumber);
+        const redisUserInfoKey = `${userId}:${redisData.twilioPhoneNumber}`;
+        const userInfo = (await RedisApiUtil.getHash(
+          redisClient,
+          redisUserInfoKey
+        )) as UserInfo;
+        try {
+          const destinationChannelName = await LoadBalancer.getJourneyChannel(
+            redisClient,
+            userInfo
+          );
+          const modalPrivateMetadata = {
+            commandType: 'ROUTE_TO_JOURNEY',
+            userId: MD5.hex(redisData.userPhoneNumber),
+            twilioPhoneNumber: redisData.twilioPhoneNumber,
+            originatingSlackUserName: originatingSlackUserName,
+            originatingSlackUserId: payload.user.id,
+            slackChannelId: payload.channel.id,
+            slackParentMessageTs: thread_ts,
+            destinationSlackChannelName: destinationChannelName,
+          } as SlackModalPrivateMetadata;
+          await SlackInteractionHandler.handleRouteToJourney(
+            redisClient,
+            modalPrivateMetadata
+          );
+        } catch (error) {
+          logger.info(error);
+        }
         return;
       }
       case SlackActionId.MANAGE_ENTRY_POINTS_FILTER_STATE:

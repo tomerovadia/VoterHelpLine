@@ -273,6 +273,34 @@ export const voterStatusPanel: SlackBlock = {
         },
       },
     },
+    {
+      type: 'button',
+      text: {
+        type: 'plain_text',
+        text: 'Route to Journey',
+        emoji: true,
+      },
+      action_id: SlackActionId.ROUTE_TO_JOURNEY,
+      confirm: {
+        title: {
+          type: 'plain_text',
+          text: 'Are you sure?',
+        },
+        text: {
+          type: 'mrkdwn',
+          text:
+            'Are you sure you want to route this voter to a journey pod?\n\nPlease remember to let the voter know that someone will be following up with them.',
+        },
+        confirm: {
+          type: 'plain_text',
+          text: 'Confirm',
+        },
+        deny: {
+          type: 'plain_text',
+          text: 'Cancel',
+        },
+      },
+    },
   ],
 };
 
