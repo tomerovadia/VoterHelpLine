@@ -49,27 +49,6 @@ export function isStaleSession(userInfo: UserInfo): boolean {
   return false;
 }
 
-function voterHeader(
-  userInfo: UserInfo,
-  announce: boolean,
-  notice?: string
-): string {
-  let r = '';
-  if (announce || userInfo.stateName || notice) {
-    r = announce ? '<!channel> ' : '';
-    // NOTE: we have to be careful here because returningVoter may be a boolean or string
-    r += `${String(userInfo.returningVoter) == 'true' ? 'Returning' : 'New'} ${
-      userInfo.stateName ? '*' + userInfo.stateName + '* ' : ''
-    }voter`;
-    if (notice) {
-      r += ` (${notice})`;
-    }
-    r += '\n';
-  }
-  r += `${userInfo.userId} via ${userInfo.twilioPhoneNumber}`;
-  return r;
-}
-
 // prepareUserInfoForNewVoter is used by functions that handle
 // phone numbers not previously seen.
 export function prepareUserInfoForNewVoter({
@@ -244,7 +223,7 @@ async function introduceNewVoterToSlackChannel(
     `ROUTER.introduceNewVoterToSlackChannel: Announcing new voter via new thread in ${slackChannelName}.`
   );
   // In Slack, create entry channel message, followed by voter's message and intro text.
-  const operatorMessage = voterHeader(
+  const operatorMessage = SlackBlockUtil.voterPanelHeader(
     userInfo,
     // Notify channel if we are not in the lobby
     slackChannelName != 'lobby' && slackChannelName != 'demo-lobby',
@@ -895,7 +874,7 @@ export async function routeVoterToSlackChannel(
   let previousParentMessageBlocks;
   if (userInfo.activeChannelId === 'NONEXISTENT_LOBBY') {
     // In Slack, create entry channel message, followed by voter's message and intro text.
-    const operatorMessage = voterHeader(userInfo, false);
+    const operatorMessage = SlackBlockUtil.voterPanelHeader(userInfo, false);
     previousParentMessageBlocks = SlackBlockUtil.getVoterStatusBlocks(
       operatorMessage
     );
@@ -951,13 +930,13 @@ export async function routeVoterToSlackChannel(
 
     let newParentMessageText = '';
     if (adminCommandParams) {
-      newParentMessageText = voterHeader(
+      newParentMessageText = SlackBlockUtil.voterPanelHeader(
         userInfo,
         true,
         `routed from *${adminCommandParams.previousSlackChannelName}* by *${adminCommandParams.routingSlackUserName}*`
       );
     } else {
-      newParentMessageText = voterHeader(userInfo, true);
+      newParentMessageText = SlackBlockUtil.voterPanelHeader(userInfo, true);
     }
 
     // Use the same blocks as from the voter's previous active thread parent message, except for the voter info text.

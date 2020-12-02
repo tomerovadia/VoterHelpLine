@@ -1,6 +1,6 @@
 import logger from './logger';
 import { SlackActionId } from './slack_interaction_ids';
-import { SessionTopics, VoterStatus } from './types';
+import { SessionTopics, VoterStatus, UserInfo } from './types';
 import { SlackModalPrivateMetadata } from './slack_interaction_handler';
 import { cloneDeep } from 'lodash';
 
@@ -368,6 +368,27 @@ export function getErrorSlackView(
     ],
     type: 'modal',
   };
+}
+
+export function voterPanelHeader(
+  userInfo: UserInfo,
+  announce: boolean,
+  notice?: string
+): string {
+  let r = '';
+  if (announce || userInfo.stateName || notice) {
+    r = announce ? '<!channel> ' : '';
+    // NOTE: we have to be careful here because returningVoter may be a boolean or string
+    r += `${String(userInfo.returningVoter) == 'true' ? 'Returning' : 'New'} ${
+      userInfo.stateName ? '*' + userInfo.stateName + '* ' : ''
+    }voter`;
+    if (notice) {
+      r += ` (${notice})`;
+    }
+    r += '\n';
+  }
+  r += `${userInfo.userId} via ${userInfo.twilioPhoneNumber}`;
+  return r;
 }
 
 export function getVoterStatusBlocks(messageText: string): SlackBlock[] {
