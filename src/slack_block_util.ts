@@ -372,23 +372,39 @@ export function getErrorSlackView(
 
 export function voterPanelHeader(
   userInfo: UserInfo,
-  announce: boolean,
-  notice?: string
+  announce: boolean
 ): string {
   let r = '';
-  if (announce || userInfo.stateName || notice) {
+  if (announce || userInfo.stateName || userInfo.panelMessage) {
     r = announce ? '<!channel> ' : '';
     // NOTE: we have to be careful here because returningVoter may be a boolean or string
     r += `${String(userInfo.returningVoter) == 'true' ? 'Returning' : 'New'} ${
       userInfo.stateName ? '*' + userInfo.stateName + '* ' : ''
     }voter`;
-    if (notice) {
-      r += ` (${notice})`;
+    if (userInfo.panelMessage) {
+      r += ` (${userInfo.panelMessage})`;
     }
     r += '\n';
   }
   r += `${userInfo.userId} via ${userInfo.twilioPhoneNumber}`;
   return r;
+}
+
+export async function getVoterPanel(
+  userInfo: UserInfo,
+  lobby: boolean,
+  volunteer?: string,
+  status?: string,
+  topics?: string[],
+): Promise<SlackBlock[]> {
+  const messageText = voterPanelHeader(userInfo, !lobby);
+  const panel = [
+    voterInfoSection(messageText),
+    cloneDeep(volunteerSelectionPanel),
+    cloneDeep(voterStatusPanel),
+    cloneDeep(voterTopicPanel),
+  ];
+  return panel;
 }
 
 export function getVoterStatusBlocks(messageText: string): SlackBlock[] {

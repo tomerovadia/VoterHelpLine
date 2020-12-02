@@ -226,8 +226,7 @@ async function introduceNewVoterToSlackChannel(
   const operatorMessage = SlackBlockUtil.voterPanelHeader(
     userInfo,
     // Notify channel if we are not in the lobby
-    slackChannelName != 'lobby' && slackChannelName != 'demo-lobby',
-    userInfo.panelMessage
+    slackChannelName != 'lobby' && slackChannelName != 'demo-lobby'
   );
 
   const slackBlocks = SlackBlockUtil.getVoterStatusBlocks(operatorMessage);
@@ -930,11 +929,8 @@ export async function routeVoterToSlackChannel(
 
     let newParentMessageText = '';
     if (adminCommandParams) {
-      newParentMessageText = SlackBlockUtil.voterPanelHeader(
-        userInfo,
-        true,
-        `routed from *${adminCommandParams.previousSlackChannelName}* by *${adminCommandParams.routingSlackUserName}*`
-      );
+      userInfo.panelMessage = `routed from *${adminCommandParams.previousSlackChannelName}* by *${adminCommandParams.routingSlackUserName}*`;
+      newParentMessageText = SlackBlockUtil.voterPanelHeader(userInfo, true);
     } else {
       newParentMessageText = SlackBlockUtil.voterPanelHeader(userInfo, true);
     }
