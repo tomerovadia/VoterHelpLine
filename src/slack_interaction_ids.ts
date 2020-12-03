@@ -32,6 +32,7 @@ export enum SlackActionId {
   VOTER_SESSION_HIDE = 'VOTER_SESSION_HIDE',
 
   SESSION_TOPICS = 'SESSION_TOPICS',
+  RESET_DEMO = 'RESET_DEMO',
 }
 
 // Prefixes per-state blocks in open-close channel modal

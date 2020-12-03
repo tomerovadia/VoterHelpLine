@@ -504,6 +504,39 @@ export async function getVoterPanel(
     });
   }
 
+  if (userInfo.isDemo) {
+    // put the Reset Demo button on the volunteer line (on the right)
+    panel[1].elements.push({
+      type: 'button',
+      style: 'danger',
+      text: {
+        type: 'plain_text',
+        text: 'Reset Demo',
+        emoji: true,
+      },
+      action_id: SlackActionId.RESET_DEMO,
+      confirm: {
+        title: {
+          type: 'plain_text',
+          text: 'Are you sure?',
+        },
+        text: {
+          type: 'mrkdwn',
+          text:
+            'Are you sure you want to end your demo conversation with this volunteer?\n\nYou will no longer be able to send messages to or receive messages from them, and they will be treated as a new demo voter the next time they send a text to this phone number.',
+        },
+        confirm: {
+          type: 'plain_text',
+          text: 'Confirm',
+        },
+        deny: {
+          type: 'plain_text',
+          text: 'Cancel',
+        },
+      },
+    });
+  }
+
   return panel;
 }
 

@@ -93,6 +93,8 @@ async function slackInteractivityHandler(
   payload: SlackInteractionEventPayload,
   interactivityMetadata: InteractivityHandlerMetadata
 ) {
+  const MD5 = new Hashes.MD5();
+
   const originatingSlackUserName = await SlackApiUtil.fetchSlackUserName(
     payload.user.id
   );
@@ -216,8 +218,6 @@ async function slackInteractivityHandler(
           );
         }
 
-        const MD5 = new Hashes.MD5();
-
         // Ignore Prettier formatting because this object needs to adhere to JSON strigify requirements.
         // prettier-ignore
         const modalPrivateMetadata = {
@@ -266,8 +266,6 @@ async function slackInteractivityHandler(
             'slackInteractivityHandler called for message_action without viewId'
           );
         }
-
-        const MD5 = new Hashes.MD5();
 
         // Ignore Prettier formatting because this object needs to adhere to JSON strigify requirements.
         // prettier-ignore
@@ -330,6 +328,26 @@ async function slackInteractivityHandler(
         await SlackInteractionHandler.handleSessionHide(payload);
         return;
       }
+      case SlackActionId.RESET_DEMO: {
+        const redisHashKey = `${payload.channel.id}:${payload.message.ts}`;
+        const redisData = await RedisApiUtil.getHash(redisClient, redisHashKey);
+        const modalPrivateMetadata = {
+          commandType: 'RESET_DEMO',
+          userId: redisData ? MD5.hex(redisData.userPhoneNumber) : null,
+          userPhoneNumber: redisData ? redisData.userPhoneNumber : null,
+          twilioPhoneNumber: redisData ? redisData.twilioPhoneNumber : null,
+          slackChannelId: payload.channel.id,
+          slackParentMessageTs: payload.message.ts,
+          originatingSlackUserName: originatingSlackUserName,
+          originatingSlackUserId: payload.user.id,
+          actionTs: payload.action_ts,
+        } as SlackModalPrivateMetadata;
+        await SlackInteractionHandler.handleResetDemo(
+          redisClient,
+          modalPrivateMetadata
+        );
+        return;
+      }
       case SlackActionId.MANAGE_ENTRY_POINTS_FILTER_STATE:
       case SlackActionId.MANAGE_ENTRY_POINTS_FILTER_TYPE: {
         logger.info(
@@ -376,7 +394,6 @@ async function slackInteractivityHandler(
       );
       return;
     }
-    const MD5 = new Hashes.MD5();
     const redisUserInfoKey = `${MD5.hex(redisData.userPhoneNumber)}:${
       redisData.twilioPhoneNumber
     }`;
