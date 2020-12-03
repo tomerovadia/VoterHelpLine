@@ -178,6 +178,13 @@ export async function handleKnownVoterBlockLogic(
       });
     }
     outboundTextsBlocked = true;
+
+    // Update thread needs attention status -> false
+    await DbApiUtil.setThreadNeedsAttentionToDb(
+      userInfo[userInfo.activeChannelId],
+      userInfo.activeChannelId,
+      false
+    );
   }
 
   // If outbound texts are prohibited to this user, we return --

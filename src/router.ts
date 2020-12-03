@@ -1526,6 +1526,13 @@ export async function handleClearedVoter(
     userInfo
   );
 
+  // Update thread needs attention status -> true
+  await DbApiUtil.setThreadNeedsAttentionToDb(
+    userInfo[userInfo.activeChannelId],
+    userInfo.activeChannelId,
+    true
+  );
+
   logger.debug(
     `ROUTER.handleClearedVoter: Seconds since last message from voter: ${
       nowSecondsEpoch - lastVoterMessageSecsFromEpoch
@@ -1948,6 +1955,14 @@ export async function handleSlackVoterThreadMessage(
       },
       outboundDbMessageEntry
     );
+
+    // Update thread needs attention status -> false
+    await DbApiUtil.setThreadNeedsAttentionToDb(
+      userInfo[userInfo.activeChannelId],
+      userInfo.activeChannelId,
+      false
+    );
+
     // Slack message is from inactive Slack thread.
   } else {
     if (userInfo.activeChannelId) {
