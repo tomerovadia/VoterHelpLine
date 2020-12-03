@@ -9,7 +9,6 @@ import * as DbApiUtil from './db_api_util';
 import * as RedisApiUtil from './redis_api_util';
 import * as LoadBalancer from './load_balancer';
 import * as SlackMessageFormatter from './slack_message_formatter';
-import * as CommandUtil from './command_util';
 import * as MessageParser from './message_parser';
 import * as SlackInteractionApiUtil from './slack_interaction_api_util';
 import logger from './logger';
@@ -1616,7 +1615,7 @@ export async function handleSlackThreadCommand(
         userId: userInfo.userId,
         twilioPhoneNumber: twilioPhoneNumber,
         destinationSlackChannelName: channel,
-      } as CommandUtil.ParsedCommandRouteVoter,
+      },
       {
         commandParentMessageTs: reqBody.event.thread_ts,
         commandChannel: reqBody.event.channel,
@@ -1996,112 +1995,3 @@ export type SlackEventRequestBody = {
   };
   authed_users: string[];
 };
-
-export async function handleSlackAdminCommand(
-  reqBody: SlackEventRequestBody,
-  redisClient: PromisifiedRedisClient,
-  originatingSlackUserName: string
-): Promise<void> {
-  logger.debug(' ENTERING ROUTER.handleSlackAdminCommand');
-  const adminCommandArgs = CommandUtil.parseSlackCommand(reqBody.event.text);
-  logger.debug(
-    `ROUTER.handleSlackAdminCommand: Parsed admin control command params: ${JSON.stringify(
-      adminCommandArgs
-    )}`
-  );
-  if (!adminCommandArgs) {
-    await SlackApiUtil.sendMessage(
-      `*Operator:* Your command could not be parsed (did you closely follow the required format)?`,
-      {
-        channel: process.env.ADMIN_CONTROL_ROOM_SLACK_CHANNEL_ID!,
-        parentMessageTs: reqBody.event.ts,
-      }
-    );
-    return;
-  }
-
-  switch (adminCommandArgs.command) {
-    case CommandUtil.ROUTE_VOTER: {
-      // TODO: Move some of this logic to CommandUtil, so this switch statement
-      // is cleaner.
-      const redisHashKey = `${adminCommandArgs.userId}:${adminCommandArgs.twilioPhoneNumber}`;
-      logger.debug(
-        `ROUTER.handleSlackAdminCommand: Looking up ${redisHashKey} in Redis.`
-      );
-      const userInfo = (await RedisApiUtil.getHash(
-        redisClient,
-        redisHashKey
-      )) as UserInfo;
-
-      // This catches invalid userPhoneNumber:twilioPhoneNumber pairs.
-      if (!userInfo) {
-        logger.debug(
-          'Router.handleSlackAdminCommand: No Redis data found for userId:twilioPhoneNumber pair.'
-        );
-        await SlackApiUtil.sendMessage(
-          `*Operator:* No record found for user ID (${adminCommandArgs.userId}) and/or Twilio phone number (${adminCommandArgs.twilioPhoneNumber}).`,
-          {
-            channel: process.env.ADMIN_CONTROL_ROOM_SLACK_CHANNEL_ID!,
-            parentMessageTs: reqBody.event.ts,
-          }
-        );
-        // userPhoneNumber:twilioPhoneNumber pair found successfully.
-      } else {
-        // Voter already in destination slack channel (error).
-        if (
-          userInfo.activeChannelName ===
-          adminCommandArgs.destinationSlackChannelName
-        ) {
-          logger.debug(
-            'Router.handleSlackAdminCommand: Voter is already active in destination Slack channel.'
-          );
-          await SlackApiUtil.sendMessage(
-            `*Operator:* Voter's thread in ${userInfo.activeChannelName} is already the active thread.`,
-            {
-              channel: process.env.ADMIN_CONTROL_ROOM_SLACK_CHANNEL_ID!,
-              parentMessageTs: reqBody.event.ts,
-            }
-          );
-        } else {
-          const adminCommandParams = {
-            commandParentMessageTs: reqBody.event.ts,
-            commandMessageTs: reqBody.event.ts,
-            commandChannel: reqBody.event.channel,
-            previousSlackChannelName: userInfo.activeChannelName,
-            routingSlackUserName: originatingSlackUserName,
-          };
-          logger.debug(
-            `Router.handleSlackAdminCommand: Routing voter from ${userInfo.activeChannelName} to ${adminCommandArgs.destinationSlackChannelName}.`
-          );
-          // Mark that a volunteer has engaged (by routing them!)
-          userInfo.volunteerEngaged = true;
-          await routeVoterToSlackChannel(
-            userInfo,
-            redisClient,
-            adminCommandArgs,
-            adminCommandParams
-          );
-        }
-      }
-      return;
-    }
-    case CommandUtil.FIND_VOTER:
-      await CommandUtil.findVoter(
-        redisClient,
-        adminCommandArgs.voterIdentifier
-      );
-      return;
-    case CommandUtil.RESET_VOTER:
-      await CommandUtil.resetVoter(
-        redisClient,
-        adminCommandArgs.userId,
-        adminCommandArgs.twilioPhoneNumber
-      );
-      return;
-    default:
-      logger.info(
-        `ROUTER.handleSlackAdminCommand: Unknown Slack admin command`
-      );
-      return;
-  }
-}
