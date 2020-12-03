@@ -71,6 +71,7 @@ export function getVoterStatusOptions(): { [key in VoterStatus]?: string } {
         RECEIVED_BALLOT: 'Received ballot',
         IN_PERSON: 'Will vote in-person',
         VOTED: 'Voted',
+        NOT_VOTING: 'Not voting this election',
         SPAM: 'Spam',
         REFUSED: 'Refused',
       };
@@ -83,6 +84,7 @@ export function getVoterStatusOptions(): { [key in VoterStatus]?: string } {
         RECEIVED_BALLOT: 'Received ballot',
         IN_PERSON: 'Will vote in-person',
         VOTED: 'Voted',
+        NOT_VOTING: 'Not voting this election',
         SPAM: 'Spam',
         REFUSED: 'Refused',
       };
@@ -95,6 +97,7 @@ export function getVoterStatusOptions(): { [key in VoterStatus]?: string } {
         RECEIVED_BALLOT: 'Received ballot',
         IN_PERSON: 'Will vote in-person',
         VOTED: 'Voted',
+        NOT_VOTING: 'Not voting this election',
         SPAM: 'Spam',
         REFUSED: 'Refused',
       };
@@ -196,6 +199,14 @@ export const voterStatusPanel: SlackBlock = {
             emoji: true,
           },
           value: 'VOTED',
+        },
+        {
+          text: {
+            type: 'plain_text',
+            text: 'Not voting this election :cry:',
+            emoji: true,
+          },
+          value: 'NOT_VOTING',
         },
       ],
     },

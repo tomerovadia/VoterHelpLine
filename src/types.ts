@@ -11,6 +11,7 @@ export type VoterStatus =
   | 'RECEIVED_BALLOT'
   | 'IN_PERSON'
   | 'VOTED'
+  | 'NOT_VOTING'
   | 'REFUSED'
   | 'REJOIN'
   | 'SPAM';

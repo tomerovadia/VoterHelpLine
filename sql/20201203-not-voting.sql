@@ -1,0 +1,1 @@
+ALTER TYPE voter_status ADD VALUE 'NOT_VOTING';
