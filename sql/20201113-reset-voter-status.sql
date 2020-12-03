@@ -10,4 +10,4 @@ WITH latest_status AS (
 INSERT INTO voter_status_updates (created_at, user_id, user_phone_number, twilio_phone_number, is_demo, voter_status)
 SELECT now(), user_id, user_phone_number, twilio_phone_number, is_demo, 'REGISTERED'
 FROM latest_status
-WHERE rn = 1 AND voter_status IN ('REQUESTED_BALLOT', 'RECEIVED_BALLOT', 'IN_PERSON', 'VOTED');
+WHERE rn = 1 AND voter_status IN ('REQUESTED_BALLOT', 'RECEIVED_BALLOT', 'IN_PERSON', 'VOTED', 'NOT_VOTING');
