@@ -30,6 +30,7 @@ type UserInfoCore = {
   numStateSelectionAttempts: number;
   sessionStartEpoch?: number;
   returningVoter?: boolean;
+  panelMessage?: string;
 };
 
 type UserInfoChannels = {

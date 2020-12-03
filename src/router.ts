@@ -55,12 +55,12 @@ function voterHeader(
   notice?: string
 ): string {
   let r = '';
-  if (announce) {
-    if (userInfo.returningVoter) {
-      r = `<!channel> Returning *${userInfo.stateName}* voter`;
-    } else {
-      r = `<!channel> New *${userInfo.stateName}* voter`;
-    }
+  if (announce || userInfo.stateName || notice) {
+    r = announce ? '<!channel> ' : '';
+    // NOTE: we have to be careful here because returningVoter may be a boolean or string
+    r += `${String(userInfo.returningVoter) == 'true' ? 'Returning' : 'New'} ${
+      userInfo.stateName ? '*' + userInfo.stateName + '* ' : ''
+    }voter`;
     if (notice) {
       r += ` (${notice})`;
     }
@@ -244,9 +244,12 @@ async function introduceNewVoterToSlackChannel(
     `ROUTER.introduceNewVoterToSlackChannel: Announcing new voter via new thread in ${slackChannelName}.`
   );
   // In Slack, create entry channel message, followed by voter's message and intro text.
-  const operatorMessage = userInfo.stateName
-    ? voterHeader(userInfo, true, 'known phone number')
-    : voterHeader(userInfo, false);
+  const operatorMessage = voterHeader(
+    userInfo,
+    // Notify channel if we are not in the lobby
+    slackChannelName != 'lobby' && slackChannelName != 'demo-lobby',
+    userInfo.panelMessage
+  );
 
   const slackBlocks = SlackBlockUtil.getVoterStatusBlocks(operatorMessage);
 
@@ -500,6 +503,7 @@ export async function handleNewVoter(
       if (stateName) {
         // Success: we know the state
         userInfo.stateName = stateName;
+        userInfo.panelmessage = 'known phone number';
         slackChannelName = await LoadBalancer.selectSlackChannel(
           redisClient,
           LoadBalancer.PULL_ENTRY_POINT,
@@ -1616,6 +1620,76 @@ export async function handleSlackThreadCommand(
         userId: userInfo.userId,
         twilioPhoneNumber: twilioPhoneNumber,
         destinationSlackChannelName: channel,
+      } as CommandUtil.ParsedCommandRouteVoter,
+      {
+        commandParentMessageTs: reqBody.event.thread_ts,
+        commandChannel: reqBody.event.channel,
+        commandMessageTs: reqBody.event.ts,
+        previousSlackChannelName: slackChannelNames[reqBody.event.channel],
+        routingSlackUserName: originatingSlackUserName,
+      }
+    );
+    return true;
+  }
+
+  if (message.startsWith('!state ')) {
+    const arg = message.substr('!state '.length);
+    const stateName = StateParser.determineState(arg);
+    if (!stateName) {
+      await SlackApiUtil.sendMessage(
+        `*Operator:* Unrecognized state '${arg}'`,
+        {
+          parentMessageTs: reqBody.event.thread_ts,
+          channel: reqBody.event.channel,
+        }
+      );
+      await SlackApiUtil.addSlackMessageReaction(
+        reqBody.event.channel,
+        reqBody.event.ts,
+        'x'
+      );
+      return true;
+    }
+    const slackChannelName = await LoadBalancer.selectSlackChannel(
+      redisClient,
+      LoadBalancer.PULL_ENTRY_POINT,
+      stateName,
+      userInfo.isDemo
+    );
+    if (!slackChannelName) {
+      await SlackApiUtil.sendMessage(
+        `*Operator:* No frontline channel for '${stateName}'`,
+        {
+          parentMessageTs: reqBody.event.thread_ts,
+          channel: reqBody.event.channel,
+        }
+      );
+      await SlackApiUtil.addSlackMessageReaction(
+        reqBody.event.channel,
+        reqBody.event.ts,
+        'x'
+      );
+      return true;
+    }
+
+    const slackChannelIds = await RedisApiUtil.getHash(
+      redisClient,
+      'slackPodChannelIds'
+    );
+    const slackChannelNames: Record<string, string> = {};
+    for (const name in slackChannelIds) {
+      slackChannelNames[slackChannelIds[name]] = name;
+    }
+
+    userInfo.stateName = stateName;
+    userInfo.volunteerEngaged = true; // Mark that a volunteer has engaged (by routing them!)
+    await routeVoterToSlackChannel(
+      userInfo,
+      redisClient,
+      {
+        userId: userInfo.userId,
+        twilioPhoneNumber: twilioPhoneNumber,
+        destinationSlackChannelName: slackChannelName,
       } as CommandUtil.ParsedCommandRouteVoter,
       {
         commandParentMessageTs: reqBody.event.thread_ts,
