@@ -1504,6 +1504,29 @@ export async function getVoterHasVolunteer(userId: string): Promise<boolean> {
   }
 }
 
+export async function getVoterVolunteer(
+  userId: string,
+  twilioPhoneNumber: string,
+  sessionStartEpoch: number
+): Promise<string | null> {
+  const client = await pool.connect();
+  try {
+    const result = await client.query(
+      `SELECT volunteer_slack_user_id FROM volunteer_voter_claims
+      WHERE
+        user_id = $1
+        AND twilio_phone_number = $2
+        AND created_at >= TO_TIMESTAMP($3)
+        AND archived IS NOT TRUE
+      ORDER BY created_at DESC LIMIT 1`,
+      [userId, twilioPhoneNumber, sessionStartEpoch]
+    );
+    return result.rows.length > 0 && result.rows[0]['volunteer_slack_user_id'];
+  } finally {
+    client.release();
+  }
+}
+
 export async function getKnownPhoneState(
   userPhoneNumber: string
 ): Promise<string | null> {

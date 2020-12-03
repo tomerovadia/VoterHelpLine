@@ -13,7 +13,7 @@ import * as CommandUtil from './command_util';
 import * as MessageParser from './message_parser';
 import * as SlackInteractionApiUtil from './slack_interaction_api_util';
 import logger from './logger';
-import { EntryPoint, SessionTopics, UserInfo, VoterStatus } from './types';
+import { EntryPoint, SessionTopics, UserInfo } from './types';
 import { PromisifiedRedisClient } from './redis_client';
 import * as Sentry from '@sentry/node';
 import { isVotedKeyword } from './keyword_parser';
@@ -127,10 +127,11 @@ export async function endVoterSession(
   const redisHashKey = `${userInfo.userId}:${twilioPhoneNumber}`;
   await RedisApiUtil.deleteKeys(redisClient, [redisHashKey]);
 
-  // update old session thread's blocks async; do not await
-  void SlackInteractionApiUtil.updateOldSessionBlocks(
+  // update old session thread's panel async; do not await
+  void SlackBlockUtil.closeVoterPanel(
     userInfo.activeChannelId,
-    userInfo[userInfo.activeChannelId]
+    userInfo[userInfo.activeChannelId],
+    'This voter helpline session is closed'
   );
 }
 
@@ -222,28 +223,20 @@ async function introduceNewVoterToSlackChannel(
   logger.debug(
     `ROUTER.introduceNewVoterToSlackChannel: Announcing new voter via new thread in ${slackChannelName}.`
   );
-  // In Slack, create entry channel message, followed by voter's message and intro text.
-  const operatorMessage = SlackBlockUtil.voterPanelHeader(
-    userInfo,
-    // Notify channel if we are not in the lobby
-    slackChannelName != 'lobby' && slackChannelName != 'demo-lobby'
-  );
-
-  const slackBlocks = SlackBlockUtil.getVoterStatusBlocks(operatorMessage);
 
   // If the voter has previously communicated that they already voted, we have them
-  // enter the helpline with "Already Voted" prepopulated as their status.
+  // enter the helpline with "Voted" prepopulated as their status.
   const status = await DbApiUtil.getLatestVoterStatus(
     userInfo.userId,
     twilioPhoneNumber
   );
-  if (status !== 'UNKNOWN') {
-    SlackBlockUtil.populateDropdownNewInitialValue(
-      slackBlocks,
-      SlackActionId.VOTER_STATUS_DROPDOWN,
-      status
-    );
-  }
+
+  const slackBlocks = await SlackBlockUtil.getVoterPanel(
+    userInfo,
+    twilioPhoneNumber,
+    undefined,
+    status || 'UNKNOWN'
+  );
 
   const skipLobby =
     (await RedisApiUtil.getKey(redisClient, 'skipLobby')) === 'true';
@@ -256,7 +249,7 @@ async function introduceNewVoterToSlackChannel(
   } as SlackApiUtil.SlackSendMessageResponse | null;
 
   if (slackChannelName !== 'lobby' || !skipLobby) {
-    response = await SlackApiUtil.sendMessage(operatorMessage, {
+    response = await SlackApiUtil.sendMessage('', {
       channel: slackChannelName,
       blocks: slackBlocks,
     });
@@ -870,51 +863,16 @@ export async function routeVoterToSlackChannel(
   const oldSlackParentMessageTs = userInfo[userInfo.activeChannelId];
   const oldChannelId = userInfo.activeChannelId;
 
-  let previousParentMessageBlocks;
-  if (userInfo.activeChannelId === 'NONEXISTENT_LOBBY') {
-    // In Slack, create entry channel message, followed by voter's message and intro text.
-    const operatorMessage = SlackBlockUtil.voterPanelHeader(userInfo, false);
-    previousParentMessageBlocks = SlackBlockUtil.getVoterStatusBlocks(
-      operatorMessage
-    );
-  } else {
-    // Remove the voter status panel from the old thread, in which the voter is no longer active.
-    // Note: First we need to fetch the old thread parent message blocks, for both 1. the
-    // text to be preserved when changing the parent message, and for 2. the other
-    // blocks to be transferred to the new thread.
-    previousParentMessageBlocks = await SlackApiUtil.fetchSlackMessageBlocks(
-      userInfo.activeChannelId,
-      userInfo[userInfo.activeChannelId]
-    );
-  }
-
-  if (!previousParentMessageBlocks) {
-    throw new Error('Unable to retrieve previousParentMessageBlocks');
-  }
-
-  // return SlackBlockUtil.populateDropdownWithLatestVoterStatus(previousParentMessageBlocks, userId).then(() => {
-  // make deep copy of previousParentMessageBlocks
-  const closedVoterPanelMessage = `Voter has been routed to ${SlackApiUtil.linkToSlackChannel(
-    destinationSlackChannelId,
-    destinationSlackChannelName
-  )}.`;
-  const closedVoterPanelBlocks = SlackBlockUtil.makeClosedVoterPanelBlocks(
-    closedVoterPanelMessage,
-    false /* include undo button */
-  );
-
-  // Note: It's important not to modify previousParentMessageBlocks here because it may be used again below.
-  // Its panel is modified in its origin and its message is modified to move its panel to destination.
-  const newPrevParentMessageBlocks = [previousParentMessageBlocks[0]].concat(
-    closedVoterPanelBlocks
-  );
-
   if (userInfo.activeChannelId !== 'NONEXISTENT_LOBBY') {
-    await SlackInteractionApiUtil.replaceSlackMessageBlocks({
-      slackChannelId: userInfo.activeChannelId,
-      slackParentMessageTs: userInfo[userInfo.activeChannelId],
-      newBlocks: newPrevParentMessageBlocks,
-    });
+    // Close old voter panel
+    await SlackBlockUtil.closeVoterPanel(
+      userInfo.activeChannelId,
+      userInfo[userInfo.activeChannelId],
+      `Voter has been routed to ${SlackApiUtil.linkToSlackChannel(
+        destinationSlackChannelId,
+        destinationSlackChannelName
+      )}.`
+    );
   }
 
   logger.debug(
@@ -927,27 +885,18 @@ export async function routeVoterToSlackChannel(
       `ROUTER.routeVoterToSlackChannel: Creating a new thread in this channel (${destinationSlackChannelId}), since voter hasn't been here.`
     );
 
-    let newParentMessageText = '';
     if (adminCommandParams) {
       userInfo.panelMessage = `routed from *${adminCommandParams.previousSlackChannelName}* by *${adminCommandParams.routingSlackUserName}*`;
-      newParentMessageText = SlackBlockUtil.voterPanelHeader(userInfo, true);
-    } else {
-      newParentMessageText = SlackBlockUtil.voterPanelHeader(userInfo, true);
     }
 
-    // Use the same blocks as from the voter's previous active thread parent message, except for the voter info text.
-    if (previousParentMessageBlocks[0] && previousParentMessageBlocks[0].text) {
-      previousParentMessageBlocks[0].text.text = newParentMessageText;
-    } else {
-      logger.error(
-        'ROUTER.routeVoterToSlackChannel: ERROR replacing voter info text above voter panel blocks that are being moved.'
-      );
-    }
-
-    // Note: The parent message text is actually populated via the blocks.
-    const response = await SlackApiUtil.sendMessage(newParentMessageText, {
+    // Start new thread in the destination channel
+    const blocks = await SlackBlockUtil.getVoterPanel(
+      userInfo,
+      twilioPhoneNumber
+    );
+    const response = await SlackApiUtil.sendMessage('', {
       channel: destinationSlackChannelName,
-      blocks: previousParentMessageBlocks,
+      blocks: blocks,
     });
 
     if (!response) {
@@ -992,35 +941,19 @@ export async function routeVoterToSlackChannel(
     );
   } else {
     // If this user HAS been to the destination channel, use the same thread info.
-
     if (!adminCommandParams) {
       throw new Error('Missing adminCommandParams');
     }
 
-    // Fetch the blocks of the parent message of the destination thread to which the voter is returning.
-    const destinationParentMessageBlocks = await SlackApiUtil.fetchSlackMessageBlocks(
-      destinationSlackChannelId,
-      userInfo[destinationSlackChannelId]
+    // Update + refresh the blocks
+    const newBlocks = await SlackBlockUtil.getVoterPanel(
+      userInfo,
+      twilioPhoneNumber
     );
-
-    if (!destinationParentMessageBlocks) {
-      throw new Error('Unable to get destinationParentMessageBlocks');
-    }
-
-    // Preserve the voter info message of the destination thread to which the voter is returning, but otherwise use the blocks of the previous thread in which the voter was active.
-    if (previousParentMessageBlocks[0] && previousParentMessageBlocks[0].text) {
-      previousParentMessageBlocks[0].text.text =
-        destinationParentMessageBlocks[0].text.text;
-    } else {
-      logger.error(
-        'ROUTER.routeVoterToSlackChannel: ERROR replacing voter info text above voter panel blocks that are being moved.'
-      );
-    }
-
     await SlackInteractionApiUtil.replaceSlackMessageBlocks({
       slackChannelId: destinationSlackChannelId,
       slackParentMessageTs: userInfo[destinationSlackChannelId],
-      newBlocks: previousParentMessageBlocks,
+      newBlocks: newBlocks,
     });
 
     logger.debug(
@@ -1110,30 +1043,18 @@ export async function recordVotedStatus(
   );
 
   // Update voter status blocks
-  const blocks = await SlackApiUtil.fetchSlackMessageBlocks(
-    userInfo.activeChannelId,
-    userInfo[userInfo.activeChannelId]
+  const blocks = await SlackBlockUtil.getVoterPanel(
+    userInfo,
+    twilioPhoneNumber,
+    undefined,
+    'VOTED',
+    undefined
   );
-  if (blocks) {
-    if (
-      !SlackBlockUtil.populateDropdownNewInitialValue(
-        blocks,
-        SlackActionId.VOTER_STATUS_DROPDOWN,
-        'VOTED' as VoterStatus
-      )
-    ) {
-      logger.error(
-        'ROUTER.handleClearedVoter: unable to modify status dropdown'
-      );
-    }
-    await SlackInteractionApiUtil.updateVoterStatusBlocks(
-      userInfo.activeChannelId,
-      userInfo[userInfo.activeChannelId],
-      blocks
-    );
-  } else {
-    logger.error('ROUTER.handleClearedVoter: unable to fetch old blocks');
-  }
+  await SlackInteractionApiUtil.replaceSlackMessageBlocks({
+    slackChannelId: userInfo.activeChannelId,
+    slackParentMessageTs: userInfo[userInfo.activeChannelId],
+    newBlocks: blocks,
+  });
 }
 
 export async function replyToVoted(
@@ -1725,37 +1646,14 @@ export async function handleSlackThreadCommand(
     userInfo.sessionStartEpoch = oldest;
 
     // Refresh the voter blocks
-    const oldBlocks = await SlackApiUtil.fetchSlackMessageBlocks(
-      userInfo.activeChannelId,
-      userInfo[userInfo.activeChannelId]
-    );
-    if (!oldBlocks) {
-      await SlackApiUtil.sendMessage('*Operator:* Unable to fetch old blocks', {
-        parentMessageTs: reqBody.event.thread_ts,
-        channel: reqBody.event.channel,
-      });
-      await SlackApiUtil.addSlackMessageReaction(
-        reqBody.event.channel,
-        reqBody.event.ts,
-        'x'
-      );
-      return true;
-    }
-    const status = ((await DbApiUtil.getLatestVoterStatus(
-      userInfo.userId,
+    const blocks = await SlackBlockUtil.getVoterPanel(
+      userInfo,
       twilioPhoneNumber
-    )) || 'UNKNOWN') as VoterStatus;
-    const topics =
-      (await DbApiUtil.getThreadTopics(
-        reqBody.event.channel,
-        reqBody.event.ts
-      )) || [];
-    await SlackInteractionApiUtil.addBackVoterStatusPanel({
+    );
+    await SlackInteractionApiUtil.replaceSlackMessageBlocks({
       slackChannelId: userInfo.activeChannelId,
       slackParentMessageTs: userInfo[userInfo.activeChannelId],
-      oldBlocks: oldBlocks,
-      status: status,
-      topics: topics,
+      newBlocks: blocks,
     });
 
     await RedisApiUtil.setHash(

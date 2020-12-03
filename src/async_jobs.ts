@@ -376,6 +376,20 @@ async function slackInteractivityHandler(
       );
       return;
     }
+    const MD5 = new Hashes.MD5();
+    const redisUserInfoKey = `${MD5.hex(redisData.userPhoneNumber)}:${
+      redisData.twilioPhoneNumber
+    }`;
+    const userInfo = (await RedisApiUtil.getHash(
+      redisClient,
+      redisUserInfoKey
+    )) as UserInfo;
+    if (!userInfo) {
+      logger.error(
+        `SERVER POST /slack-interactivity: missing userInfo for ${redisUserInfoKey}`
+      );
+      return;
+    }
 
     if (
       payload.actions[0].action_id === SlackActionId.VOTER_STATUS_DROPDOWN ||
@@ -397,12 +411,13 @@ async function slackInteractivityHandler(
         payload.message.blocks[2] = cloneDeep(SlackBlockUtil.voterStatusPanel);
       }
       await SlackInteractionHandler.handleVoterStatusUpdate({
+        userInfo,
         payload,
         selectedVoterStatus: selectedVoterStatus as SlackInteractionHandler.VoterStatusUpdate,
         originatingSlackUserName,
         slackChannelName: originatingSlackChannelName,
-        userPhoneNumber: redisData ? redisData.userPhoneNumber : null,
-        twilioPhoneNumber: redisData ? redisData.twilioPhoneNumber : null,
+        userPhoneNumber: redisData.userPhoneNumber,
+        twilioPhoneNumber: redisData.twilioPhoneNumber,
         redisClient,
       });
     } else if (
@@ -413,17 +428,17 @@ async function slackInteractivityHandler(
         `SERVER POST /slack-interactivity: Determined user interaction is a volunteer update.`
       );
       await SlackInteractionHandler.handleVolunteerUpdate({
+        userInfo,
         payload,
         originatingSlackUserName,
         slackChannelName: originatingSlackChannelName,
-        userPhoneNumber: redisData ? redisData.userPhoneNumber : null,
-        twilioPhoneNumber: redisData ? redisData.twilioPhoneNumber : null,
+        userPhoneNumber: redisData.userPhoneNumber,
+        twilioPhoneNumber: redisData.twilioPhoneNumber,
       });
     } else if (payload.actions[0].action_id === SlackActionId.SESSION_TOPICS) {
       logger.info(
         `SERVER POST /slack-interactivity: Determined user interaction is a session topics update.`
       );
-      const MD5 = new Hashes.MD5();
       await SlackInteractionHandler.handleSessionTopicUpdate({
         payload: payload,
         userId: MD5.hex(redisData.userPhoneNumber),

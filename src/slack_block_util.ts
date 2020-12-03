@@ -3,6 +3,9 @@ import { SlackActionId } from './slack_interaction_ids';
 import { SessionTopics, VoterStatus, UserInfo } from './types';
 import { SlackModalPrivateMetadata } from './slack_interaction_handler';
 import { cloneDeep } from 'lodash';
+import * as DbApiUtil from './db_api_util';
+import * as SlackInteractionApiUtil from './slack_interaction_api_util';
+import * as SlackApiUtil from './slack_api_util';
 
 export type SlackBlock = {
   type: string;
@@ -370,73 +373,80 @@ export function getErrorSlackView(
   };
 }
 
-export function voterPanelHeader(
-  userInfo: UserInfo,
-  announce: boolean
-): string {
-  let r = '';
-  if (announce || userInfo.stateName || userInfo.panelMessage) {
-    r = announce ? '<!channel> ' : '';
-    // NOTE: we have to be careful here because returningVoter may be a boolean or string
-    r += `${String(userInfo.returningVoter) == 'true' ? 'Returning' : 'New'} ${
-      userInfo.stateName ? '*' + userInfo.stateName + '* ' : ''
-    }voter`;
-    if (userInfo.panelMessage) {
-      r += ` (${userInfo.panelMessage})`;
-    }
-    r += '\n';
+function voterPanelHeader(userInfo: UserInfo): string {
+  // NOTE: we have to be careful here because returningVoter may be a boolean or string
+  let r = `<!channel> ${
+    String(userInfo.returningVoter) == 'true' ? 'Returning' : 'New'
+  } ${userInfo.stateName ? '*' + userInfo.stateName + '* ' : ''}voter`;
+  if (userInfo.panelMessage) {
+    r += ` (${userInfo.panelMessage})`;
   }
+  r += '\n';
   r += `${userInfo.userId} via ${userInfo.twilioPhoneNumber}`;
   return r;
 }
 
+// Generate the slack blocks for a voter thread header panel, either based on state in the database
+// or values provided by the caller
 export async function getVoterPanel(
   userInfo: UserInfo,
-  lobby: boolean,
+  twilioPhoneNumber: string,
   volunteer?: string,
   status?: string,
-  topics?: string[],
+  topics?: string[]
 ): Promise<SlackBlock[]> {
-  const messageText = voterPanelHeader(userInfo, !lobby);
+  const messageText = voterPanelHeader(userInfo);
   const panel = [
     voterInfoSection(messageText),
     cloneDeep(volunteerSelectionPanel),
     cloneDeep(voterStatusPanel),
     cloneDeep(voterTopicPanel),
   ];
-  return panel;
-}
 
-export function getVoterStatusBlocks(messageText: string): SlackBlock[] {
-  return cloneDeep([
-    voterInfoSection(messageText),
-    volunteerSelectionPanel,
-    voterStatusPanel,
-    voterTopicPanel,
-  ]);
-}
+  if (!volunteer) {
+    volunteer =
+      (await DbApiUtil.getVoterVolunteer(
+        userInfo.userId,
+        twilioPhoneNumber,
+        userInfo.sessionStartEpoch || 0
+      )) || undefined;
+  }
+  if (volunteer) {
+    populateDropdownNewInitialValue(
+      panel,
+      SlackActionId.VOLUNTEER_DROPDOWN,
+      volunteer
+    );
+    panel[1].elements.push({
+      type: 'button',
+      style: 'primary',
+      text: {
+        type: 'plain_text',
+        text: 'Clear volunteer',
+        emoji: true,
+      },
+      action_id: SlackActionId.VOLUNTEER_RELEASE_CLAIM,
+      value: 'RELEASE_CLAIM',
+    });
+  }
 
-export function makeClosedVoterPanelBlocks(
-  messageText: string,
-  includeUndoButton: boolean
-): SlackBlock[] {
-  logger.info('ENTERING SLACKINTERACTIONAPIUTIL.getClosedVoterStatusPanel');
-
-  const blocks = [];
-
-  blocks.push({
-    type: 'section',
-    text: {
-      type: 'mrkdwn',
-      text: messageText,
-    },
-  });
-
-  if (includeUndoButton) {
-    blocks.push({
-      type: 'actions',
-      elements: [
-        {
+  if (!status) {
+    status =
+      (await DbApiUtil.getLatestVoterStatus(
+        userInfo.userId,
+        twilioPhoneNumber
+      )) || 'UNKNOWN';
+  }
+  if (status != 'UNKNOWN') {
+    if (status === 'REFUSED' || status === 'SPAM') {
+      // These statuses are special: frame with with a warning and require confirmation to undo.
+      panel[2] = {
+        type: 'section',
+        text: {
+          type: 'mrkdwn',
+          text: `:no_entry_sign: This voter is marked *${status}* :no_entry_sign:`,
+        },
+        accessory: {
           type: 'button',
           action_id: SlackActionId.CLOSED_VOTER_PANEL_UNDO_BUTTON,
           style: 'danger',
@@ -453,7 +463,7 @@ export function makeClosedVoterPanelBlocks(
             },
             text: {
               type: 'mrkdwn',
-              text: "Please confirm you'd like to reset the voter's status.",
+              text: "Please confirm you'd like to restore this voter.",
             },
             confirm: {
               type: 'plain_text',
@@ -465,51 +475,64 @@ export function makeClosedVoterPanelBlocks(
             },
           },
         },
-      ],
-    });
+      };
+    } else {
+      populateDropdownNewInitialValue(
+        panel,
+        SlackActionId.VOTER_STATUS_DROPDOWN,
+        status
+      );
+    }
   }
-  return blocks;
-}
 
-export function replaceVoterPanelBlocks(
-  oldBlocks: SlackBlock[],
-  replacementBlocks: SlackBlock[]
-): SlackBlock[] {
-  const newBlocks = [];
-  // The first block is the user info.
-  newBlocks.push(oldBlocks[0]);
-  // The second block is the volunteer dropdown.
-  newBlocks.push(oldBlocks[1]);
-  // The remaining blocks are the panel.
-  for (const idx in replacementBlocks) {
-    newBlocks.push(replacementBlocks[idx]);
+  if (!topics) {
+    topics =
+      (await DbApiUtil.getThreadTopics(
+        userInfo.activeChannelId,
+        userInfo[userInfo.activeChannelId]
+      )) || [];
   }
-  return newBlocks;
-}
-
-// Adjust whether the 'Clear volunteer' button is present or not.
-export function updateClearVolunteerButton(
-  blocks: SlackBlock[],
-  visible: boolean
-): void {
-  if (visible) {
-    if (blocks[1].elements.length == 1) {
-      blocks[1].elements.push({
-        type: 'button',
-        style: 'primary',
+  if (topics.length > 0) {
+    panel[3].accessory.initial_options = topics.map((topic) => {
+      return {
         text: {
           type: 'plain_text',
-          text: 'Clear volunteer',
-          emoji: true,
+          text: SessionTopics[topic],
         },
-        action_id: SlackActionId.VOLUNTEER_RELEASE_CLAIM,
-        value: 'RELEASE_CLAIM',
-      });
-    }
-  } else {
-    if (blocks[1].elements.length > 1) {
-      blocks[1].elements.pop();
-    }
+        value: topic,
+      };
+    });
+  }
+
+  return panel;
+}
+
+// Close out the voter panel completely.
+export async function closeVoterPanel(
+  channelId: string,
+  parentMessageTs: string,
+  message: string
+): Promise<void> {
+  const oldBlocks = await SlackApiUtil.fetchSlackMessageBlocks(
+    channelId,
+    parentMessageTs
+  );
+  if (oldBlocks) {
+    const newBlocks = [
+      oldBlocks[0],
+      {
+        type: 'section',
+        text: {
+          type: 'mrkdwn',
+          text: message,
+        },
+      },
+    ];
+    await SlackInteractionApiUtil.replaceSlackMessageBlocks({
+      slackChannelId: channelId,
+      slackParentMessageTs: parentMessageTs,
+      newBlocks: newBlocks,
+    });
   }
 }
 
