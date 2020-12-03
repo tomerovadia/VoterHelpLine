@@ -249,7 +249,7 @@ async function introduceNewVoterToSlackChannel(
   } as SlackApiUtil.SlackSendMessageResponse | null;
 
   if (slackChannelName !== 'lobby' || !skipLobby) {
-    response = await SlackApiUtil.sendMessage('', {
+    response = await SlackApiUtil.sendMessage(slackBlocks[0].text.text, {
       channel: slackChannelName,
       blocks: slackBlocks,
     });
@@ -395,7 +395,7 @@ async function introduceNewVoterToSlackChannel(
         userAttachments
       );
       await SlackApiUtil.sendMessage(
-        '',
+        blocks[0].text.text,
         {
           parentMessageTs: response.data.ts,
           blocks,
@@ -894,7 +894,7 @@ export async function routeVoterToSlackChannel(
       userInfo,
       twilioPhoneNumber
     );
-    const response = await SlackApiUtil.sendMessage('', {
+    const response = await SlackApiUtil.sendMessage(blocks[0].text.text, {
       channel: destinationSlackChannelName,
       blocks: blocks,
     });
