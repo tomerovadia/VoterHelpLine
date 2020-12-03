@@ -1255,8 +1255,6 @@ export async function determineVoterState(
 
     try {
       await DbApiUtil.logMessageToDb(inboundDbMessageEntry);
-      if (!skipLobby && userInfo.activeChannelId != 'NONEXISTENT_LOBBY')
-        await DbApiUtil.updateThreadStatusFromMessage(inboundDbMessageEntry);
     } catch (error) {
       logger.info(
         `SLACKAPIUTIL.sendMessage: failed to log message send success to DB`

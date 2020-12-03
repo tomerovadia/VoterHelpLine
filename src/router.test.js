@@ -41,7 +41,6 @@ const requireModules = () => {
   DbApiUtil.setThreadNeedsAttentionToDb = jest.fn();
   DbApiUtil.getThreadNeedsAttentionFor = jest.fn();
   DbApiUtil.setThreadHistoryTs = jest.fn();
-  DbApiUtil.updateThreadStatusFromMessage = jest.fn();
   DbApiUtil.getLatestVoterStatus = jest.fn();
   DbApiUtil.setThreadInactive = jest.fn();
   DbApiUtil.getKnownPhoneState = jest.fn();
