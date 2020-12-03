@@ -70,5 +70,6 @@ export const SessionTopics = {
   VOTE_EARLY: 'How to vote early',
   ABSENTEE_VOTE_IN_PERSON:
     'How to vote in person despite having absentee ballot',
+  MOVED: 'Moved',
   UNUSUAL_QUESTION: 'Unusual and/or uncategorized question',
 } as Record<string, string>;
