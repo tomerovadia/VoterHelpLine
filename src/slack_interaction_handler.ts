@@ -1005,33 +1005,6 @@ export async function handleCommandFollowUp(
   await SlackApiUtil.sendEphemeralResponse(responseUrl, lines.join('\n'));
 }
 
-export async function handleShortcutShowNeedsAttention({
-  payload,
-  viewId,
-}: {
-  payload: SlackInteractionEventPayload;
-  viewId: string;
-}): Promise<void> {
-  const lines = await getNeedsAttentionList(payload.user.id);
-  const slackView: SlackBlockUtil.SlackView = {
-    title: {
-      type: 'plain_text',
-      text: `${lines.length} voters need attention`,
-    },
-    blocks: [
-      {
-        type: 'section',
-        text: {
-          type: 'mrkdwn',
-          text: lines.join('\n') || 'No voters need attention right now',
-        },
-      },
-    ],
-    type: 'modal',
-  };
-  await SlackApiUtil.updateModal(viewId, slackView);
-}
-
 export async function handleSessionShow(
   payload: SlackInteractionEventPayload
 ): Promise<void> {
