@@ -1259,8 +1259,6 @@ export async function determineVoterState(
 
     try {
       await DbApiUtil.logMessageToDb(inboundDbMessageEntry);
-      if (!skipLobby && userInfo.activeChannelId != 'NONEXISTENT_LOBBY')
-        await DbApiUtil.updateThreadStatusFromMessage(inboundDbMessageEntry);
     } catch (error) {
       logger.info(
         `SLACKAPIUTIL.sendMessage: failed to log message send success to DB`
@@ -1530,6 +1528,13 @@ export async function handleClearedVoter(
     },
     inboundDbMessageEntry,
     userInfo
+  );
+
+  // Update thread needs attention status -> true
+  await DbApiUtil.setThreadNeedsAttentionToDb(
+    userInfo[userInfo.activeChannelId],
+    userInfo.activeChannelId,
+    true
   );
 
   logger.debug(
@@ -2024,6 +2029,14 @@ export async function handleSlackVoterThreadMessage(
       },
       outboundDbMessageEntry
     );
+
+    // Update thread needs attention status -> false
+    await DbApiUtil.setThreadNeedsAttentionToDb(
+      userInfo[userInfo.activeChannelId],
+      userInfo.activeChannelId,
+      false
+    );
+
     // Slack message is from inactive Slack thread.
   } else {
     if (userInfo.activeChannelId) {

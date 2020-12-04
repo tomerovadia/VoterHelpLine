@@ -141,6 +141,7 @@ export async function logMessageToDb(
 ): Promise<void> {
   const client = await pool.connect();
   try {
+    // Log the message
     await client.query(
       'INSERT INTO messages (message, direction, automated, successfully_sent, from_phone_number, user_id, to_phone_number, originating_slack_user_id, slack_channel, slack_parent_message_ts, twilio_message_sid, slack_message_ts, slack_error, twilio_error, twilio_send_timestamp, twilio_receive_timestamp, slack_send_timestamp, slack_receive_timestamp, confirmed_disclaimer, is_demo, last_voter_message_secs_from_epoch, unprocessed_message, slack_retry_num, slack_retry_reason, originating_slack_user_name, entry_point, archived, state_name, slack_attachments, twilio_attachments) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30);',
       [
@@ -185,6 +186,17 @@ export async function logMessageToDb(
     );
     logger.info(
       `DBAPIUTIL.logMessageToDb: Successfully inserted message into PostgreSQL database.`
+    );
+
+    // Update the thread updated_at, too
+    await client.query(
+      `UPDATE threads
+      SET updated_at=NOW()
+      WHERE slack_parent_message_ts = $1 AND slack_channel_id = $2`,
+      [
+        databaseMessageEntry.slackParentMessageTs,
+        databaseMessageEntry.slackChannel,
+      ]
     );
   } finally {
     // Make sure to release the client before any error handling,
@@ -682,75 +694,6 @@ export async function logThreadToDb(
     );
     logger.info('DBAPIUTIL.logThreadToDb: Successfully created thread');
   } finally {
-    client.release();
-  }
-}
-
-export async function updateThreadStatusFromMessage(
-  databaseMessageEntry: DatabaseMessageEntry
-): Promise<void> {
-  const client = await pool.connect();
-  try {
-    // Update thread status
-    let result;
-    if (databaseMessageEntry.direction === 'INBOUND') {
-      result = await client.query(
-        `UPDATE threads
-        SET needs_attention = true, updated_at=NOW()
-        WHERE slack_parent_message_ts = $1 AND slack_channel_id = $2`,
-        [
-          databaseMessageEntry.slackParentMessageTs,
-          databaseMessageEntry.slackChannel,
-        ]
-      );
-    } else if (
-      !databaseMessageEntry.automated &&
-      databaseMessageEntry.userId &&
-      databaseMessageEntry.toPhoneNumber &&
-      (await getVoterHasVolunteer(databaseMessageEntry.userId))
-    ) {
-      result = await client.query(
-        `UPDATE threads
-        SET needs_attention = false, updated_at=NOW()
-        WHERE slack_parent_message_ts = $1 AND slack_channel_id = $2`,
-        [
-          databaseMessageEntry.slackParentMessageTs,
-          databaseMessageEntry.slackChannel,
-        ]
-      );
-    } else {
-      result = await client.query(
-        `UPDATE threads
-        SET updated_at=NOW()
-        WHERE slack_parent_message_ts = $1 AND slack_channel_id = $2`,
-        [
-          databaseMessageEntry.slackParentMessageTs,
-          databaseMessageEntry.slackChannel,
-        ]
-      );
-    }
-    if (result.rowCount == 0) {
-      // If the thread doesn't already exist (because this thread predates the creation
-      // of the threads table), create it now.
-      await logThreadToDb({
-        slackParentMessageTs: databaseMessageEntry.slackParentMessageTs,
-        channelId: databaseMessageEntry.slackChannel,
-        userId: databaseMessageEntry.userId,
-        userPhoneNumber:
-          databaseMessageEntry.direction === 'INBOUND'
-            ? databaseMessageEntry.fromPhoneNumber
-            : databaseMessageEntry.toPhoneNumber,
-        twilioPhoneNumber:
-          databaseMessageEntry.direction === 'INBOUND'
-            ? databaseMessageEntry.toPhoneNumber
-            : databaseMessageEntry.fromPhoneNumber,
-        needsAttention: databaseMessageEntry.direction === 'INBOUND',
-        sessionStartEpoch: 0 /* kludge but this code path is so rare */,
-      } as DatabaseThreadEntry);
-    }
-  } finally {
-    // Make sure to release the client before any error handling,
-    // just in case the error handling itself throws an error.
     client.release();
   }
 }
