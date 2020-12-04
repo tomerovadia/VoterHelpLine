@@ -621,22 +621,6 @@ async function slackAppMentionEventHandler(reqBody: SlackEventRequestBody) {
   logger.info(
     `SERVER POST /slack: Successfully determined Slack user name of bot mentioner: ${originatingSlackUserName}, from Slack user ID: ${reqBody.event.user}`
   );
-  // For these commands, require that the message was sent in the #admin-control-room Slack channel.
-  if (
-    reqBody.event.channel === process.env.ADMIN_CONTROL_ROOM_SLACK_CHANNEL_ID
-  ) {
-    logger.info(
-      'SERVER POST /slack: Slack event listener caught bot mention in admin channel.'
-    );
-    logger.info(
-      `SERVER POST /slack: Received admin control command from ${originatingSlackUserName}: ${reqBody.event.text}`
-    );
-    await Router.handleSlackAdminCommand(
-      reqBody,
-      redisClient,
-      originatingSlackUserName
-    );
-  }
 }
 
 const BACKGROUND_TASKS = {
