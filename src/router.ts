@@ -685,11 +685,9 @@ export async function routeVoterToSlackChannel(
   userInfo: UserInfo,
   redisClient: PromisifiedRedisClient,
   {
-    userId,
     twilioPhoneNumber,
     destinationSlackChannelName,
   }: {
-    userId: string;
     twilioPhoneNumber: string;
     destinationSlackChannelName: string;
   },
@@ -888,9 +886,9 @@ export async function routeVoterToSlackChannel(
     {
       destinationSlackParentMessageTs: response.data.ts,
       destinationSlackChannelId: response.data.channel,
-    },
+    }
   );
-  
+
   await DbApiUtil.setThreadInactive(oldSlackParentMessageTs, oldChannelId);
 
   if (
@@ -1140,7 +1138,6 @@ export async function determineVoterState(
   }
 
   await routeVoterToSlackChannel(userInfo, redisClient, {
-    userId,
     twilioPhoneNumber,
     destinationSlackChannelName: selectedStateChannelName,
   });
@@ -1403,7 +1400,6 @@ export async function handleSlackThreadCommand(
       userInfo,
       redisClient,
       {
-        userId: userInfo.userId,
         twilioPhoneNumber: twilioPhoneNumber,
         destinationSlackChannelName: channel,
       } as CommandUtil.ParsedCommandRouteVoter,
@@ -1473,7 +1469,6 @@ export async function handleSlackThreadCommand(
       userInfo,
       redisClient,
       {
-        userId: userInfo.userId,
         twilioPhoneNumber: twilioPhoneNumber,
         destinationSlackChannelName: slackChannelName,
       } as CommandUtil.ParsedCommandRouteVoter,
