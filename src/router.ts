@@ -695,57 +695,6 @@ async function postUserMessageHistoryToSlack(
   }
 }
 
-// This helper handles all tasks associated with routing a voter to a new
-// channel that require the new channel's thread.
-const routeVoterToSlackChannelHelper = async (
-  userInfo: UserInfo,
-  redisClient: PromisifiedRedisClient,
-  twilioPhoneNumber: string,
-  {
-    destinationSlackChannelName,
-    destinationSlackChannelId,
-    destinationSlackParentMessageTs,
-  }: {
-    destinationSlackChannelName: string;
-    destinationSlackChannelId: string;
-    destinationSlackParentMessageTs: string;
-  },
-  returningToThread: boolean
-) => {
-  logger.debug('ENTERING ROUTER.routeVoterToSlackChannelHelper');
-  logger.debug(`ROUTER.routeVoterToSlackChannelHelper: Voter is being routed to,
-                destinationSlackChannelId: ${destinationSlackChannelId},
-                destinationSlackParentMessageTs: ${destinationSlackParentMessageTs},
-                destinationSlackChannelName: ${destinationSlackChannelName}`);
-
-  logger.debug(
-    "ROUTER.routeVoterToSlackChannelHelper: Changing voter's active channel."
-  );
-  // Reassign the active channel so that the next voter messages go to the
-  // new active channel.
-  userInfo.activeChannelId = destinationSlackChannelId;
-  userInfo.activeChannelName = destinationSlackChannelName;
-
-  // Update userInfo in Redis (remember state channel thread identifying info and new activeChannel).
-  logger.debug(
-    `ROUTER.routeVoterToSlackChannelHelper: Writing updated userInfo to Redis.`
-  );
-  await RedisApiUtil.setHash(
-    redisClient,
-    `${userInfo.userId}:${twilioPhoneNumber}`,
-    userInfo
-  );
-
-  // Populate state channel thread with message history so far.
-  await postUserMessageHistoryToSlack(
-    redisClient,
-    userInfo,
-    twilioPhoneNumber,
-    { destinationSlackParentMessageTs, destinationSlackChannelId },
-    returningToThread
-  );
-};
-
 // This function routes a voter to a new channel WHETHER OR NOT they have
 // previously been to that channel before, creating a new thread if needed.
 export async function routeVoterToSlackChannel(
@@ -924,17 +873,37 @@ export async function routeVoterToSlackChannel(
     sessionStartEpoch: userInfo.sessionStartEpoch || null,
   });
 
-  // The logic above this is for a voter's first time at a channel (e.g. create thread).
-  // This function is separated so that it could be used to return a voter to
-  // their thread in a channel they've already been in.
-  await routeVoterToSlackChannelHelper(
-    userInfo,
+  logger.debug(`ROUTER.routeVoterToSlackChannel: Voter is being routed to,
+  destinationSlackChannelId: ${destinationSlackChannelId},
+  destinationSlackParentMessageTs: ${response.data.ts},
+  destinationSlackChannelName: ${destinationSlackChannelName}`);
+
+  logger.debug(
+    "ROUTER.routeVoterToSlackChannel: Changing voter's active channel."
+  );
+  // Reassign the active channel so that the next voter messages go to the
+  // new active channel.
+  userInfo.activeChannelId = response.data.channel;
+  userInfo.activeChannelName = destinationSlackChannelName;
+
+  // Update userInfo in Redis (remember state channel thread identifying info and new activeChannel).
+  logger.debug(
+    `ROUTER.routeVoterToSlackChannel: Writing updated userInfo to Redis.`
+  );
+  await RedisApiUtil.setHash(
     redisClient,
+    `${userInfo.userId}:${twilioPhoneNumber}`,
+    userInfo
+  );
+
+  // Populate state channel thread with message history so far.
+  await postUserMessageHistoryToSlack(
+    redisClient,
+    userInfo,
     twilioPhoneNumber,
     {
-      destinationSlackChannelName,
-      destinationSlackChannelId: response.data.channel,
       destinationSlackParentMessageTs: response.data.ts,
+      destinationSlackChannelId: response.data.channel,
     },
     false
   );
