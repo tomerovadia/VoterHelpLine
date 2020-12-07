@@ -879,128 +879,66 @@ export async function routeVoterToSlackChannel(
     'ROUTER.routeVoterToSlackChannel: Successfully updated old thread parent message during channel move'
   );
 
-  // If this user hasn't been to the destination channel, create new thread in the channel.
-  if (!userInfo[destinationSlackChannelId]) {
-    logger.debug(
-      `ROUTER.routeVoterToSlackChannel: Creating a new thread in this channel (${destinationSlackChannelId}), since voter hasn't been here.`
-    );
+  // Create new thread in the channel.
+  logger.debug(
+    `ROUTER.routeVoterToSlackChannel: Creating a new thread in this channel (${destinationSlackChannelId}), since voter hasn't been here.`
+  );
 
-    if (adminCommandParams) {
-      userInfo.panelMessage = `routed from *${adminCommandParams.previousSlackChannelName}* by *${adminCommandParams.routingSlackUserName}*`;
-    }
-
-    // Start new thread in the destination channel
-    const blocks = await SlackBlockUtil.getVoterPanel(
-      userInfo,
-      twilioPhoneNumber
-    );
-    const response = await SlackApiUtil.sendMessage(blocks[0].text.text, {
-      channel: destinationSlackChannelName,
-      blocks: blocks,
-    });
-
-    if (!response) {
-      throw new Error('Unable to send newParentMessageText as a Slack message');
-    }
-
-    // Remember the voter's thread in this channel.
-    userInfo[response.data.channel] = response.data.ts;
-
-    // Be able to identify phone number using NEW Slack channel identifying info.
-    await RedisApiUtil.setHash(
-      redisClient,
-      `${response.data.channel}:${response.data.ts}`,
-      { userPhoneNumber, twilioPhoneNumber }
-    );
-
-    // Create the thread with the origin thread's need_attention status
-    await DbApiUtil.logThreadToDb({
-      slackParentMessageTs: response.data.ts,
-      channelId: response.data.channel,
-      userId: userInfo.userId,
-      userPhoneNumber: userInfo.userPhoneNumber,
-      twilioPhoneNumber: twilioPhoneNumber,
-      needsAttention: needsAttention,
-      isDemo: userInfo.isDemo,
-      sessionStartEpoch: userInfo.sessionStartEpoch || null,
-    });
-
-    // The logic above this is for a voter's first time at a channel (e.g. create thread).
-    // This function is separated so that it could be used to return a voter to
-    // their thread in a channel they've already been in.
-    await routeVoterToSlackChannelHelper(
-      userInfo,
-      redisClient,
-      twilioPhoneNumber,
-      {
-        destinationSlackChannelName,
-        destinationSlackChannelId: response.data.channel,
-        destinationSlackParentMessageTs: response.data.ts,
-      },
-      false
-    );
-  } else {
-    // If this user HAS been to the destination channel, use the same thread info.
-    if (!adminCommandParams) {
-      throw new Error('Missing adminCommandParams');
-    }
-
-    // Update + refresh the blocks
-    const newBlocks = await SlackBlockUtil.getVoterPanel(
-      userInfo,
-      twilioPhoneNumber
-    );
-    await SlackInteractionApiUtil.replaceSlackMessageBlocks({
-      slackChannelId: destinationSlackChannelId,
-      slackParentMessageTs: userInfo[destinationSlackChannelId],
-      newBlocks: newBlocks,
-    });
-
-    logger.debug(
-      `ROUTER.routeVoterToSlackChannel: Returning voter back to *${destinationSlackChannelName}* from *${adminCommandParams.previousSlackChannelName}*. Voter has been here before.`
-    );
-
-    const historyTs = await DbApiUtil.getThreadLatestMessageTs(
-      userInfo[destinationSlackChannelId],
-      destinationSlackChannelId
-    );
-    const url = await SlackApiUtil.getThreadPermalink(
-      destinationSlackChannelId,
-      historyTs || userInfo[destinationSlackChannelId]
-    );
-    await SlackApiUtil.sendMessage(
-      `*Operator:* Voter *${userId}* was routed from *${adminCommandParams.previousSlackChannelName}* back to this channel by *${adminCommandParams.routingSlackUserName}*: <${url}|Open>`,
-      { channel: destinationSlackChannelId }
-    );
-
-    // Set destination thread to have same needs_attention status as origin thread
-    await DbApiUtil.reactivateThread(
-      userInfo[destinationSlackChannelId],
-      destinationSlackChannelId,
-      needsAttention
-    );
-
-    await SlackApiUtil.sendMessage(
-      `*Operator:* Voter *${userId}* was routed from *${adminCommandParams.previousSlackChannelName}* back to this thread by *${adminCommandParams.routingSlackUserName}*. Messages sent here will again relay to the voter.`,
-      {
-        channel: destinationSlackChannelId,
-        parentMessageTs: userInfo[destinationSlackChannelId],
-      }
-    );
-
-    await routeVoterToSlackChannelHelper(
-      userInfo,
-      redisClient,
-      twilioPhoneNumber,
-      {
-        destinationSlackChannelName,
-        destinationSlackChannelId,
-        destinationSlackParentMessageTs: userInfo[destinationSlackChannelId],
-      },
-      true /* returning to channel */
-    );
+  if (adminCommandParams) {
+    userInfo.panelMessage = `routed from *${adminCommandParams.previousSlackChannelName}* by *${adminCommandParams.routingSlackUserName}*`;
   }
 
+  // Start new thread in the destination channel
+  const blocks = await SlackBlockUtil.getVoterPanel(
+    userInfo,
+    twilioPhoneNumber
+  );
+  const response = await SlackApiUtil.sendMessage(blocks[0].text.text, {
+    channel: destinationSlackChannelName,
+    blocks: blocks,
+  });
+
+  if (!response) {
+    throw new Error('Unable to send newParentMessageText as a Slack message');
+  }
+
+  // Remember the voter's thread in this channel.
+  userInfo[response.data.channel] = response.data.ts;
+
+  // Be able to identify phone number using NEW Slack channel identifying info.
+  await RedisApiUtil.setHash(
+    redisClient,
+    `${response.data.channel}:${response.data.ts}`,
+    { userPhoneNumber, twilioPhoneNumber }
+  );
+
+  // Create the thread with the origin thread's need_attention status
+  await DbApiUtil.logThreadToDb({
+    slackParentMessageTs: response.data.ts,
+    channelId: response.data.channel,
+    userId: userInfo.userId,
+    userPhoneNumber: userInfo.userPhoneNumber,
+    twilioPhoneNumber: twilioPhoneNumber,
+    needsAttention: needsAttention,
+    isDemo: userInfo.isDemo,
+    sessionStartEpoch: userInfo.sessionStartEpoch || null,
+  });
+
+  // The logic above this is for a voter's first time at a channel (e.g. create thread).
+  // This function is separated so that it could be used to return a voter to
+  // their thread in a channel they've already been in.
+  await routeVoterToSlackChannelHelper(
+    userInfo,
+    redisClient,
+    twilioPhoneNumber,
+    {
+      destinationSlackChannelName,
+      destinationSlackChannelId: response.data.channel,
+      destinationSlackParentMessageTs: response.data.ts,
+    },
+    false
+  );
+  
   await DbApiUtil.setThreadInactive(oldSlackParentMessageTs, oldChannelId);
 
   if (
