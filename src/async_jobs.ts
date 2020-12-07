@@ -19,6 +19,7 @@ import Hashes from 'jshashes';
 import * as DbApiUtil from './db_api_util';
 import * as SlackBlockUtil from './slack_block_util';
 import { cloneDeep } from 'lodash';
+import * as LoadBalancer from './load_balancer';
 
 import {
   SlackInteractionEventPayload,
@@ -93,6 +94,8 @@ async function slackInteractivityHandler(
   payload: SlackInteractionEventPayload,
   interactivityMetadata: InteractivityHandlerMetadata
 ) {
+  const MD5 = new Hashes.MD5();
+
   const originatingSlackUserName = await SlackApiUtil.fetchSlackUserName(
     payload.user.id
   );
@@ -216,8 +219,6 @@ async function slackInteractivityHandler(
           );
         }
 
-        const MD5 = new Hashes.MD5();
-
         // Ignore Prettier formatting because this object needs to adhere to JSON strigify requirements.
         // prettier-ignore
         const modalPrivateMetadata = {
@@ -266,8 +267,6 @@ async function slackInteractivityHandler(
             'slackInteractivityHandler called for message_action without viewId'
           );
         }
-
-        const MD5 = new Hashes.MD5();
 
         // Ignore Prettier formatting because this object needs to adhere to JSON strigify requirements.
         // prettier-ignore
@@ -330,6 +329,59 @@ async function slackInteractivityHandler(
         await SlackInteractionHandler.handleSessionHide(payload);
         return;
       }
+      case SlackActionId.RESET_DEMO: {
+        const redisHashKey = `${payload.channel.id}:${payload.message.ts}`;
+        const redisData = await RedisApiUtil.getHash(redisClient, redisHashKey);
+        const modalPrivateMetadata = {
+          commandType: 'RESET_DEMO',
+          userId: redisData ? MD5.hex(redisData.userPhoneNumber) : null,
+          userPhoneNumber: redisData ? redisData.userPhoneNumber : null,
+          twilioPhoneNumber: redisData ? redisData.twilioPhoneNumber : null,
+          slackChannelId: payload.channel.id,
+          slackParentMessageTs: payload.message.ts,
+          originatingSlackUserName: originatingSlackUserName,
+          originatingSlackUserId: payload.user.id,
+          actionTs: payload.action_ts,
+        } as SlackModalPrivateMetadata;
+        await SlackInteractionHandler.handleResetDemo(
+          redisClient,
+          modalPrivateMetadata
+        );
+        return;
+      }
+      case SlackActionId.ROUTE_TO_JOURNEY: {
+        const redisHashKey = `${payload.channel.id}:${payload.message.ts}`;
+        const redisData = await RedisApiUtil.getHash(redisClient, redisHashKey);
+        const userId = MD5.hex(redisData.userPhoneNumber);
+        const redisUserInfoKey = `${userId}:${redisData.twilioPhoneNumber}`;
+        const userInfo = (await RedisApiUtil.getHash(
+          redisClient,
+          redisUserInfoKey
+        )) as UserInfo;
+        try {
+          const destinationChannelName = await LoadBalancer.getJourneyChannel(
+            redisClient,
+            userInfo
+          );
+          const modalPrivateMetadata = {
+            commandType: 'ROUTE_TO_JOURNEY',
+            userId: MD5.hex(redisData.userPhoneNumber),
+            twilioPhoneNumber: redisData.twilioPhoneNumber,
+            originatingSlackUserName: originatingSlackUserName,
+            originatingSlackUserId: payload.user.id,
+            slackChannelId: payload.channel.id,
+            slackParentMessageTs: thread_ts,
+            destinationSlackChannelName: destinationChannelName,
+          } as SlackModalPrivateMetadata;
+          await SlackInteractionHandler.handleRouteToJourney(
+            redisClient,
+            modalPrivateMetadata
+          );
+        } catch (error) {
+          logger.info(error);
+        }
+        return;
+      }
       case SlackActionId.MANAGE_ENTRY_POINTS_FILTER_STATE:
       case SlackActionId.MANAGE_ENTRY_POINTS_FILTER_TYPE: {
         logger.info(
@@ -376,6 +428,19 @@ async function slackInteractivityHandler(
       );
       return;
     }
+    const redisUserInfoKey = `${MD5.hex(redisData.userPhoneNumber)}:${
+      redisData.twilioPhoneNumber
+    }`;
+    const userInfo = (await RedisApiUtil.getHash(
+      redisClient,
+      redisUserInfoKey
+    )) as UserInfo;
+    if (!userInfo) {
+      logger.error(
+        `SERVER POST /slack-interactivity: missing userInfo for ${redisUserInfoKey}`
+      );
+      return;
+    }
 
     if (
       payload.actions[0].action_id === SlackActionId.VOTER_STATUS_DROPDOWN ||
@@ -397,12 +462,13 @@ async function slackInteractivityHandler(
         payload.message.blocks[2] = cloneDeep(SlackBlockUtil.voterStatusPanel);
       }
       await SlackInteractionHandler.handleVoterStatusUpdate({
+        userInfo,
         payload,
         selectedVoterStatus: selectedVoterStatus as SlackInteractionHandler.VoterStatusUpdate,
         originatingSlackUserName,
         slackChannelName: originatingSlackChannelName,
-        userPhoneNumber: redisData ? redisData.userPhoneNumber : null,
-        twilioPhoneNumber: redisData ? redisData.twilioPhoneNumber : null,
+        userPhoneNumber: redisData.userPhoneNumber,
+        twilioPhoneNumber: redisData.twilioPhoneNumber,
         redisClient,
       });
     } else if (
@@ -413,17 +479,17 @@ async function slackInteractivityHandler(
         `SERVER POST /slack-interactivity: Determined user interaction is a volunteer update.`
       );
       await SlackInteractionHandler.handleVolunteerUpdate({
+        userInfo,
         payload,
         originatingSlackUserName,
         slackChannelName: originatingSlackChannelName,
-        userPhoneNumber: redisData ? redisData.userPhoneNumber : null,
-        twilioPhoneNumber: redisData ? redisData.twilioPhoneNumber : null,
+        userPhoneNumber: redisData.userPhoneNumber,
+        twilioPhoneNumber: redisData.twilioPhoneNumber,
       });
     } else if (payload.actions[0].action_id === SlackActionId.SESSION_TOPICS) {
       logger.info(
         `SERVER POST /slack-interactivity: Determined user interaction is a session topics update.`
       );
-      const MD5 = new Hashes.MD5();
       await SlackInteractionHandler.handleSessionTopicUpdate({
         payload: payload,
         userId: MD5.hex(redisData.userPhoneNumber),

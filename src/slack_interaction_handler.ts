@@ -131,18 +131,6 @@ export function parseSlackModalPrivateMetadata(
   return modalPrivateMetadataObject;
 }
 
-const getClosedVoterPanelText = (
-  selectedVoterStatus: VoterStatusUpdate,
-  originatingSlackUserName: string
-): string => {
-  logger.info('ENTERING SLACKINTERACTIONAPIUTIL.getClosedVoterPanelText');
-  const timeSinceEpochSecs = Math.round(Date.now() / 1000);
-  // See https://api.slack.com/reference/surfaces/formatting#visual-styles
-  const specialSlackTimestamp = `<!date^${timeSinceEpochSecs}^{date_num} {time_secs}|${new Date()}>`;
-
-  return `:no_entry_sign: This voter was marked as *${selectedVoterStatus}* by *${originatingSlackUserName}* on *${specialSlackTimestamp}*. :no_entry_sign:`;
-};
-
 const handleVoterStatusUpdateHelper = async ({
   payload,
   selectedVoterStatus,
@@ -198,6 +186,7 @@ const handleVoterStatusUpdateHelper = async ({
 };
 
 export async function handleVoterStatusUpdate({
+  userInfo,
   payload,
   selectedVoterStatus,
   originatingSlackUserName,
@@ -206,6 +195,7 @@ export async function handleVoterStatusUpdate({
   twilioPhoneNumber,
   redisClient,
 }: {
+  userInfo: UserInfo;
   payload: Payload;
   selectedVoterStatus: VoterStatusUpdate;
   originatingSlackUserName: string;
@@ -223,40 +213,12 @@ export async function handleVoterStatusUpdate({
     logger.info(
       `SLACKINTERACTIONHANDLER.handleVoterStatusUpdate: Determined user interaction is a voter status update`
     );
-    await handleVoterStatusUpdateHelper({
-      payload,
-      selectedVoterStatus,
-      originatingSlackUserName,
-      slackChannelName,
-      userPhoneNumber,
-      twilioPhoneNumber,
-    });
-
     // Accommodate either a button press or an automated, programmatic operation
     // that desires the same effect.
     if (
       (payload.actions && payload.actions[0].type === 'button') ||
       payload.automatedButtonSelection
     ) {
-      const closedVoterPanelText = getClosedVoterPanelText(
-        selectedVoterStatus,
-        originatingSlackUserName
-      );
-      const closedVoterPanelBlocks = SlackBlockUtil.makeClosedVoterPanelBlocks(
-        closedVoterPanelText,
-        true /* include undo button */
-      );
-      const newParentMessageBlocks = SlackBlockUtil.replaceVoterPanelBlocks(
-        payload.message.blocks,
-        closedVoterPanelBlocks
-      );
-
-      await SlackInteractionApiUtil.replaceSlackMessageBlocks({
-        slackChannelId: payload.channel.id,
-        slackParentMessageTs: payload.container.thread_ts,
-        newBlocks: newParentMessageBlocks,
-      });
-
       // Make sure we don't text voters marked as REFUSED or SPAM.
       if (selectedVoterStatus === 'REFUSED' || selectedVoterStatus === 'SPAM') {
         await RedisApiUtil.setHash(
@@ -272,28 +234,6 @@ export async function handleVoterStatusUpdate({
           );
         }
       }
-      // Steps to take if the dropdown was changed.
-    } else {
-      // Take the blocks and replace the initial_option with the new status, so that
-      // even when Slack is refreshed this new status is shown.
-      if (
-        !SlackBlockUtil.populateDropdownNewInitialValue(
-          payload.message.blocks,
-          SlackActionId.VOTER_STATUS_DROPDOWN,
-          selectedVoterStatus as VoterStatus
-        )
-      ) {
-        logger.error(
-          'SLACKINTERACTIONHANDLER.handleVoterStatusUpdate: Error updating VOTER_STATUS_DROPDOWN'
-        );
-      }
-
-      // Update voter panel
-      await SlackInteractionApiUtil.updateVoterStatusBlocks(
-        payload.channel.id,
-        payload.container.thread_ts,
-        payload.message.blocks
-      );
     }
   } else if (
     selectedVoterStatus === 'UNDO' &&
@@ -303,38 +243,13 @@ export async function handleVoterStatusUpdate({
     logger.info(
       `SLACKINTERACTIONHANDLER.handleVoterStatusUpdate: Determined user interaction is UNDO of voter status update`
     );
-    const MD5 = new Hashes.MD5();
-    const userId = MD5.hex(userPhoneNumber);
-    const previousStatus = ((await DbApiUtil.getLatestVoterStatus(
-      userId,
+
+    // Fetch the last voter status that is not REFUSED|SPAM
+    selectedVoterStatus = ((await DbApiUtil.getLatestVoterStatus(
+      userInfo.userId,
       twilioPhoneNumber
     )) || 'UNKNOWN') as VoterStatusUpdate;
-    await handleVoterStatusUpdateHelper({
-      payload,
-      selectedVoterStatus: previousStatus,
-      originatingSlackUserName,
-      slackChannelName,
-      userPhoneNumber,
-      twilioPhoneNumber,
-    });
-    const topics =
-      (await DbApiUtil.getThreadTopics(
-        payload.channel.id,
-        payload.container.thread_ts
-      )) || [];
-    const status = ((await DbApiUtil.getLatestVoterStatus(
-      userId,
-      twilioPhoneNumber
-    )) || 'UNKNOWN') as VoterStatus;
-    await SlackInteractionApiUtil.addBackVoterStatusPanel({
-      slackChannelId: payload.channel.id,
-      slackParentMessageTs: payload.container.thread_ts,
-      oldBlocks: payload.message.blocks,
-      status: status,
-      topics: topics,
-    });
 
-    // For code simplicity, this executes even if "VOTED" is the button clicked before "UNDO".
     await RedisApiUtil.deleteHashField(
       redisClient,
       'slackBlockedUserPhoneNumbers',
@@ -346,15 +261,41 @@ export async function handleVoterStatusUpdate({
       userPhoneNumber
     );
   }
+
+  await handleVoterStatusUpdateHelper({
+    payload,
+    selectedVoterStatus: selectedVoterStatus,
+    originatingSlackUserName,
+    slackChannelName,
+    userPhoneNumber,
+    twilioPhoneNumber,
+  });
+
+  // Update the voter panel
+  const blocks = await SlackBlockUtil.getVoterPanel(
+    userInfo,
+    twilioPhoneNumber,
+    undefined,
+    selectedVoterStatus,
+    undefined
+  );
+
+  await SlackInteractionApiUtil.replaceSlackMessageBlocks({
+    slackChannelId: payload.channel.id,
+    slackParentMessageTs: payload.container.thread_ts,
+    newBlocks: blocks,
+  });
 }
 
 export async function handleVolunteerUpdate({
+  userInfo,
   payload,
   originatingSlackUserName,
   slackChannelName,
   userPhoneNumber,
   twilioPhoneNumber,
 }: {
+  userInfo: UserInfo;
   payload: Payload;
   originatingSlackUserName: string;
   slackChannelName: string | null;
@@ -425,31 +366,19 @@ export async function handleVolunteerUpdate({
     actionTs: payload.actions ? payload.actions[0].action_ts : null,
   });
 
-  // Take the blocks and replace the initial_user with the new user, so that
-  // even when Slack is refreshed this new status is shown.
-  if (
-    !SlackBlockUtil.populateDropdownNewInitialValue(
-      payload.message.blocks,
-      SlackActionId.VOLUNTEER_DROPDOWN,
-      selectedVolunteerSlackUserId
-    )
-  ) {
-    logger.error(
-      'SLACKINTERACTIONHANDLER.handleVoterStatusUpdate: Error updating VOLUNTEER_DROPDOWN'
-    );
-  }
-
-  // only show the 'Clear volunteer' button if a volunteer is selected
-  SlackBlockUtil.updateClearVolunteerButton(
-    payload.message.blocks,
-    Boolean(selectedVolunteerSlackUserId)
+  // Refresh the voter panel
+  const blocks = await SlackBlockUtil.getVoterPanel(
+    userInfo,
+    twilioPhoneNumber,
+    selectedVolunteerSlackUserId || undefined,
+    undefined,
+    undefined
   );
-
   // Replace the entire block so that the initial user change persists.
   await SlackInteractionApiUtil.replaceSlackMessageBlocks({
     slackChannelId: payload.channel.id,
     slackParentMessageTs: payload.container.thread_ts,
-    newBlocks: payload.message.blocks,
+    newBlocks: blocks,
   });
 }
 
@@ -1278,58 +1207,33 @@ export async function receiveRouteToJourney({
         `This voter is no longer active in this thread. Please reach out to the folks at *#${userInfo.activeChannelName}*.`
       );
     } else {
-      const activeSlackChannelName = userInfo.activeChannelName;
-      const activeStateName = LoadBalancer.convertSlackChannelNameToStateOrRegionName(
-        activeSlackChannelName
-      );
-
-      if (!activeStateName) {
-        slackView = SlackBlockUtil.getErrorSlackView(
-          'route_to_journey_error_no_state_name_parsed',
-          `Failed to parse state name from channel: *#${activeSlackChannelName}*. Please contact an admin.`
-        );
-      } else {
-        const selectedSlackChannelName = await LoadBalancer.selectSlackChannel(
+      try {
+        const selectedSlackChannelName = await LoadBalancer.getJourneyChannel(
           redisClient,
-          // We use PUSH to store open journey pods (PULL = frontline).
-          'PUSH',
-          activeStateName,
-          userInfo.isDemo
+          userInfo
+        );
+        logger.info(
+          `SLACKINTERACTIONHANDLER.receiveRouteToJourney: Route to journey command is valid.`
         );
 
-        // Either a stateName wasn't valid or Redis didn't provide open pods for the given stateName.
-        if (
-          !selectedSlackChannelName ||
-          ['demo-national-0', 'national-0'].includes(selectedSlackChannelName)
-        ) {
-          slackView = SlackBlockUtil.getErrorSlackView(
-            'route_to_journey_error_no_pods_found',
-            `No journey pods found for U.S. state name: *${activeStateName}*. Please contact an admin.`
-          );
-        } else if (activeSlackChannelName === selectedSlackChannelName) {
-          slackView = SlackBlockUtil.getErrorSlackView(
-            'route_to_journey_error_routing_to_same_channel',
-            `The voter is already in an open journey pod for this U.S. state.`
-          );
-        } else {
-          logger.info(
-            `SLACKINTERACTIONHANDLER.receiveRouteToJourney: Route to journey command is valid.`
-          );
+        // Store the destinationSlackChannelName for when the modal is confirmed.
+        modalPrivateMetadata.destinationSlackChannelName = selectedSlackChannelName;
 
-          // Store the destinationSlackChannelName for when the modal is confirmed.
-          modalPrivateMetadata.destinationSlackChannelName = selectedSlackChannelName;
-
-          // Store the relevant information in the modal so that when the requested action is confirmed
-          // the data needed for the necessary actions is available.
-          slackView = SlackBlockUtil.confirmationSlackView(
-            SlackCallbackId.ROUTE_TO_JOURNEY,
-            modalPrivateMetadata,
-            'Are you sure you want to route this voter to a journey pod?\n\nPlease remember to let the voter know that someone will be following up with them.'
-          );
-        }
+        // Store the relevant information in the modal so that when the requested action is confirmed
+        // the data needed for the necessary actions is available.
+        slackView = SlackBlockUtil.confirmationSlackView(
+          SlackCallbackId.ROUTE_TO_JOURNEY,
+          modalPrivateMetadata,
+          'Are you sure you want to route this voter to a journey pod?\n\nPlease remember to let the voter know that someone will be following up with them.'
+        );
+      } catch (error) {
+        logger.warn(error);
+        slackView = SlackBlockUtil.getErrorSlackView(
+          'route_to_journey_error',
+          error
+        );
       }
     }
-
     await SlackApiUtil.updateModal(viewId, slackView);
   } catch (e) {
     // Update the modal to say that there was an error, then re-throw the
@@ -1396,41 +1300,11 @@ export async function handleResetDemo(
   // See https://api.slack.com/reference/surfaces/formatting#visual-styles
   const specialSlackTimestamp = `<!date^${timeSinceEpochSecs}^{date_num} {time_secs}|${new Date()}>`;
 
-  const closedVoterPanelText = `:white_check_mark: This demo conversation was closed by *${modalPrivateMetadata.originatingSlackUserName}* on *${specialSlackTimestamp}*. :white_check_mark:`;
-
-  const closedVoterPanelBlocks = SlackBlockUtil.makeClosedVoterPanelBlocks(
-    closedVoterPanelText,
-    false /* include undo button */
-  );
-
-  const previousParentMessageBlocks = await SlackApiUtil.fetchSlackMessageBlocks(
+  await SlackBlockUtil.closeVoterPanel(
     modalPrivateMetadata.slackChannelId,
-    modalPrivateMetadata.slackParentMessageTs
+    modalPrivateMetadata.slackParentMessageTs,
+    `:white_check_mark: This demo conversation was closed by *${modalPrivateMetadata.originatingSlackUserName}* on *${specialSlackTimestamp}*. :white_check_mark:`
   );
-
-  logger.info(
-    `SLACKINTERACTIONHANDLER.handleResetDemo: Fetched previousParentMessageBlocks.`
-  );
-
-  if (previousParentMessageBlocks === null) {
-    modalPrivateMetadata.success = false;
-    modalPrivateMetadata.failureReason = 'message_blocks_fetch_failure';
-    await DbApiUtil.logCommandToDb(modalPrivateMetadata);
-    throw new Error(
-      `SLACKINTERACTIONHANDLER.handleResetDemo: Failed to fetch Slack message blocks for channelId (${modalPrivateMetadata.slackChannelId}) and parentMessageTs (${modalPrivateMetadata.slackParentMessageTs}).`
-    );
-  }
-
-  const newParentMessageBlocks = SlackBlockUtil.replaceVoterPanelBlocks(
-    previousParentMessageBlocks,
-    closedVoterPanelBlocks
-  );
-
-  await SlackInteractionApiUtil.replaceSlackMessageBlocks({
-    slackChannelId: modalPrivateMetadata.slackChannelId,
-    slackParentMessageTs: modalPrivateMetadata.slackParentMessageTs,
-    newBlocks: newParentMessageBlocks,
-  });
 
   await DbApiUtil.archiveDemoVoter(
     modalPrivateMetadata.userId,
@@ -1484,17 +1358,6 @@ export async function handleRouteToJourney(
   } as Router.AdminCommandParams;
 
   // Clear the volunteer
-  const blocks = await SlackApiUtil.fetchSlackMessageBlocks(
-    modalPrivateMetadata.slackChannelId,
-    modalPrivateMetadata.slackParentMessageTs
-  );
-  logger.info(JSON.stringify(blocks));
-  if (!blocks) {
-    logger.warn(
-      'Router.handleSlackAdminCommand: unable to fetch blocks to clear volunteer'
-    );
-    return;
-  }
   await DbApiUtil.logVolunteerVoterClaimToDb({
     userId: modalPrivateMetadata.userId,
     userPhoneNumber: modalPrivateMetadata.userPhoneNumber,
@@ -1511,17 +1374,6 @@ export async function handleRouteToJourney(
     slackChannelId: modalPrivateMetadata.slackChannelId,
     slackParentMessageTs: modalPrivateMetadata.slackParentMessageTs,
     actionTs: null,
-  });
-  SlackBlockUtil.populateDropdownNewInitialValue(
-    blocks,
-    SlackActionId.VOLUNTEER_DROPDOWN,
-    null
-  );
-  SlackBlockUtil.updateClearVolunteerButton(blocks, false);
-  await SlackInteractionApiUtil.replaceSlackMessageBlocks({
-    slackChannelId: modalPrivateMetadata.slackChannelId,
-    slackParentMessageTs: modalPrivateMetadata.slackParentMessageTs,
-    newBlocks: blocks,
   });
 
   // Mark that a volunteer has engaged (by routing them!)

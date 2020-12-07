@@ -1,6 +1,6 @@
 import logger from './logger';
 import { PromisifiedRedisClient } from './redis_client';
-import { EntryPoint } from './types';
+import { EntryPoint, UserInfo } from './types';
 import * as StateRegionConfig from './state_region_config';
 
 export const PULL_ENTRY_POINT = 'PULL';
@@ -49,6 +49,36 @@ export function convertSlackChannelNameToStateOrRegionName(
       return word[0].toUpperCase() + word.substring(1);
     })
     .join(' ');
+}
+
+export async function getJourneyChannel(
+  redisClient: PromisifiedRedisClient,
+  userInfo: UserInfo
+): Promise<string> {
+  const activeStateName = convertSlackChannelNameToStateOrRegionName(
+    userInfo.activeChannelName
+  );
+  if (!activeStateName) {
+    throw `Failed to parse state name from channel: *#${userInfo.activeChannelName}*. Please contact an admin.`;
+  }
+  const selectedSlackChannelName = await selectSlackChannel(
+    redisClient,
+    // We use PUSH to store open journey pods (PULL = frontline).
+    'PUSH',
+    activeStateName,
+    userInfo.isDemo
+  );
+  // Either a stateName wasn't valid or Redis didn't provide open pods for the given stateName.
+  if (
+    !selectedSlackChannelName ||
+    ['demo-national-0', 'national-0'].includes(selectedSlackChannelName)
+  ) {
+    throw `No journey pods found for U.S. state name: *${activeStateName}*. Please contact an admin.`;
+  }
+  if (userInfo.activeSlackChannelName === selectedSlackChannelName) {
+    throw `The voter is already in an open journey pod for this U.S. state.`;
+  }
+  return selectedSlackChannelName;
 }
 
 export async function selectSlackChannel(

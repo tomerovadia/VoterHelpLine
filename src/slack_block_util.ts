@@ -1,8 +1,11 @@
 import logger from './logger';
 import { SlackActionId } from './slack_interaction_ids';
-import { SessionTopics, VoterStatus } from './types';
+import { SessionTopics, VoterStatus, UserInfo } from './types';
 import { SlackModalPrivateMetadata } from './slack_interaction_handler';
 import { cloneDeep } from 'lodash';
+import * as DbApiUtil from './db_api_util';
+import * as SlackInteractionApiUtil from './slack_interaction_api_util';
+import * as SlackApiUtil from './slack_api_util';
 
 export type SlackBlock = {
   type: string;
@@ -270,6 +273,34 @@ export const voterStatusPanel: SlackBlock = {
         },
       },
     },
+    {
+      type: 'button',
+      text: {
+        type: 'plain_text',
+        text: 'Route to Journey',
+        emoji: true,
+      },
+      action_id: SlackActionId.ROUTE_TO_JOURNEY,
+      confirm: {
+        title: {
+          type: 'plain_text',
+          text: 'Are you sure?',
+        },
+        text: {
+          type: 'mrkdwn',
+          text:
+            'Are you sure you want to route this voter to a journey pod?\n\nPlease remember to let the voter know that someone will be following up with them.',
+        },
+        confirm: {
+          type: 'plain_text',
+          text: 'Confirm',
+        },
+        deny: {
+          type: 'plain_text',
+          text: 'Cancel',
+        },
+      },
+    },
   ],
 };
 
@@ -370,36 +401,80 @@ export function getErrorSlackView(
   };
 }
 
-export function getVoterStatusBlocks(messageText: string): SlackBlock[] {
-  return cloneDeep([
-    voterInfoSection(messageText),
-    volunteerSelectionPanel,
-    voterStatusPanel,
-    voterTopicPanel,
-  ]);
+function voterPanelHeader(userInfo: UserInfo): string {
+  // NOTE: we have to be careful here because returningVoter may be a boolean or string
+  let r = `<!channel> ${
+    String(userInfo.returningVoter) == 'true' ? 'Returning' : 'New'
+  } ${userInfo.stateName ? '*' + userInfo.stateName + '* ' : ''}voter`;
+  if (userInfo.panelMessage) {
+    r += ` (${userInfo.panelMessage})`;
+  }
+  r += '\n';
+  r += `${userInfo.userId} via ${userInfo.twilioPhoneNumber}`;
+  return r;
 }
 
-export function makeClosedVoterPanelBlocks(
-  messageText: string,
-  includeUndoButton: boolean
-): SlackBlock[] {
-  logger.info('ENTERING SLACKINTERACTIONAPIUTIL.getClosedVoterStatusPanel');
+// Generate the slack blocks for a voter thread header panel, either based on state in the database
+// or values provided by the caller
+export async function getVoterPanel(
+  userInfo: UserInfo,
+  twilioPhoneNumber: string,
+  volunteer?: string,
+  status?: string,
+  topics?: string[]
+): Promise<SlackBlock[]> {
+  const messageText = voterPanelHeader(userInfo);
+  const panel = [
+    voterInfoSection(messageText),
+    cloneDeep(volunteerSelectionPanel),
+    cloneDeep(voterStatusPanel),
+    cloneDeep(voterTopicPanel),
+  ];
 
-  const blocks = [];
+  if (!volunteer) {
+    volunteer =
+      (await DbApiUtil.getVoterVolunteer(
+        userInfo.userId,
+        twilioPhoneNumber,
+        userInfo.sessionStartEpoch || 0
+      )) || undefined;
+  }
+  if (volunteer) {
+    populateDropdownNewInitialValue(
+      panel,
+      SlackActionId.VOLUNTEER_DROPDOWN,
+      volunteer
+    );
+    panel[1].elements.push({
+      type: 'button',
+      style: 'primary',
+      text: {
+        type: 'plain_text',
+        text: 'Clear volunteer',
+        emoji: true,
+      },
+      action_id: SlackActionId.VOLUNTEER_RELEASE_CLAIM,
+      value: 'RELEASE_CLAIM',
+    });
+  }
 
-  blocks.push({
-    type: 'section',
-    text: {
-      type: 'mrkdwn',
-      text: messageText,
-    },
-  });
-
-  if (includeUndoButton) {
-    blocks.push({
-      type: 'actions',
-      elements: [
-        {
+  if (!status) {
+    status =
+      (await DbApiUtil.getLatestVoterStatus(
+        userInfo.userId,
+        twilioPhoneNumber
+      )) || 'UNKNOWN';
+  }
+  if (status != 'UNKNOWN') {
+    if (status === 'REFUSED' || status === 'SPAM') {
+      // These statuses are special: frame with with a warning and require confirmation to undo.
+      panel[2] = {
+        type: 'section',
+        text: {
+          type: 'mrkdwn',
+          text: `:no_entry_sign: This voter is marked *${status}* :no_entry_sign:`,
+        },
+        accessory: {
           type: 'button',
           action_id: SlackActionId.CLOSED_VOTER_PANEL_UNDO_BUTTON,
           style: 'danger',
@@ -416,7 +491,7 @@ export function makeClosedVoterPanelBlocks(
             },
             text: {
               type: 'mrkdwn',
-              text: "Please confirm you'd like to reset the voter's status.",
+              text: "Please confirm you'd like to restore this voter.",
             },
             confirm: {
               type: 'plain_text',
@@ -428,51 +503,97 @@ export function makeClosedVoterPanelBlocks(
             },
           },
         },
-      ],
-    });
+      };
+    } else {
+      populateDropdownNewInitialValue(
+        panel,
+        SlackActionId.VOTER_STATUS_DROPDOWN,
+        status
+      );
+    }
   }
-  return blocks;
-}
 
-export function replaceVoterPanelBlocks(
-  oldBlocks: SlackBlock[],
-  replacementBlocks: SlackBlock[]
-): SlackBlock[] {
-  const newBlocks = [];
-  // The first block is the user info.
-  newBlocks.push(oldBlocks[0]);
-  // The second block is the volunteer dropdown.
-  newBlocks.push(oldBlocks[1]);
-  // The remaining blocks are the panel.
-  for (const idx in replacementBlocks) {
-    newBlocks.push(replacementBlocks[idx]);
+  if (!topics) {
+    topics =
+      (await DbApiUtil.getThreadTopics(
+        userInfo.activeChannelId,
+        userInfo[userInfo.activeChannelId]
+      )) || [];
   }
-  return newBlocks;
-}
-
-// Adjust whether the 'Clear volunteer' button is present or not.
-export function updateClearVolunteerButton(
-  blocks: SlackBlock[],
-  visible: boolean
-): void {
-  if (visible) {
-    if (blocks[1].elements.length == 1) {
-      blocks[1].elements.push({
-        type: 'button',
-        style: 'primary',
+  if (topics.length > 0) {
+    panel[3].accessory.initial_options = topics.map((topic) => {
+      return {
         text: {
           type: 'plain_text',
-          text: 'Clear volunteer',
-          emoji: true,
+          text: SessionTopics[topic],
         },
-        action_id: SlackActionId.VOLUNTEER_RELEASE_CLAIM,
-        value: 'RELEASE_CLAIM',
-      });
-    }
-  } else {
-    if (blocks[1].elements.length > 1) {
-      blocks[1].elements.pop();
-    }
+        value: topic,
+      };
+    });
+  }
+
+  if (userInfo.isDemo) {
+    // put the Reset Demo button on the volunteer line (on the right)
+    panel[1].elements.push({
+      type: 'button',
+      style: 'danger',
+      text: {
+        type: 'plain_text',
+        text: 'Reset Demo',
+        emoji: true,
+      },
+      action_id: SlackActionId.RESET_DEMO,
+      confirm: {
+        title: {
+          type: 'plain_text',
+          text: 'Are you sure?',
+        },
+        text: {
+          type: 'mrkdwn',
+          text:
+            'Are you sure you want to end your demo conversation with this volunteer?\n\nYou will no longer be able to send messages to or receive messages from them, and they will be treated as a new demo voter the next time they send a text to this phone number.',
+        },
+        confirm: {
+          type: 'plain_text',
+          text: 'Confirm',
+        },
+        deny: {
+          type: 'plain_text',
+          text: 'Cancel',
+        },
+      },
+    });
+  }
+
+  return panel;
+}
+
+// Close out the voter panel completely.
+export async function closeVoterPanel(
+  channelId: string,
+  parentMessageTs: string,
+  message: string
+): Promise<void> {
+  const oldBlocks = await SlackApiUtil.fetchSlackMessageBlocks(
+    channelId,
+    parentMessageTs
+  );
+  if (oldBlocks) {
+    const newBlocks = [
+      oldBlocks[0],
+      {
+        type: 'section',
+        text: {
+          type: 'mrkdwn',
+          text: message,
+        },
+      },
+    ];
+    await SlackInteractionApiUtil.replaceSlackMessageBlocks({
+      slackChannelId: channelId,
+      slackParentMessageTs: parentMessageTs,
+      newBlocks: newBlocks,
+    });
   }
 }
 
