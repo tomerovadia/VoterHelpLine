@@ -1030,9 +1030,10 @@ export async function getThreadsNeedingAttentionByVolunteer(): Promise<
       `WITH claims AS (
         SELECT
           user_id
+          , is_demo
           , volunteer_slack_user_id
           , volunteer_slack_user_name
-          , row_number () OVER (PARTITION BY user_id ORDER BY created_at DESC) AS rn
+          , row_number () OVER (PARTITION BY user_id, is_demo ORDER BY created_at DESC) AS rn
         FROM volunteer_voter_claims
         WHERE archived IS NOT TRUE
       )
@@ -1048,6 +1049,7 @@ export async function getThreadsNeedingAttentionByVolunteer(): Promise<
           AND t.session_end_at IS NULL
           AND t.archived IS NOT TRUE
           AND t.user_id=c.user_id
+          AND t.is_demo=c.is_demo
           AND c.rn=1
         GROUP BY volunteer_slack_user_id, volunteer_slack_user_name
         ORDER BY max_last_update_age DESC`
@@ -1076,9 +1078,10 @@ export async function getThreadsNeedingAttentionForChannel(
       `WITH claims AS (
         SELECT
           user_id
+          , is_demo
           , volunteer_slack_user_id
           , volunteer_slack_user_name
-          , row_number () OVER (PARTITION BY user_id ORDER BY created_at DESC) AS rn
+          , row_number () OVER (PARTITION BY user_id, is_demo ORDER BY created_at DESC) AS rn
         FROM volunteer_voter_claims
         WHERE archived IS NOT TRUE
       )
@@ -1100,6 +1103,7 @@ export async function getThreadsNeedingAttentionForChannel(
           AND t.session_end_at IS NULL
           AND t.archived IS NOT TRUE
           AND t.user_id=c.user_id
+          AND t.is_demo=c.is_demo
           AND c.rn=1
           AND slack_channel_id = $1
         ORDER BY updated_at`,
@@ -1132,9 +1136,10 @@ export async function getThreadsNeedingAttentionFor(
       `WITH claims AS (
         SELECT
           user_id
+          , is_demo
           , volunteer_slack_user_id
           , volunteer_slack_user_name
-          , row_number () OVER (PARTITION BY user_id ORDER BY created_at DESC) AS rn
+          , row_number () OVER (PARTITION BY user_id, is_demo ORDER BY created_at DESC) AS rn
         FROM volunteer_voter_claims
         WHERE archived IS NOT TRUE
       )
@@ -1155,6 +1160,7 @@ export async function getThreadsNeedingAttentionFor(
           AND t.session_end_at IS NULL
           AND t.archived IS NOT TRUE
           AND t.user_id=c.user_id
+          AND t.is_demo=c.is_demo
           AND c.rn=1
           AND c.volunteer_slack_user_id=$1
         ORDER BY updated_at`,
