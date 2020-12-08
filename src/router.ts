@@ -1701,6 +1701,7 @@ export async function handleSlackThreadCommand(
     userInfo.sessionStartEpoch = Math.round(Date.now() / 1000);
     userInfo.volunteerEngaged = false;
     userInfo.numStateSelectionAttempts = 0;
+    userInfo.returningVoter = true;
     const ts = await introduceNewVoterToSlackChannel(
       {
         userInfo: userInfo as UserInfo,
