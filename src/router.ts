@@ -237,9 +237,6 @@ async function introduceNewVoterToSlackChannel(
     status || 'UNKNOWN'
   );
 
-  const skipLobby =
-    (await RedisApiUtil.getKey(redisClient, 'skipLobby')) === 'true';
-
   let response = {
     data: {
       channel: 'NONEXISTENT_LOBBY',
@@ -247,12 +244,10 @@ async function introduceNewVoterToSlackChannel(
     },
   } as SlackApiUtil.SlackSendMessageResponse | null;
 
-  if (slackChannelName !== 'lobby' || !skipLobby) {
-    response = await SlackApiUtil.sendMessage(slackBlocks[0].text.text, {
-      channel: slackChannelName,
-      blocks: slackBlocks,
-    });
-  }
+  response = await SlackApiUtil.sendMessage(slackBlocks[0].text.text, {
+    channel: slackChannelName,
+    blocks: slackBlocks,
+  });
 
   let messageToVoter;
   if (process.env.CLIENT_ORGANIZATION === 'VOTE_AMERICA') {
@@ -315,18 +310,16 @@ async function introduceNewVoterToSlackChannel(
   userInfo[response.data.channel] = response.data.ts;
 
   // Create the thread
-  if (!skipLobby) {
-    await DbApiUtil.logThreadToDb({
-      slackParentMessageTs: response.data.ts,
-      channelId: response.data.channel,
-      userId: userInfo.userId,
-      userPhoneNumber: userInfo.userPhoneNumber,
-      twilioPhoneNumber: twilioPhoneNumber,
-      needsAttention: true,
-      isDemo: userInfo.isDemo,
-      sessionStartEpoch: userInfo.sessionStartEpoch || null,
-    });
-  }
+  await DbApiUtil.logThreadToDb({
+    slackParentMessageTs: response.data.ts,
+    channelId: response.data.channel,
+    userId: userInfo.userId,
+    userPhoneNumber: userInfo.userPhoneNumber,
+    twilioPhoneNumber: twilioPhoneNumber,
+    needsAttention: true,
+    isDemo: userInfo.isDemo,
+    sessionStartEpoch: userInfo.sessionStartEpoch || null,
+  });
 
   // Set active channel to this first channel, since the voter is new.
   // Makes sure subsequent messages from the voter go to this channel, unless
@@ -369,17 +362,15 @@ async function introduceNewVoterToSlackChannel(
       }
     }
 
-    if (slackChannelName !== 'lobby' || !skipLobby) {
-      await postUserMessageHistoryToSlack(
-        redisClient,
-        userInfo,
-        twilioPhoneNumber,
-        {
-          destinationSlackParentMessageTs: response.data.ts,
-          destinationSlackChannelId: response.data.channel,
-        }
-      );
-    }
+    await postUserMessageHistoryToSlack(
+      redisClient,
+      userInfo,
+      twilioPhoneNumber,
+      {
+        destinationSlackParentMessageTs: response.data.ts,
+        destinationSlackChannelId: response.data.channel,
+      }
+    );
   } else if (entryPoint === LoadBalancer.PULL_ENTRY_POINT) {
     // Pass the voter's message along to the initial Slack channel thread,
     // and show in the Slack thread the welcome message the voter received
@@ -692,9 +683,6 @@ export async function routeVoterToSlackChannel(
   },
   adminCommandParams?: AdminCommandParams /* only for admin rerouteVoterToSlackChannel-routes or Route to Journey shortcut (not automated)*/
 ): Promise<void> {
-  const skipLobby =
-    (await RedisApiUtil.getKey(redisClient, 'skipLobby')) === 'true';
-
   logger.debug('ENTERING ROUTER.routeVoterToSlackChannel');
   const userPhoneNumber = userInfo.userPhoneNumber;
 
@@ -772,7 +760,7 @@ export async function routeVoterToSlackChannel(
       }
     );
     // Operations for AUTOMATED route of voter.
-  } else if (!skipLobby && userInfo.activeChannelId != 'NONEXISTENT_LOBBY') {
+  } else {
     await SlackApiUtil.sendMessage(
       `*Operator:* Routing voter to ${SlackApiUtil.linkToSlackChannel(
         destinationSlackChannelId,
@@ -998,56 +986,27 @@ export async function determineVoterState(
     `ROUTER.determineVoterState: Updating lastVoterMessageSecsFromEpoch to ${userInfo.lastVoterMessageSecsFromEpoch}`
   );
 
-  const skipLobby =
-    (await RedisApiUtil.getKey(redisClient, 'skipLobby')) === 'true';
+  const lobbyChannelId = userInfo.activeChannelId;
+  const lobbyParentMessageTs = userInfo[lobbyChannelId];
 
-  const lobbyChannelId = skipLobby ? '' : userInfo.activeChannelId;
-  const lobbyParentMessageTs = skipLobby ? '' : userInfo[lobbyChannelId];
-
-  if (!skipLobby && userInfo.activeChannelId != 'NONEXISTENT_LOBBY') {
-    logger.debug(
-      `ROUTER.determineVoterState: Passing voter message to Slack, slackChannelName: ${lobbyChannelId}, parentMessageTs: ${lobbyParentMessageTs}.`
-    );
-    const blocks = SlackBlockUtil.formatMessageWithAttachmentLinks(
-      userMessage,
-      userOptions.userAttachments
-    );
-    await SlackApiUtil.sendMessage(
-      '',
-      {
-        parentMessageTs: lobbyParentMessageTs,
-        blocks,
-        channel: lobbyChannelId,
-        isVoterMessage: true,
-      },
-      inboundDbMessageEntry,
-      userInfo
-    );
-  } else {
-    if (inboundDbMessageEntry) {
-      logger.info(
-        `SLACKAPIUTIL.sendMessage: This Slack message send will log to DB (inboundDbMessageEntry is not null).`
-      );
-      // Copies a few fields from userInfo to inboundDbMessageEntry.
-      DbApiUtil.updateDbMessageEntryWithUserInfo(
-        userInfo!,
-        inboundDbMessageEntry
-      );
-      inboundDbMessageEntry.slackChannel = 'NONEXISTENT_LOBBY';
-      inboundDbMessageEntry.slackParentMessageTs = 'NONEXISTENT_LOBBY_TS';
-      inboundDbMessageEntry.slackSendTimestamp = new Date();
-    }
-    inboundDbMessageEntry.successfullySent = true;
-
-    try {
-      await DbApiUtil.logMessageToDb(inboundDbMessageEntry);
-    } catch (error) {
-      logger.info(
-        `SLACKAPIUTIL.sendMessage: failed to log message send success to DB`
-      );
-      Sentry.captureException(error);
-    }
-  }
+  logger.debug(
+    `ROUTER.determineVoterState: Passing voter message to Slack, slackChannelName: ${lobbyChannelId}, parentMessageTs: ${lobbyParentMessageTs}.`
+  );
+  const blocks = SlackBlockUtil.formatMessageWithAttachmentLinks(
+    userMessage,
+    userOptions.userAttachments
+  );
+  await SlackApiUtil.sendMessage(
+    '',
+    {
+      parentMessageTs: lobbyParentMessageTs,
+      blocks,
+      channel: lobbyChannelId,
+      isVoterMessage: true,
+    },
+    inboundDbMessageEntry,
+    userInfo
+  );
 
   let stateName = StateParser.determineState(userMessage);
 
@@ -1067,13 +1026,11 @@ export async function determineVoterState(
         { userPhoneNumber, twilioPhoneNumber, twilioCallbackURL },
         DbApiUtil.populateAutomatedDbMessageEntry(userInfo)
       );
-      if (!skipLobby && userInfo.activeChannelId != 'NONEXISTENT_LOBBY') {
-        await SlackApiUtil.sendMessage(MessageConstants.CLARIFY_STATE(), {
-          parentMessageTs: lobbyParentMessageTs,
-          channel: lobbyChannelId,
-          isAutomatedMessage: true,
-        });
-      }
+      await SlackApiUtil.sendMessage(MessageConstants.CLARIFY_STATE(), {
+        parentMessageTs: lobbyParentMessageTs,
+        channel: lobbyChannelId,
+        isAutomatedMessage: true,
+      });
 
       logger.debug(
         `ROUTER.determineVoterState: Writing updated userInfo to Redis.`
@@ -1105,13 +1062,11 @@ export async function determineVoterState(
     { userPhoneNumber, twilioPhoneNumber, twilioCallbackURL },
     DbApiUtil.populateAutomatedDbMessageEntry(userInfo)
   );
-  if (!skipLobby && userInfo.activeChannelId != 'NONEXISTENT_LOBBY') {
-    await SlackApiUtil.sendMessage(messageToVoter, {
-      parentMessageTs: lobbyParentMessageTs,
-      channel: lobbyChannelId,
-      isAutomatedMessage: true,
-    });
-  }
+  await SlackApiUtil.sendMessage(messageToVoter, {
+    parentMessageTs: lobbyParentMessageTs,
+    channel: lobbyChannelId,
+    isAutomatedMessage: true,
+  });
 
   let selectedStateChannelName = await LoadBalancer.selectSlackChannel(
     redisClient,
