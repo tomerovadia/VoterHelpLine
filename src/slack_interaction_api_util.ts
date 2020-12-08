@@ -102,21 +102,10 @@ export async function handleAutomatedCollapseOfVoterStatusPanel({
   userPhoneNumber: string;
   twilioPhoneNumber: string;
 }): Promise<void> {
-  const messageBlocks = await SlackApiUtil.fetchSlackMessageBlocks(
-    userInfo.activeChannelId,
-    userInfo[userInfo.activeChannelId]
-  );
-
-  if (!messageBlocks) {
-    throw new Error(
-      `Could not get Slack blocks for known user ${userInfo.userId}`
-    );
-  }
-
   const payload = {
     automatedButtonSelection: true,
     message: {
-      blocks: messageBlocks,
+      blocks: [], // these are not needed by handleVoterStatusUpdate
     },
     container: {
       thread_ts: userInfo[userInfo.activeChannelId],

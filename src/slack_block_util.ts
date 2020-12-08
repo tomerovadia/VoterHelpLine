@@ -5,7 +5,6 @@ import { SlackModalPrivateMetadata } from './slack_interaction_handler';
 import { cloneDeep } from 'lodash';
 import * as DbApiUtil from './db_api_util';
 import * as SlackInteractionApiUtil from './slack_interaction_api_util';
-import * as SlackApiUtil from './slack_api_util';
 
 export type SlackBlock = {
   type: string;
