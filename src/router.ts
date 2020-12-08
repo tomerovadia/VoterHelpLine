@@ -129,8 +129,7 @@ export async function endVoterSession(
 
   // update old session thread's panel async; do not await
   void SlackBlockUtil.closeVoterPanel(
-    userInfo.activeChannelId,
-    userInfo[userInfo.activeChannelId],
+    userInfo,
     'This voter helpline session is closed'
   );
 }
@@ -866,8 +865,7 @@ export async function routeVoterToSlackChannel(
   if (userInfo.activeChannelId !== 'NONEXISTENT_LOBBY') {
     // Close old voter panel
     await SlackBlockUtil.closeVoterPanel(
-      userInfo.activeChannelId,
-      userInfo[userInfo.activeChannelId],
+      userInfo,
       `Voter has been routed to ${SlackApiUtil.linkToSlackChannel(
         destinationSlackChannelId,
         destinationSlackChannelName

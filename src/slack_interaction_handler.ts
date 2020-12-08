@@ -1271,6 +1271,11 @@ export async function handleResetDemo(
     ...redisDatas,
   ]);
 
+  const userInfo = (await RedisApiUtil.getHash(
+    redisClient,
+    redisUserInfoKey
+  )) as UserInfo;
+
   // If any key is missing, something is wrong, so log and don't try to delete.
   // Count = multiple Slack thread lookups + 1 phone number lookup for this user.
   let redisError = numKeysPresent !== slackThreads.length + 1;
@@ -1301,8 +1306,7 @@ export async function handleResetDemo(
   const specialSlackTimestamp = `<!date^${timeSinceEpochSecs}^{date_num} {time_secs}|${new Date()}>`;
 
   await SlackBlockUtil.closeVoterPanel(
-    modalPrivateMetadata.slackChannelId,
-    modalPrivateMetadata.slackParentMessageTs,
+    userInfo,
     `:white_check_mark: This demo conversation was closed by *${modalPrivateMetadata.originatingSlackUserName}* on *${specialSlackTimestamp}*. :white_check_mark:`
   );
 

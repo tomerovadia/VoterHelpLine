@@ -570,31 +570,26 @@ export async function getVoterPanel(
 
 // Close out the voter panel completely.
 export async function closeVoterPanel(
-  channelId: string,
-  parentMessageTs: string,
+  userInfo: UserInfo,
   message: string
 ): Promise<void> {
-  const oldBlocks = await SlackApiUtil.fetchSlackMessageBlocks(
-    channelId,
-    parentMessageTs
-  );
-  if (oldBlocks) {
-    const newBlocks = [
-      oldBlocks[0],
-      {
-        type: 'section',
-        text: {
-          type: 'mrkdwn',
-          text: message,
-        },
+  const channelId = userInfo.activeChannelId;
+  const parentMessageTs = userInfo[userInfo.activeChannelId];
+  const newBlocks = [
+    voterInfoSection(voterPanelHeader(userInfo)),
+    {
+      type: 'section',
+      text: {
+        type: 'mrkdwn',
+        text: message,
       },
-    ];
-    await SlackInteractionApiUtil.replaceSlackMessageBlocks({
-      slackChannelId: channelId,
-      slackParentMessageTs: parentMessageTs,
-      newBlocks: newBlocks,
-    });
-  }
+    },
+  ];
+  await SlackInteractionApiUtil.replaceSlackMessageBlocks({
+    slackChannelId: channelId,
+    slackParentMessageTs: parentMessageTs,
+    newBlocks: newBlocks,
+  });
 }
 
 export function formatMessageWithAttachmentLinks(
