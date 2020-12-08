@@ -1671,9 +1671,12 @@ export async function handleSlackThreadCommand(
     return true;
   }
 
-  if (message.startsWith('!new-session ')) {
+  if (message.startsWith('!new-session ') || message === '!new-session') {
     // Open a new session + thread for this voter.
-    const channel = message.substr('!new-session '.length);
+    let channel = userInfo.activeChannelName;
+    if (message !== '!new-session') {
+      channel = message.substr('!new-session '.length);
+    }
 
     // Make sure the destination channel exists before we end their old session!
     const slackChannelIds = await RedisApiUtil.getHash(
