@@ -168,14 +168,6 @@ This should be added as a **messages** shortcut.
 - **Short Description**: Remove this thread from your Needs Attention list
 - **Callback ID**: clear_needs_attention
 
-##### Needs Attention
-
-This should be added as a **global** shortcut.
-
-- **Name:** Needs Attention
-- **Short Description:** Show voters needing attention
-- **Callback ID:** show_needs_attention
-
 ##### Manage Entry Points
 
 This should be added as a **global** shortcut.

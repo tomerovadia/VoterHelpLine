@@ -129,14 +129,6 @@ async function slackInteractivityHandler(
     }
 
     switch (payload.callback_id) {
-      case SlackCallbackId.SHOW_NEEDS_ATTENTION: {
-        await SlackInteractionHandler.handleShortcutShowNeedsAttention({
-          payload,
-          viewId,
-        });
-        return;
-      }
-
       case SlackCallbackId.MANAGE_ENTRY_POINTS: {
         logger.info(
           `SERVER POST /slack-interactivity: Determined user interaction is a MANAGE_ENTRY_POINTS_MODAL submission.`
