@@ -259,7 +259,10 @@ async function introduceNewVoterToSlackChannel(
     if (includeWelcome) {
       // Voter initiated conversation with "HELPLINE".
       if (userInfo.stateName) {
-        messageToVoter = MessageConstants.WELCOME_FINDING_VOLUNTEER();
+        messageToVoter = MessageConstants.WELCOME_FINDING_VOLUNTEER().replace(
+          '{state}',
+          userInfo.stateName
+        );
       } else {
         messageToVoter = MessageConstants.WELCOME_AND_STATE_QUESTION();
       }
