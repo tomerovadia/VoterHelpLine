@@ -168,6 +168,14 @@ This should be added as a **messages** shortcut.
 - **Short Description**: Remove this thread from your Needs Attention list
 - **Callback ID**: clear_needs_attention
 
+##### Reveal identity
+
+This should be added as a **messages** shortcut.
+
+- **Name:** Reveal Identity
+- **Short Description**: Reveal voter identity (phone number)
+- **Callback ID**: reveal_identity
+
 ##### Manage Entry Points
 
 This should be added as a **global** shortcut.

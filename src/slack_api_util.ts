@@ -40,6 +40,7 @@ type SlackSendMessageOptions = {
   blocks?: SlackBlock[];
   isVoterMessage?: boolean;
   isAutomatedMessage?: boolean;
+  user?: string; // for sendEphemeralMessage
 };
 
 type SlackChannelNamesAndIds = {
@@ -151,6 +152,34 @@ export async function sendEphemeralResponse(
     if (response.status != 200) {
       throw new Error(
         `SLACKAPIUTIL.sendEphemeralResponse: ERROR in sending Slack message: ${JSON.stringify(
+          response.data
+        )}`
+      );
+    }
+  } catch (error) {
+    logger.error(
+      `SLACKAPIUTIL.sendEphemeralResponse: ERROR in sending Slack response. Error data from Slack: ${JSON.stringify(
+        error
+      )}`
+    );
+    Sentry.captureException(error);
+  }
+}
+
+export async function sendEphemeralMessage(
+  message: string,
+  options: SlackSendMessageOptions
+): Promise<void> {
+  try {
+    const response = await slackAPI.post('chat.postEphemeral', {
+      channel: options.channel,
+      thread_ts: options.parentMessageTs,
+      user: options.user || '',
+      text: message,
+    });
+    if (!response.data.ok) {
+      throw new Error(
+        `SLACKAPIUTIL.sendEphemeralMessage: ERROR in sending Slack message: ${JSON.stringify(
           response.data
         )}`
       );
