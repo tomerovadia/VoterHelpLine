@@ -259,8 +259,7 @@ async function introduceNewVoterToSlackChannel(
     if (includeWelcome) {
       // Voter initiated conversation with "HELPLINE".
       if (userInfo.stateName) {
-        messageToVoter = MessageConstants.WELCOME_FINDING_VOLUNTEER().replace(
-          '{state}',
+        messageToVoter = MessageConstants.WELCOME_FINDING_VOLUNTEER(
           userInfo.stateName
         );
       } else {
@@ -269,7 +268,9 @@ async function introduceNewVoterToSlackChannel(
     } else {
       // Voter has already received automated welcome and is just now responding with "HELPLINE".
       if (userInfo.stateName) {
-        messageToVoter = MessageConstants.FINDING_VOLUNTEER();
+        messageToVoter = MessageConstants.FINDING_VOLUNTEER_IN_STATE(
+          userInfo.stateName
+        );
       } else {
         messageToVoter = MessageConstants.STATE_QUESTION();
       }
