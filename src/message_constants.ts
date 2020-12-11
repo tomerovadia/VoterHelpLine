@@ -75,8 +75,12 @@ export function WELCOME_AND_STATE_QUESTION(): string {
   return 'Welcome to the VoteAmerica Helpline! In which U.S. state are you looking to vote?\n\nMsg&data rates may apply. Reply STOP to unsubscribe.';
 }
 
-export function WELCOME_FINDING_VOLUNTEER(): string {
-  return `Welcome to the VoteAmerica Helpline! Msg&data rates may apply. Reply STOP to unsubscribe.\n\nWe are finding a volunteer for {state}. Please share more about how we can help, or let us know if you are looking to vote in a different state.`;
+export function WELCOME_FINDING_VOLUNTEER(state: string): string {
+  return `Welcome to the VoteAmerica Helpline! Msg&data rates may apply. Reply STOP to unsubscribe.\n\nWe are finding a volunteer for ${state}. Please share more about how we can help, or let us know if you are looking to vote in a different state.`;
+}
+
+export function FINDING_VOLUNTEER_IN_STATE(state: string): string {
+  return `We are finding a volunteer for ${state} and will be with you shortly. Please share more about how we can help, or let us know if you are looking to vote in a different state.`;
 }
 
 export function VOTED_WELCOME_RESPONSE(): string {
