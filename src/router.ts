@@ -1272,7 +1272,14 @@ export async function handleDisclaimer(
       `ROUTER.handleDisclaimer: Voter cleared disclaimer with message ${userMessage}.`
     );
     userInfo.confirmedDisclaimer = true;
-    automatedMessage = MessageConstants.STATE_QUESTION();
+    if (process.env.CLIENT_ORGANIZATION === 'GADEMS') {
+      userInfo.stateName = 'Georgia';
+      automatedMessage = MessageConstants.FINDING_VOLUNTEER_IN_STATE(
+        userInfo.stateName
+      );
+    } else {
+      automatedMessage = MessageConstants.STATE_QUESTION();
+    }
   } else {
     logger.debug(
       `ROUTER.handleDisclaimer: Voter did not clear disclaimer with message ${userMessage}.`
@@ -1298,6 +1305,33 @@ export async function handleDisclaimer(
     ...slackLobbyMessageParams,
     isAutomatedMessage: true,
   });
+
+  if (userInfo.stateName) {
+    let selectedStateChannelName = await LoadBalancer.selectSlackChannel(
+      redisClient,
+      LoadBalancer.PULL_ENTRY_POINT,
+      userInfo.stateName,
+      userInfo.isDemo
+    );
+
+    if (!selectedStateChannelName) {
+      selectedStateChannelName = userInfo.isDemo
+        ? 'demo-national-0'
+        : 'national-0';
+      logger.error(
+        `ROUTER.determineVoterState: ERROR in selecting U.S. state channel. Defaulting to ${selectedStateChannelName}.`
+      );
+    } else {
+      logger.debug(
+        `ROUTER.determineVoterState: U.S. state channel successfully selected: ${selectedStateChannelName}`
+      );
+    }
+
+    await routeVoterToSlackChannel(userInfo, redisClient, {
+      twilioPhoneNumber,
+      destinationSlackChannelName: selectedStateChannelName,
+    });
+  }
 }
 
 export async function handleClearedVoter(
