@@ -421,7 +421,7 @@ const handleIncomingTwilioMessage = async (
           .replace(/[^a-zA-Z]/g, '');
         if (
           userMessageNoPunctuation.startsWith('helpline') ||
-          (await Router.parseStateKeyword(redisClient, userInfo, userMessage))
+          Router.parseStateKeyword(redisClient, userInfo, userMessage)
         ) {
           await Router.handleNewVoter(
             userInfo,
@@ -588,7 +588,7 @@ const handleIncomingTwilioMessage = async (
     if (process.env.CLIENT_ORGANIZATION === 'VOTE_AMERICA') {
       if (
         KeywordParser.isHelplineKeyword(userMessage) ||
-        (await Router.parseStateKeyword(redisClient, userInfo, userMessage))
+        Router.parseStateKeyword(redisClient, userInfo, userMessage)
       ) {
         await Router.handleNewVoter(
           userInfo,

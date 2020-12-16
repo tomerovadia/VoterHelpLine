@@ -443,21 +443,18 @@ async function introduceNewVoterToSlackChannel(
   return response.data.ts;
 }
 
-export async function parseStateKeyword(
+export function parseStateKeyword(
   redisClient: PromisifiedRedisClient,
   userInfo: UserInfo,
   userMessage: string
-): Promise<boolean> {
-  // Is this a special keyword?
-  const keywords = await RedisApiUtil.getHash(redisClient, 'keywordConfig');
-  if (keywords) {
+): boolean {
+  if (process.env.CLIENT_ORGANIZATION === 'VOTE_AMERICA') {
     const keyword = userMessage.toLowerCase().replace(/[^a-zA-Z]/g, '');
-    const stateName = keywords[keyword];
-    if (stateName) {
+    if (keyword === 'georgia') {
+      userInfo.stateName = 'Georgia';
       logger.info(
-        `ROUTER.isStateKeyword recognized state keyword '${keyword}' -> ${stateName}`
+        `ROUTER.isStateKeyword recognized state keyword '${keyword}' -> ${userInfo.stateName}`
       );
-      userInfo.stateName = stateName;
       return true;
     }
   }
