@@ -419,7 +419,10 @@ const handleIncomingTwilioMessage = async (
         const userMessageNoPunctuation = userMessage
           .toLowerCase()
           .replace(/[^a-zA-Z]/g, '');
-        if (userMessageNoPunctuation.startsWith('helpline')) {
+        if (
+          userMessageNoPunctuation.startsWith('helpline') ||
+          (await Router.parseStateKeyword(redisClient, userInfo, userMessage))
+        ) {
           await Router.handleNewVoter(
             userInfo,
             { userPhoneNumber, userMessage, userAttachments, userId },
@@ -583,7 +586,10 @@ const handleIncomingTwilioMessage = async (
     });
 
     if (process.env.CLIENT_ORGANIZATION === 'VOTE_AMERICA') {
-      if (KeywordParser.isHelplineKeyword(userMessage)) {
+      if (
+        KeywordParser.isHelplineKeyword(userMessage) ||
+        (await Router.parseStateKeyword(redisClient, userInfo, userMessage))
+      ) {
         await Router.handleNewVoter(
           userInfo,
           userOptions,
