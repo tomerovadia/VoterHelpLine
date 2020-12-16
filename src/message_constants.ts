@@ -80,7 +80,12 @@ export function WELCOME_FINDING_VOLUNTEER(state: string): string {
 }
 
 export function FINDING_VOLUNTEER_IN_STATE(state: string): string {
-  return `We are finding a volunteer for ${state} and will be with you shortly. Please share more about how we can help, or let us know if you are looking to vote in a different state.`;
+  switch (process.env.CLIENT_ORGANIZATION) {
+    case 'GADEMS':
+      return `We are finding a volunteer for ${state} and will be with you shortly. In the meantime, please share more about how we can help.`;
+    default:
+      return `We are finding a volunteer for ${state} and will be with you shortly. Please share more about how we can help, or let us know if you are looking to vote in a different state.`;
+  }
 }
 
 export function VOTED_WELCOME_RESPONSE(): string {
