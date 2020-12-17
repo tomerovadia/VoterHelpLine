@@ -483,8 +483,11 @@ export async function handleNewVoter(
 
   let slackChannelName = null as string | null;
 
-  // Do we already know the voter's state?
-  if (process.env.CLIENT_ORGANIZATION === 'VOTE_AMERICA') {
+  // Can we infer the voter's state from their phone number?
+  if (
+    process.env.CLIENT_ORGANIZATION === 'VOTE_AMERICA' &&
+    !userInfo.stateName
+  ) {
     const knownState = await DbApiUtil.getKnownPhoneState(
       userOptions.userPhoneNumber
     );
