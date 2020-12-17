@@ -443,6 +443,24 @@ async function introduceNewVoterToSlackChannel(
   return response.data.ts;
 }
 
+export function parseStateKeyword(
+  redisClient: PromisifiedRedisClient,
+  userInfo: UserInfo,
+  userMessage: string
+): boolean {
+  if (process.env.CLIENT_ORGANIZATION === 'VOTE_AMERICA') {
+    const keyword = userMessage.toLowerCase().replace(/[^a-zA-Z]/g, '');
+    if (keyword === 'georgia') {
+      userInfo.stateName = 'Georgia';
+      logger.info(
+        `ROUTER.isStateKeyword recognized state keyword '${keyword}' -> ${userInfo.stateName}`
+      );
+      return true;
+    }
+  }
+  return false;
+}
+
 export async function handleNewVoter(
   userInfo: UserInfo,
   userOptions: UserOptions & { userId: string },
@@ -477,29 +495,33 @@ export async function handleNewVoter(
         // Success: we know the state
         userInfo.stateName = stateName;
         userInfo.panelmessage = 'known phone number';
-        slackChannelName = await LoadBalancer.selectSlackChannel(
-          redisClient,
-          LoadBalancer.PULL_ENTRY_POINT,
-          stateName,
-          userInfo.isDemo
-        );
-        if (slackChannelName) {
-          // We can route them too
-          logger.info(
-            `ROUTER.handleNewVoter (${userInfo.userId}): New voter is in known state {stateName}, selected Slack channel {slackChannelName}`
-          );
-        } else {
-          // That state doesn't route for some reason; go to national
-          slackChannelName = userInfo.isDemo ? 'demo-national' : 'national';
-          logger.info(
-            `ROUTER.handleNewVoter (${userInfo.userId}): New voter is in known state {stateName}, but no channel match`
-          );
-        }
       } else {
         logger.warning(
           `ROUTER.handleNewVoter (${userInfo.userId}): unable to parse known state '${knownState}`
         );
       }
+    }
+  }
+
+  // userInfo.stateName may be populated above, or by parseStateKeyword
+  if (userInfo.stateName) {
+    slackChannelName = await LoadBalancer.selectSlackChannel(
+      redisClient,
+      LoadBalancer.PULL_ENTRY_POINT,
+      userInfo.stateName,
+      userInfo.isDemo
+    );
+    if (slackChannelName) {
+      // We can route them too
+      logger.info(
+        `ROUTER.handleNewVoter (${userInfo.userId}): New voter is in known state {stateName}, selected Slack channel {slackChannelName}`
+      );
+    } else {
+      // That state doesn't route for some reason; go to national
+      slackChannelName = userInfo.isDemo ? 'demo-national' : 'national';
+      logger.info(
+        `ROUTER.handleNewVoter (${userInfo.userId}): New voter is in known state {stateName}, but no channel match`
+      );
     }
   }
 
