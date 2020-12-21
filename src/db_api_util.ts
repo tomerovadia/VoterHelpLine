@@ -1071,6 +1071,7 @@ export async function getThreadsNeedingAttentionByVolunteer(): Promise<
           AND t.user_id=c.user_id
           AND t.is_demo=c.is_demo
           AND c.rn=1
+          AND c.volunteer_slack_user_id IS NOT NULL
         GROUP BY volunteer_slack_user_id, volunteer_slack_user_name
         ORDER BY max_last_update_age DESC`
     );
@@ -1125,6 +1126,7 @@ export async function getThreadsNeedingAttentionForChannel(
           AND t.user_id=c.user_id
           AND t.is_demo=c.is_demo
           AND c.rn=1
+          AND c.volunteer_slack_user_id IS NOT NULL
           AND slack_channel_id = $1
         ORDER BY updated_at`,
       [channelId]
