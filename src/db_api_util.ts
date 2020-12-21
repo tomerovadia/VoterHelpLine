@@ -896,6 +896,11 @@ export async function getUnclaimedVoters(
         WHERE archived IS NOT TRUE
       ), latest_status AS (
         SELECT user_id, voter_status FROM all_status WHERE rn=1
+      ), latest_claim AS (
+        SELECT DISTINCT ON (user_id, is_demo) user_id, is_demo, volunteer_slack_user_id
+        FROM volunteer_voter_claims
+        WHERE archived IS NOT TRUE
+        ORDER BY user_id, is_demo, created_at DESC
       )
       SELECT
         t.slack_parent_message_ts
@@ -914,10 +919,15 @@ export async function getUnclaimedVoters(
         AND t.session_end_at IS NULL
         AND t.archived IS NOT TRUE
         AND t.slack_channel_id = $1
-        AND NOT EXISTS (
-          SELECT FROM volunteer_voter_claims c
-          WHERE t.user_id=c.user_id
-          AND c.archived IS NOT TRUE
+        AND (
+          NOT EXISTS (
+            SELECT FROM latest_claim c
+            WHERE c.user_id = t.user_id AND c.is_demo = t.is_demo
+          )
+          OR EXISTS (
+            SELECT FROM latest_claim c
+            WHERE c.user_id = t.user_id AND c.is_demo = t.is_demo AND c.volunteer_slack_user_id IS NULL
+          )
         )
         AND s.voter_status NOT IN ('REFUSED', 'SPAM')
       ORDER BY t.updated_at`,
@@ -953,6 +963,11 @@ export async function getUnclaimedVotersByChannel(): Promise<ChannelStat[]> {
         WHERE archived IS NOT TRUE
       ), latest_status AS (
         SELECT user_id, voter_status FROM all_status WHERE rn=1
+      ), latest_claim AS (
+        SELECT DISTINCT ON (user_id, is_demo) user_id, is_demo, volunteer_slack_user_id
+        FROM volunteer_voter_claims
+        WHERE archived IS NOT TRUE
+        ORDER BY user_id, is_demo, created_at DESC
       )
       SELECT
         count(*)
@@ -966,10 +981,15 @@ export async function getUnclaimedVotersByChannel(): Promise<ChannelStat[]> {
         AND t.session_end_at IS NULL
         AND t.archived IS NOT TRUE
         AND s.voter_status NOT IN ('REFUSED', 'SPAM')
-        AND NOT EXISTS (
-          SELECT FROM volunteer_voter_claims c
-          WHERE t.user_id=c.user_id
-          AND c.archived IS NOT TRUE
+        AND (
+          NOT EXISTS (
+            SELECT FROM latest_claim c
+            WHERE c.user_id = t.user_id AND c.is_demo = t.is_demo
+          )
+          OR EXISTS (
+            SELECT FROM latest_claim c
+            WHERE c.user_id = t.user_id AND c.is_demo = t.is_demo AND c.volunteer_slack_user_id IS NULL
+          )
         )
       GROUP BY slack_channel_id
       ORDER BY max_last_update_age DESC`
