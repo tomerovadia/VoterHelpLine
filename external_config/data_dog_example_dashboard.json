@@ -1,0 +1,736 @@
+{
+  "description": "",
+  "id": "yxz-9ta-6s8",
+  "is_read_only": false,
+  "layout_type": "ordered",
+  "notify_list": [],
+  "template_variables": [],
+  "title": "Helpline Production",
+  "widgets": [
+    {
+      "definition": {
+        "layout_type": "ordered",
+        "title": "Postgres",
+        "type": "group",
+        "widgets": [
+          {
+            "definition": {
+              "legend_size": "0",
+              "requests": [
+                {
+                  "display_type": "line",
+                  "q": "avg:aws.rds.cpuutilization{dbclusteridentifier:helpline-pg} by {dbinstanceidentifier}",
+                  "style": {
+                    "line_type": "solid",
+                    "line_width": "normal",
+                    "palette": "dog_classic"
+                  }
+                }
+              ],
+              "show_legend": false,
+              "title": "CPU Utilization",
+              "type": "timeseries",
+              "yaxis": {
+                "include_zero": true,
+                "label": "",
+                "max": "auto",
+                "min": "auto",
+                "scale": "linear"
+              }
+            },
+            "id": 2278638713567162
+          },
+          {
+            "definition": {
+              "legend_size": "0",
+              "requests": [
+                {
+                  "display_type": "line",
+                  "q": "avg:aws.rds.freeable_memory{dbclusteridentifier:helpline-pg} by {dbinstanceidentifier}",
+                  "style": {
+                    "line_type": "solid",
+                    "line_width": "normal",
+                    "palette": "dog_classic"
+                  }
+                }
+              ],
+              "show_legend": false,
+              "title": "Freeable Memory",
+              "type": "timeseries",
+              "yaxis": {
+                "include_zero": true,
+                "label": "",
+                "max": "auto",
+                "min": "auto",
+                "scale": "linear"
+              }
+            },
+            "id": 6556638874292036
+          },
+          {
+            "definition": {
+              "legend_size": "0",
+              "markers": [
+                {
+                  "display_type": "error dashed",
+                  "label": " Max Connections ",
+                  "value": "y = 5000"
+                }
+              ],
+              "requests": [
+                {
+                  "display_type": "line",
+                  "q": "max:aws.rds.database_connections{dbclusteridentifier:helpline-pg} by {dbinstanceidentifier}",
+                  "style": {
+                    "line_type": "solid",
+                    "line_width": "normal",
+                    "palette": "dog_classic"
+                  }
+                }
+              ],
+              "show_legend": false,
+              "title": "DB Connections",
+              "type": "timeseries",
+              "yaxis": {
+                "include_zero": true,
+                "label": "",
+                "max": "auto",
+                "min": "auto",
+                "scale": "linear"
+              }
+            },
+            "id": 755555349160434
+          },
+          {
+            "definition": {
+              "legend_size": "0",
+              "requests": [
+                {
+                  "display_type": "line",
+                  "q": "max:aws.rds.free_local_storage{dbclusteridentifier:helpline-pg} by {dbinstanceidentifier}",
+                  "style": {
+                    "line_type": "solid",
+                    "line_width": "normal",
+                    "palette": "dog_classic"
+                  }
+                }
+              ],
+              "show_legend": false,
+              "title": "DB Available Storage",
+              "type": "timeseries",
+              "yaxis": {
+                "include_zero": true,
+                "label": "",
+                "max": "auto",
+                "min": "auto",
+                "scale": "linear"
+              }
+            },
+            "id": 1236354633903866
+          },
+          {
+            "definition": {
+              "legend_size": "0",
+              "requests": [
+                {
+                  "display_type": "line",
+                  "q": "avg:aws.rds.aurora_replica_lag{dbclusteridentifier:helpline-pg} by {dbinstanceidentifier}",
+                  "style": {
+                    "line_type": "solid",
+                    "line_width": "normal",
+                    "palette": "dog_classic"
+                  }
+                }
+              ],
+              "show_legend": false,
+              "title": "DB Replication Lag",
+              "type": "timeseries",
+              "yaxis": {
+                "include_zero": true,
+                "label": "",
+                "max": "auto",
+                "min": "auto",
+                "scale": "linear"
+              }
+            },
+            "id": 4407726990671790
+          },
+          {
+            "definition": {
+              "legend_size": "0",
+              "requests": [
+                {
+                  "display_type": "line",
+                  "q": "avg:aws.rds.read_latency{dbclusteridentifier:helpline-pg} by {dbinstanceidentifier}",
+                  "style": {
+                    "line_type": "solid",
+                    "line_width": "normal",
+                    "palette": "dog_classic"
+                  }
+                }
+              ],
+              "show_legend": false,
+              "title": "Read Latency",
+              "type": "timeseries",
+              "yaxis": {
+                "include_zero": true,
+                "label": "",
+                "max": "auto",
+                "min": "auto",
+                "scale": "linear"
+              }
+            },
+            "id": 4284470472232782
+          },
+          {
+            "definition": {
+              "legend_size": "0",
+              "requests": [
+                {
+                  "display_type": "line",
+                  "q": "avg:aws.rds.write_latency{dbclusteridentifier:helpline-pg} by {dbinstanceidentifier}",
+                  "style": {
+                    "line_type": "solid",
+                    "line_width": "normal",
+                    "palette": "dog_classic"
+                  }
+                }
+              ],
+              "show_legend": false,
+              "title": "Write Latency",
+              "type": "timeseries",
+              "yaxis": {
+                "include_zero": true,
+                "label": "",
+                "max": "auto",
+                "min": "auto",
+                "scale": "linear"
+              }
+            },
+            "id": 7219932588139676
+          }
+        ]
+      },
+      "id": 7917623511530414
+    },
+    {
+      "definition": {
+        "layout_type": "ordered",
+        "title": "Redis",
+        "type": "group",
+        "widgets": [
+          {
+            "definition": {
+              "legend_size": "0",
+              "requests": [
+                {
+                  "display_type": "line",
+                  "q": "avg:aws.elasticache.freeable_memory{replication_group:helpline-redis} by {name}",
+                  "style": {
+                    "line_type": "solid",
+                    "line_width": "normal",
+                    "palette": "dog_classic"
+                  }
+                }
+              ],
+              "show_legend": false,
+              "title": "Freeable Memory",
+              "type": "timeseries",
+              "yaxis": {
+                "include_zero": true,
+                "label": "",
+                "max": "auto",
+                "min": "auto",
+                "scale": "linear"
+              }
+            },
+            "id": 4874303365591398
+          },
+          {
+            "definition": {
+              "legend_size": "0",
+              "requests": [
+                {
+                  "display_type": "line",
+                  "q": "avg:aws.elasticache.engine_cpuutilization{replication_group:helpline-redis} by {name}",
+                  "style": {
+                    "line_type": "solid",
+                    "line_width": "normal",
+                    "palette": "dog_classic"
+                  }
+                }
+              ],
+              "show_legend": false,
+              "title": "CPU Utilization",
+              "type": "timeseries",
+              "yaxis": {
+                "include_zero": true,
+                "label": "",
+                "max": "auto",
+                "min": "auto",
+                "scale": "linear"
+              }
+            },
+            "id": 6770531955950572
+          },
+          {
+            "definition": {
+              "legend_size": "0",
+              "markers": [
+                {
+                  "display_type": "error dashed",
+                  "label": " Max Connections ",
+                  "value": "y = 65000"
+                }
+              ],
+              "requests": [
+                {
+                  "display_type": "line",
+                  "q": "avg:aws.elasticache.curr_connections{replication_group:helpline-redis} by {name}",
+                  "style": {
+                    "line_type": "solid",
+                    "line_width": "normal",
+                    "palette": "dog_classic"
+                  }
+                }
+              ],
+              "show_legend": false,
+              "title": "Connections",
+              "type": "timeseries",
+              "yaxis": {
+                "include_zero": true,
+                "label": "",
+                "max": "auto",
+                "min": "auto",
+                "scale": "linear"
+              }
+            },
+            "id": 2650166809874276
+          },
+          {
+            "definition": {
+              "legend_size": "0",
+              "requests": [
+                {
+                  "display_type": "line",
+                  "q": "avg:aws.elasticache.replication_lag{replication_group:helpline-redis} by {name}",
+                  "style": {
+                    "line_type": "solid",
+                    "line_width": "normal",
+                    "palette": "dog_classic"
+                  }
+                }
+              ],
+              "show_legend": false,
+              "title": "Replication Lag",
+              "type": "timeseries",
+              "yaxis": {
+                "include_zero": true,
+                "label": "",
+                "max": "auto",
+                "min": "auto",
+                "scale": "linear"
+              }
+            },
+            "id": 2316451797751036
+          },
+          {
+            "definition": {
+              "legend_size": "0",
+              "requests": [
+                {
+                  "display_type": "line",
+                  "on_right_yaxis": false,
+                  "q": "sum:aws.elasticache.get_type_cmds{replication_group:helpline-redis,cachenodeid:0001}.as_count()",
+                  "style": {
+                    "line_type": "solid",
+                    "line_width": "normal",
+                    "palette": "dog_classic"
+                  }
+                },
+                {
+                  "display_type": "line",
+                  "on_right_yaxis": false,
+                  "q": "sum:aws.elasticache.set_type_cmds{replication_group:helpline-redis,cachenodeid:0001}.as_count()",
+                  "style": {
+                    "line_type": "solid",
+                    "line_width": "normal",
+                    "palette": "dog_classic"
+                  }
+                }
+              ],
+              "show_legend": false,
+              "title": "Command Counts",
+              "type": "timeseries",
+              "yaxis": {
+                "include_zero": true,
+                "label": "",
+                "max": "auto",
+                "min": "auto",
+                "scale": "linear"
+              }
+            },
+            "id": 6089003729964280
+          },
+          {
+            "definition": {
+              "legend_size": "0",
+              "requests": [
+                {
+                  "display_type": "line",
+                  "on_right_yaxis": false,
+                  "q": "avg:aws.elasticache.get_type_cmds_latency{replication_group:helpline-redis}",
+                  "style": {
+                    "line_type": "solid",
+                    "line_width": "normal",
+                    "palette": "dog_classic"
+                  }
+                },
+                {
+                  "display_type": "line",
+                  "on_right_yaxis": false,
+                  "q": "avg:aws.elasticache.set_type_cmds_latency{replication_group:helpline-redis}",
+                  "style": {
+                    "line_type": "solid",
+                    "line_width": "normal",
+                    "palette": "dog_classic"
+                  }
+                }
+              ],
+              "show_legend": false,
+              "title": "Command Latency",
+              "type": "timeseries",
+              "yaxis": {
+                "include_zero": true,
+                "label": "",
+                "max": "auto",
+                "min": "auto",
+                "scale": "linear"
+              }
+            },
+            "id": 5425152482880752
+          }
+        ]
+      },
+      "id": 7908526192264272
+    },
+    {
+      "definition": {
+        "layout_type": "ordered",
+        "title": "API Gateway",
+        "type": "group",
+        "widgets": [
+          {
+            "definition": {
+              "legend_size": "0",
+              "requests": [
+                {
+                  "display_type": "line",
+                  "q": "sum:aws.apigateway.count{apiname:prod-helpline}.as_count()",
+                  "style": {
+                    "line_type": "solid",
+                    "line_width": "normal",
+                    "palette": "dog_classic"
+                  }
+                },
+                {
+                  "display_type": "line",
+                  "q": "sum:aws.apigateway.5xxerror{apiname:prod-helpline}.as_count()",
+                  "style": {
+                    "line_type": "solid",
+                    "line_width": "normal",
+                    "palette": "dog_classic"
+                  }
+                }
+              ],
+              "show_legend": false,
+              "title": "Request Count & Error Count",
+              "type": "timeseries",
+              "yaxis": {
+                "include_zero": true,
+                "label": "",
+                "max": "auto",
+                "min": "auto",
+                "scale": "linear"
+              }
+            },
+            "id": 3027903626829936
+          },
+          {
+            "definition": {
+              "legend_size": "0",
+              "requests": [
+                {
+                  "display_type": "line",
+                  "q": "avg:aws.apigateway.latency.p50{apiname:prod-helpline}",
+                  "style": {
+                    "line_type": "solid",
+                    "line_width": "normal",
+                    "palette": "dog_classic"
+                  }
+                },
+                {
+                  "display_type": "line",
+                  "q": "avg:aws.apigateway.latency.p75{apiname:prod-helpline}",
+                  "style": {
+                    "line_type": "solid",
+                    "line_width": "normal",
+                    "palette": "dog_classic"
+                  }
+                },
+                {
+                  "display_type": "line",
+                  "q": "avg:aws.apigateway.latency.p90{apiname:prod-helpline}",
+                  "style": {
+                    "line_type": "solid",
+                    "line_width": "normal",
+                    "palette": "dog_classic"
+                  }
+                },
+                {
+                  "display_type": "line",
+                  "q": "avg:aws.apigateway.latency.p95{apiname:prod-helpline}",
+                  "style": {
+                    "line_type": "solid",
+                    "line_width": "normal",
+                    "palette": "dog_classic"
+                  }
+                },
+                {
+                  "display_type": "line",
+                  "q": "avg:aws.apigateway.latency.p99{apiname:prod-helpline}",
+                  "style": {
+                    "line_type": "solid",
+                    "line_width": "normal",
+                    "palette": "dog_classic"
+                  }
+                },
+                {
+                  "display_type": "line",
+                  "q": "max:aws.apigateway.latency.maximum{apiname:prod-helpline}",
+                  "style": {
+                    "line_type": "solid",
+                    "line_width": "normal",
+                    "palette": "dog_classic"
+                  }
+                }
+              ],
+              "show_legend": false,
+              "title": "Api Gateway Latency",
+              "type": "timeseries",
+              "yaxis": {
+                "include_zero": true,
+                "label": "",
+                "max": "auto",
+                "min": "auto",
+                "scale": "linear"
+              }
+            },
+            "id": 5344825530249412
+          }
+        ]
+      },
+      "id": 3151118291237850
+    },
+    {
+      "definition": {
+        "layout_type": "ordered",
+        "title": "Lambda",
+        "type": "group",
+        "widgets": [
+          {
+            "definition": {
+              "legend_size": "0",
+              "requests": [
+                {
+                  "display_type": "area",
+                  "on_right_yaxis": false,
+                  "q": "max:aws.lambda.concurrent_executions.maximum{resource:helpline-prod-app OR resource:helpline-prod-worker} by {resource}",
+                  "style": {
+                    "line_type": "solid",
+                    "line_width": "normal",
+                    "palette": "dog_classic"
+                  }
+                }
+              ],
+              "show_legend": false,
+              "title": "Concurrent Executions",
+              "type": "timeseries",
+              "yaxis": {
+                "include_zero": true,
+                "label": "",
+                "max": "auto",
+                "min": "auto",
+                "scale": "linear"
+              }
+            },
+            "id": 7864946902524254
+          },
+          {
+            "definition": {
+              "legend_size": "0",
+              "requests": [
+                {
+                  "display_type": "line",
+                  "q": "top(sum:aws.lambda.enhanced.invocations{functionname:helpline-prod-app,cold_start:true} by {functionname}.as_count(), 100, 'sum', 'desc')",
+                  "style": {
+                    "line_type": "solid",
+                    "line_width": "normal",
+                    "palette": "dog_classic"
+                  }
+                }
+              ],
+              "show_legend": false,
+              "title": "Cold Starts",
+              "type": "timeseries",
+              "yaxis": {
+                "include_zero": true,
+                "label": "",
+                "max": "auto",
+                "min": "auto",
+                "scale": "linear"
+              }
+            },
+            "id": 4735991181702630
+          },
+          {
+            "definition": {
+              "legend_size": "0",
+              "requests": [
+                {
+                  "display_type": "line",
+                  "q": "avg:aws.lambda.duration.p50{functionname:helpline-prod-app} by {functionname}",
+                  "style": {
+                    "line_type": "solid",
+                    "line_width": "normal",
+                    "palette": "dog_classic"
+                  }
+                },
+                {
+                  "display_type": "line",
+                  "q": "avg:aws.lambda.duration.p95{functionname:helpline-prod-app} by {functionname}",
+                  "style": {
+                    "line_type": "solid",
+                    "line_width": "normal",
+                    "palette": "dog_classic"
+                  }
+                },
+                {
+                  "display_type": "line",
+                  "q": "avg:aws.lambda.duration.p99{functionname:helpline-prod-app} by {functionname}",
+                  "style": {
+                    "line_type": "solid",
+                    "line_width": "normal",
+                    "palette": "dog_classic"
+                  }
+                }
+              ],
+              "show_legend": false,
+              "title": "Lambda App Duration",
+              "type": "timeseries",
+              "yaxis": {
+                "include_zero": true,
+                "label": "",
+                "max": "auto",
+                "min": "auto",
+                "scale": "linear"
+              }
+            },
+            "id": 3130223795387408
+          },
+          {
+            "definition": {
+              "legend_size": "0",
+              "requests": [
+                {
+                  "display_type": "line",
+                  "q": "avg:aws.lambda.duration.p50{functionname:helpline-prod-worker} by {functionname}",
+                  "style": {
+                    "line_type": "solid",
+                    "line_width": "normal",
+                    "palette": "dog_classic"
+                  }
+                },
+                {
+                  "display_type": "line",
+                  "q": "avg:aws.lambda.duration.p95{functionname:helpline-prod-worker} by {functionname}",
+                  "style": {
+                    "line_type": "solid",
+                    "line_width": "normal",
+                    "palette": "dog_classic"
+                  }
+                },
+                {
+                  "display_type": "line",
+                  "q": "avg:aws.lambda.duration.p99{resource:helpline-prod-worker} by {functionname}",
+                  "style": {
+                    "line_type": "solid",
+                    "line_width": "normal",
+                    "palette": "dog_classic"
+                  }
+                }
+              ],
+              "show_legend": false,
+              "title": "Lambda Worker Duration",
+              "type": "timeseries",
+              "yaxis": {
+                "include_zero": true,
+                "label": "",
+                "max": "auto",
+                "min": "auto",
+                "scale": "linear"
+              }
+            },
+            "id": 2906651589948634
+          },
+          {
+            "definition": {
+              "legend_size": "0",
+              "requests": [
+                {
+                  "display_type": "line",
+                  "q": "avg:aws.lambda.duration.p50{functionname:helpline-prod-app} by {functionname}",
+                  "style": {
+                    "line_type": "solid",
+                    "line_width": "normal",
+                    "palette": "dog_classic"
+                  }
+                },
+                {
+                  "display_type": "line",
+                  "q": "avg:aws.lambda.duration.p95{functionname:helpline-prod-app} by {functionname}",
+                  "style": {
+                    "line_type": "solid",
+                    "line_width": "normal",
+                    "palette": "dog_classic"
+                  }
+                },
+                {
+                  "display_type": "line",
+                  "q": "avg:aws.lambda.duration.p99{functionname:helpline-prod-app} by {functionname}",
+                  "style": {
+                    "line_type": "solid",
+                    "line_width": "normal",
+                    "palette": "dog_classic"
+                  }
+                }
+              ],
+              "show_legend": false,
+              "title": "Lambda App Duration",
+              "type": "timeseries",
+              "yaxis": {
+                "include_zero": true,
+                "label": "",
+                "max": "auto",
+                "min": "auto",
+                "scale": "linear"
+              }
+            },
+            "id": 8550234653668544
+          }
+        ]
+      },
+      "id": 4134395244500936
+    }
+  ]
+}

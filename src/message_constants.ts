@@ -45,6 +45,8 @@ export function WELCOME_VOTER(): string {
       return 'Vote From Home 2020 is excited to help you vote!\n\nPlease note this is not an official or government-affiliated service. Volunteers will do their best to share official links that support their answers to your questions, but by using this service you release Vote From Home 2020 of all liability for your personal voting experience.\n\nReply AGREE to confirm that you understand and would like to continue to receive automated text messages from this number with further information. (Msg & data rates may apply). Reply STOP to unsubscribe.';
     case 'VOTER_HELP_LINE':
       return 'Welcome to Voter Help Line! We are excited to help you vote.\n\nPlease note that this is not an official or government-affiliated service. Volunteers will do their best to share official links that support their answers to your questions, but by using this service you release Voter Help Line of all liability for your personal voting experience.\n\nReply AGREE to confirm that you understand and would like to continue. (Msg & data rates may apply).';
+    case 'GADEMS':
+      return 'Welcome to Voter Help Line! We are excited to help you vote.\n\nPlease note that this is not an official or government-affiliated service. Volunteers will do their best to share official links that support their answers to your questions, but by using this service you release us of all liability for your personal voting experience.\n\nReply AGREE to confirm that you understand and would like to continue. (Msg & data rates may apply).';
     default:
       return 'Welcome to Voter Help Line! We are excited to help you vote.\n\nPlease note that this is not an official or government-affiliated service. Volunteers will do their best to share official links that support their answers to your questions, but by using this service you release Voter Help Line of all liability for your personal voting experience.\n\nReply AGREE to confirm that you understand and would like to continue. (Msg & data rates may apply).';
   }
@@ -82,7 +84,7 @@ export function WELCOME_FINDING_VOLUNTEER(state: string): string {
 export function FINDING_VOLUNTEER_IN_STATE(state: string): string {
   switch (process.env.CLIENT_ORGANIZATION) {
     case 'GADEMS':
-      return `We are finding a volunteer for ${state} and will be with you shortly. In the meantime, please share more about how we can help.`;
+      return `We are finding a volunteer and will be with you shortly. In the meantime, please share more about how we can help.`;
     default:
       return `We are finding a volunteer for ${state} and will be with you shortly. Please share more about how we can help, or let us know if you are looking to vote in a different state.`;
   }

@@ -66,6 +66,10 @@ export function getStateConstants(): { [stateCode: string]: string } {
         NC: 'North Carolina',
         PA: 'Pennsylvania',
       };
+    case 'GADEMS':
+      return {
+        GA: 'Georgia',
+      };
     default:
       return {
         NC: 'North Carolina',
