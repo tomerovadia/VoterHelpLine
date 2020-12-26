@@ -1455,7 +1455,9 @@ export async function handleManageEntryPoints({
     const channelString = channelInfo
       .map(
         ({ channelName, weight, entrypoint }) =>
-          `• ${entrypoint} \`${channelName}\` - *${weight}*`
+          `• ${
+            entrypoint === 'PULL' ? 'FRONTLINE' : 'JOURNEY'
+          } \`${channelName}\` - *${weight}*`
       )
       .sort()
       .join('\n');
