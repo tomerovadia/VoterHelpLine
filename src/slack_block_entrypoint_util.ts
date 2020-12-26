@@ -262,7 +262,7 @@ export function openCloseConfirmationView({
       text: {
         type: 'mrkdwn',
         text:
-          ':warning: There are no *pull* entrypoints associated with this state or region.',
+          ':warning: There are no *frontline* pods associated with this state or region.',
       },
     });
   }
@@ -272,7 +272,7 @@ export function openCloseConfirmationView({
       text: {
         type: 'mrkdwn',
         text:
-          ':warning: There are no *push* entrypoints associated with this state or region.',
+          ':warning: There are no *journey* pods associated with this state or region.',
       },
     });
   }

@@ -802,16 +802,25 @@ export async function routeVoterToSlackChannel(
     );
     // Operations for AUTOMATED route of voter.
   } else if (!skipLobby && userInfo.activeChannelId != 'NONEXISTENT_LOBBY') {
-    await SlackApiUtil.sendMessage(
-      `*Operator:* Routing voter to ${SlackApiUtil.linkToSlackChannel(
+    let msg;
+    if (userInfo.activeChannelId === destinationSlackChannelId) {
+      // we're routing back to the same channel (to make a new thread)
+      msg = `*Operator:* Routing voter to a new thread in this channel (${SlackApiUtil.linkToSlackChannel(
         destinationSlackChannelId,
         destinationSlackChannelName
-      )}.`,
-      {
-        channel: userInfo.activeChannelId,
-        parentMessageTs: userInfo[userInfo.activeChannelId],
-      }
-    );
+      )}).`;
+    } else {
+      // routing to a new channel
+      msg = `*Operator:* Routing voter to ${SlackApiUtil.linkToSlackChannel(
+        destinationSlackChannelId,
+        destinationSlackChannelName
+      )}.`;
+    }
+
+    await SlackApiUtil.sendMessage(msg, {
+      channel: userInfo.activeChannelId,
+      parentMessageTs: userInfo[userInfo.activeChannelId],
+    });
   }
 
   // The old thread no longer needs attention
@@ -1415,6 +1424,16 @@ export async function handleClearedVoter(
       ...activeChannelMessageParams,
       isAutomatedMessage: true,
     });
+
+    if (process.env.CLIENT_ORGANIZATION === 'GADEMS') {
+      // GA Dems starts a new thread if an old voters comes back rather
+      // than continuing to use the existing thread. We do this by "routing"
+      // the voter back to the same channel
+      await routeVoterToSlackChannel(userInfo, redisClient, {
+        twilioPhoneNumber,
+        destinationSlackChannelName: userInfo.activeChannelName,
+      });
+    }
   }
 
   logger.debug(`ROUTER.handleClearedVoter: Writing updated userInfo to Redis.`);
