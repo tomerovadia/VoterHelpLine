@@ -46,7 +46,7 @@ export function WELCOME_VOTER(): string {
     case 'VOTER_HELP_LINE':
       return 'Welcome to Voter Help Line! We are excited to help you vote.\n\nPlease note that this is not an official or government-affiliated service. Volunteers will do their best to share official links that support their answers to your questions, but by using this service you release Voter Help Line of all liability for your personal voting experience.\n\nReply AGREE to confirm that you understand and would like to continue. (Msg & data rates may apply).';
     case 'GADEMS':
-      return 'Hi! You’ve reached the Georgia Voter Assistance Textline.\n\nReply HELPLINE to be connected to a volunteer.';
+      return 'Hi! You’ve reached the Georgia Voter Assistance Helpline.\n\nReply HELPLINE to be connected to a volunteer.';
     default:
       return 'Welcome to Voter Help Line! We are excited to help you vote.\n\nPlease note that this is not an official or government-affiliated service. Volunteers will do their best to share official links that support their answers to your questions, but by using this service you release Voter Help Line of all liability for your personal voting experience.\n\nReply AGREE to confirm that you understand and would like to continue. (Msg & data rates may apply).';
   }
@@ -87,7 +87,7 @@ export function WELCOME_AND_STATE_QUESTION(): string {
 export function WELCOME_FINDING_VOLUNTEER(state: string): string {
   switch (process.env.CLIENT_ORGANIZATION) {
     case 'GADEMS':
-      return `Hi! You’ve reached the Georgia Voter Assistance Textline.\n\nWe are finding a volunteer and will be with you shortly. In the meantime, please share your name and question or concern.`;
+      return `Hi! You’ve reached the Georgia Voter Assistance Helpline.\n\nWe are finding a volunteer and will be with you shortly. In the meantime, please share your name and question or concern.`;
     case 'VOTE_AMERICA':
       return `Welcome to the VoteAmerica Helpline! Msg&data rates may apply. Reply STOP to unsubscribe.\n\nWe are finding a volunteer for ${state}. Please share more about how we can help, or let us know if you are looking to vote in a different state.`;
     default:
