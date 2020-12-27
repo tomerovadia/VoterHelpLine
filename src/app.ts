@@ -327,7 +327,8 @@ const handleIncomingTwilioMessage = async (
       }
     }
   } else if (
-    process.env.CLIENT_ORGANIZATION === 'VOTE_AMERICA' &&
+    (process.env.CLIENT_ORGANIZATION === 'VOTE_AMERICA' ||
+      process.env.CLIENT_ORGANIZATION === 'GADEMS') &&
     KeywordParser.isHelplineKeyword(userMessage)
   ) {
     // If the voter has previously opted out and then texts HELPLINE, instruct
@@ -415,13 +416,17 @@ const handleIncomingTwilioMessage = async (
       logger.info(
         `SERVER.handleIncomingTwilioMessage (${userId}): Voter is known but doesn't have a Slack thread yet.`
       );
-      if (process.env.CLIENT_ORGANIZATION === 'VOTE_AMERICA') {
+      if (
+        process.env.CLIENT_ORGANIZATION === 'VOTE_AMERICA' ||
+        process.env.CLIENT_ORGANIZATION === 'GADEMS'
+      ) {
         const userMessageNoPunctuation = userMessage
           .toLowerCase()
           .replace(/[^a-zA-Z]/g, '');
         if (
           userMessageNoPunctuation.startsWith('helpline') ||
-          Router.parseStateKeyword(redisClient, userInfo, userMessage)
+          (process.env.CLIENT_ORGANIZATION === 'VOTE_AMERICA' &&
+            Router.parseStateKeyword(redisClient, userInfo, userMessage))
         ) {
           await Router.handleNewVoter(
             userInfo,
@@ -468,7 +473,8 @@ const handleIncomingTwilioMessage = async (
       // PULL
     } else if (
       userInfo.confirmedDisclaimer ||
-      process.env.CLIENT_ORGANIZATION === 'VOTE_AMERICA'
+      process.env.CLIENT_ORGANIZATION === 'VOTE_AMERICA' ||
+      process.env.CLIENT_ORGANIZATION === 'GADEMS'
     ) {
       logger.info(
         `SERVER.handleIncomingTwilioMessage (${userId}): Activating automated system since entrypoint is ${LoadBalancer.PULL_ENTRY_POINT}.`
@@ -585,10 +591,14 @@ const handleIncomingTwilioMessage = async (
       returningVoter,
     });
 
-    if (process.env.CLIENT_ORGANIZATION === 'VOTE_AMERICA') {
+    if (
+      process.env.CLIENT_ORGANIZATION === 'VOTE_AMERICA' ||
+      process.env.CLIENT_ORGANIZATION === 'GADEMS'
+    ) {
       if (
         KeywordParser.isHelplineKeyword(userMessage) ||
-        Router.parseStateKeyword(redisClient, userInfo, userMessage)
+        (process.env.CLIENT_ORGANIZATION === 'VOTE_AMERICA' &&
+          Router.parseStateKeyword(redisClient, userInfo, userMessage))
       ) {
         await Router.handleNewVoter(
           userInfo,

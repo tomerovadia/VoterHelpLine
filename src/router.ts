@@ -255,7 +255,10 @@ async function introduceNewVoterToSlackChannel(
   }
 
   let messageToVoter;
-  if (process.env.CLIENT_ORGANIZATION === 'VOTE_AMERICA') {
+  if (
+    process.env.CLIENT_ORGANIZATION === 'VOTE_AMERICA' ||
+    process.env.CLIENT_ORGANIZATION === 'GADEMS'
+  ) {
     if (includeWelcome) {
       // Voter initiated conversation with "HELPLINE".
       if (userInfo.stateName) {
@@ -482,6 +485,10 @@ export async function handleNewVoter(
   );
 
   let slackChannelName = null as string | null;
+
+  if (process.env.CLIENT_ORGANIZATION === 'GADEMS') {
+    userInfo.stateName = 'Georgia';
+  }
 
   // Can we infer the voter's state from their phone number?
   if (
@@ -1284,14 +1291,7 @@ export async function handleDisclaimer(
       `ROUTER.handleDisclaimer: Voter cleared disclaimer with message ${userMessage}.`
     );
     userInfo.confirmedDisclaimer = true;
-    if (process.env.CLIENT_ORGANIZATION === 'GADEMS') {
-      userInfo.stateName = 'Georgia';
-      automatedMessage = MessageConstants.FINDING_VOLUNTEER_IN_STATE(
-        userInfo.stateName
-      );
-    } else {
-      automatedMessage = MessageConstants.STATE_QUESTION();
-    }
+    automatedMessage = MessageConstants.STATE_QUESTION();
   } else {
     logger.debug(
       `ROUTER.handleDisclaimer: Voter did not clear disclaimer with message ${userMessage}.`
