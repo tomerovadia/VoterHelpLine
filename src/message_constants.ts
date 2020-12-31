@@ -87,7 +87,7 @@ export function WELCOME_AND_STATE_QUESTION(): string {
 export function WELCOME_FINDING_VOLUNTEER(state: string): string {
   switch (process.env.CLIENT_ORGANIZATION) {
     case 'GADEMS':
-      return `Hi! You’ve reached the Georgia Voter Assistance Helpline.\n\nWe are finding a volunteer and will be with you shortly. In the meantime, please share your name and question or concern.`;
+      return `Hi! You’ve reached the Georgia Voter Assistance Helpline.\n\nWe are finding a volunteer and will be with you shortly. In the meantime, please share more about how we can help.\n\nIf you are comfortable using our voice hotline, please call 888-730-5816.`;
     case 'VOTE_AMERICA':
       return `Welcome to the VoteAmerica Helpline! Msg&data rates may apply. Reply STOP to unsubscribe.\n\nWe are finding a volunteer for ${state}. Please share more about how we can help, or let us know if you are looking to vote in a different state.`;
     default:
@@ -98,7 +98,7 @@ export function WELCOME_FINDING_VOLUNTEER(state: string): string {
 export function FINDING_VOLUNTEER_IN_STATE(state: string): string {
   switch (process.env.CLIENT_ORGANIZATION) {
     case 'GADEMS':
-      return `We are finding a volunteer and will be with you shortly. In the meantime, please share your name and question or concern.`;
+      return `We are finding a volunteer and will be with you shortly. In the meantime, please share more about how we can help.\n\nIf you are comfortable using our voice hotline, please call 888-730-5816.`;
     default:
       return `We are finding a volunteer for ${state} and will be with you shortly. Please share more about how we can help, or let us know if you are looking to vote in a different state.`;
   }
