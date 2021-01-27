@@ -43,6 +43,13 @@ export function isStaleSession(userInfo: UserInfo): boolean {
     return true;
   }
 
+  if (
+    process.env.CLIENT_ORGANIZATION === 'VOTE_AMERICA' &&
+    userInfo.sessionStartEpoch < 1611775722 // Jan 27, 2021 -- VA moved all voters back to national-0
+  ) {
+    return true;
+  }
+
   // add other "stale" logic here (e.g., session is idle for >2 months)
   // ...
 
