@@ -353,7 +353,8 @@ async function introduceNewVoterToSlackChannel(
   // PUSH/some clients: Write user reply to database and then pass message history to Slack.
   if (
     entryPoint === LoadBalancer.PUSH_ENTRY_POINT ||
-    process.env.CLIENT_ORGANIZATION === 'VOTE_AMERICA'
+    process.env.CLIENT_ORGANIZATION === 'VOTE_AMERICA' ||
+    process.env.CLIENT_ORGANIZATION === 'GADEMS'
   ) {
     logger.debug(
       `ROUTER.introduceNewVoterToSlackChannel: Retrieving and passing message history to Slack, slackChannelName: ${slackChannelName}, parentMessageTs: ${response.data.channel}.`

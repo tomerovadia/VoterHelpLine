@@ -575,7 +575,17 @@ export async function handleCommandNeedsAttention(
 ): Promise<void> {
   // command argument
   let arg = text;
-  if (arg && !SlackApiUtil.isMemberOfAdminChannel(userId)) {
+  if (
+    arg &&
+    !(
+      // Only admins can run this command for anyone other than themselves,
+      // except for in GADEMS, which lets anyone run it.
+      (
+        SlackApiUtil.isMemberOfAdminChannel(userId) ||
+        process.env.CLIENT_ORGANIZATION === 'GADEMS'
+      )
+    )
+  ) {
     arg = '';
   }
 
@@ -649,15 +659,20 @@ export async function handleCommandNeedsAttention(
     if (!channelId) {
       lines.push(`Unrecognized channel ${arg}`);
     } else {
-      lines.push(
-        `Voters needing attention for ${SlackApiUtil.linkToSlackChannel(
-          channelId,
-          channelName
-        )}`
-      );
       const threads = await DbApiUtil.getThreadsNeedingAttentionForChannel(
         channelId
       );
+
+      if (threads.length === 0) {
+        lines.push(`No voters need attention in ${channelName} :tada:`);
+      } else {
+        lines.push(
+          `Voters needing attention for ${SlackApiUtil.linkToSlackChannel(
+            channelId,
+            channelName
+          )}`
+        );
+      }
 
       for (const thread of threads) {
         const messageTs =

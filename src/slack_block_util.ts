@@ -134,84 +134,88 @@ const volunteerSelectionPanel: SlackBlock = {
 export const voterStatusPanel: SlackBlock = {
   type: 'actions',
   elements: [
-    {
-      type: 'static_select',
-      action_id: SlackActionId.VOTER_STATUS_DROPDOWN,
-      initial_option: {
-        text: {
-          type: 'plain_text',
-          text: 'Unknown',
-          emoji: true,
-        },
-        value: 'UNKNOWN',
-      },
-      options: [
-        {
-          text: {
-            type: 'plain_text',
-            text: 'Unknown',
-            emoji: true,
+    ...(process.env.CLIENT_ORGANIZATION === 'GADEMS'
+      ? []
+      : [
+          {
+            type: 'static_select',
+            action_id: SlackActionId.VOTER_STATUS_DROPDOWN,
+            initial_option: {
+              text: {
+                type: 'plain_text',
+                text: 'Unknown',
+                emoji: true,
+              },
+              value: 'UNKNOWN',
+            },
+            options: [
+              {
+                text: {
+                  type: 'plain_text',
+                  text: 'Unknown',
+                  emoji: true,
+                },
+                value: 'UNKNOWN',
+              },
+              {
+                text: {
+                  type: 'plain_text',
+                  text: 'Unregistered',
+                  emoji: true,
+                },
+                value: 'UNREGISTERED',
+              },
+              {
+                text: {
+                  type: 'plain_text',
+                  text: 'Registered',
+                  emoji: true,
+                },
+                value: 'REGISTERED',
+              },
+              {
+                text: {
+                  type: 'plain_text',
+                  text: 'Requested ballot',
+                  emoji: true,
+                },
+                value: 'REQUESTED_BALLOT',
+              },
+              {
+                text: {
+                  type: 'plain_text',
+                  text: 'Received ballot',
+                  emoji: true,
+                },
+                value: 'RECEIVED_BALLOT',
+              },
+              {
+                text: {
+                  type: 'plain_text',
+                  text: 'Will vote in-person',
+                  emoji: true,
+                },
+                value: 'IN_PERSON',
+              },
+              {
+                text: {
+                  type: 'plain_text',
+                  text: 'Voted :tada:',
+                  emoji: true,
+                },
+                value: 'VOTED',
+              },
+              {
+                text: {
+                  type: 'plain_text',
+                  text: 'Not voting this election :cry:',
+                  emoji: true,
+                },
+                value: 'NOT_VOTING',
+              },
+            ],
           },
-          value: 'UNKNOWN',
-        },
-        {
-          text: {
-            type: 'plain_text',
-            text: 'Unregistered',
-            emoji: true,
-          },
-          value: 'UNREGISTERED',
-        },
-        {
-          text: {
-            type: 'plain_text',
-            text: 'Registered',
-            emoji: true,
-          },
-          value: 'REGISTERED',
-        },
-        {
-          text: {
-            type: 'plain_text',
-            text: 'Requested ballot',
-            emoji: true,
-          },
-          value: 'REQUESTED_BALLOT',
-        },
-        {
-          text: {
-            type: 'plain_text',
-            text: 'Received ballot',
-            emoji: true,
-          },
-          value: 'RECEIVED_BALLOT',
-        },
-        {
-          text: {
-            type: 'plain_text',
-            text: 'Will vote in-person',
-            emoji: true,
-          },
-          value: 'IN_PERSON',
-        },
-        {
-          text: {
-            type: 'plain_text',
-            text: 'Voted :tada:',
-            emoji: true,
-          },
-          value: 'VOTED',
-        },
-        {
-          text: {
-            type: 'plain_text',
-            text: 'Not voting this election :cry:',
-            emoji: true,
-          },
-          value: 'NOT_VOTING',
-        },
-      ],
-    },
+        ]),
     {
       type: 'button',
       style: 'danger',
@@ -272,34 +276,38 @@ export const voterStatusPanel: SlackBlock = {
         },
       },
     },
-    {
-      type: 'button',
-      text: {
-        type: 'plain_text',
-        text: 'Route to Journey',
-        emoji: true,
-      },
-      action_id: SlackActionId.ROUTE_TO_JOURNEY,
-      confirm: {
-        title: {
-          type: 'plain_text',
-          text: 'Are you sure?',
-        },
-        text: {
-          type: 'mrkdwn',
-          text:
-            'Are you sure you want to route this voter to a journey pod?\n\nPlease remember to let the voter know that someone will be following up with them.',
-        },
-        confirm: {
-          type: 'plain_text',
-          text: 'Confirm',
-        },
-        deny: {
-          type: 'plain_text',
-          text: 'Cancel',
-        },
-      },
-    },
+    ...(process.env.CLIENT_ORGANIZATION === 'GADEMS'
+      ? []
+      : [
+          {
+            type: 'button',
+            text: {
+              type: 'plain_text',
+              text: 'Route to Journey',
+              emoji: true,
+            },
+            action_id: SlackActionId.ROUTE_TO_JOURNEY,
+            confirm: {
+              title: {
+                type: 'plain_text',
+                text: 'Are you sure?',
+              },
+              text: {
+                type: 'mrkdwn',
+                text:
+                  'Are you sure you want to route this voter to a journey pod?\n\nPlease remember to let the voter know that someone will be following up with them.',
+              },
+              confirm: {
+                type: 'plain_text',
+                text: 'Confirm',
+              },
+              deny: {
+                type: 'plain_text',
+                text: 'Cancel',
+              },
+            },
+          },
+        ]),
   ],
 };
 
@@ -409,7 +417,11 @@ function voterPanelHeader(userInfo: UserInfo): string {
     r += ` (${userInfo.panelMessage})`;
   }
   r += '\n';
-  r += `${userInfo.userId} via ${userInfo.twilioPhoneNumber}`;
+  if (process.env.CLIENT_ORGANIZATION === 'GADEMS') {
+    r += `${userInfo.userId} (${userInfo.userPhoneNumber})`;
+  } else {
+    r += `${userInfo.userId} via ${userInfo.twilioPhoneNumber}`;
+  }
   return r;
 }
 
@@ -427,7 +439,9 @@ export async function getVoterPanel(
     voterInfoSection(messageText),
     cloneDeep(volunteerSelectionPanel),
     cloneDeep(voterStatusPanel),
-    cloneDeep(voterTopicPanel),
+    ...(process.env.CLIENT_ORGANIZATION === 'GADEMS'
+      ? []
+      : [cloneDeep(voterTopicPanel)]),
   ];
 
   if (!volunteer) {
@@ -504,11 +518,13 @@ export async function getVoterPanel(
         },
       };
     } else {
-      populateDropdownNewInitialValue(
-        panel,
-        SlackActionId.VOTER_STATUS_DROPDOWN,
-        status
-      );
+      if (process.env.CLIENT_ORGANIZATION !== 'GADEMS') {
+        populateDropdownNewInitialValue(
+          panel,
+          SlackActionId.VOTER_STATUS_DROPDOWN,
+          status
+        );
+      }
     }
   }
 
