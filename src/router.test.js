@@ -30,7 +30,6 @@ const requireModules = () => {
   jest.mock('./state_parser');
 
   SlackApiUtil.sendMessage = jest.fn();
-  SlackApiUtil.fetchSlackMessageBlocks = jest.fn();
   SlackInteractionApiUtil.replaceSlackMessageBlocks = jest.fn();
   RedisApiUtil.setHash = jest.fn();
   RedisApiUtil.getKey = jest.fn();
@@ -665,9 +664,6 @@ describe('determineVoterState', () => {
         .mockResolvedValueOnce(lobbySlackMessageResponse)
         .mockResolvedValueOnce(stateSlackMessageResponse);
 
-      // This is necessary so that the nested operations within this function to complete.
-      // An empty array is only okay because this is being left untested.
-      SlackApiUtil.fetchSlackMessageBlocks.mockResolvedValue([]);
       // This is necessary so that the nested operations within this function to complete, even though the resolved value isn't used.
       SlackInteractionApiUtil.replaceSlackMessageBlocks.mockResolvedValue(null);
       SlackBlockUtil.populateDropdownWithLatestVoterStatus.mockResolvedValue(

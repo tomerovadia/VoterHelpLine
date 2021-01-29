@@ -362,33 +362,6 @@ export async function fetchSlackUserName(
   }
 }
 
-// See reference here: https://api.slack.com/messaging/retrieving#individual_messages
-export async function fetchSlackMessageBlocks(
-  channelId: string,
-  messageTs: string
-): Promise<SlackBlock[] | null> {
-  const response = await slackAPI.get('conversations.history', {
-    params: {
-      token: process.env.SLACK_BOT_ACCESS_TOKEN,
-      channel: channelId,
-      latest: messageTs,
-      inclusive: true,
-    },
-  });
-
-  if (response.data.ok) {
-    logger.info(
-      `SLACKAPIUTIL.fetchSlackMessageFirstBlockText: Successfully revealed Slack message text (${messageTs} -> ${response.data.messages[0].blocks[0].text.text})`
-    );
-    return response.data.messages[0].blocks;
-  } else {
-    logger.error(
-      `SLACKAPIUTIL.fetchSlackMessageFirstBlockText: Failed to reveal Slack message text (${messageTs}). Error: ${response.data.error}.`
-    );
-    return null;
-  }
-}
-
 export async function fetchSlackChannelNamesAndIds(): Promise<SlackChannelNamesAndIds | null> {
   logger.info(`ENTERING SLACKAPIUTIL.fetchSlackChannelNamesAndIds`);
   const firstPageResponse = await slackAPI.get('conversations.list', {
