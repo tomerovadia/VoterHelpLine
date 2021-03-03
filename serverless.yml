@@ -120,8 +120,8 @@ custom:
   # Provisioned concurrency for the app -- Slack requires responses in 3 seconds so cold starts
   # can cause timeouts.
   provisionedConcurrency:
-    staging: 2
-    prod: 25
+    staging: 1
+    prod: 2
 
 functions:
   app:
