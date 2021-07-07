@@ -40,7 +40,7 @@ export function CLARIFY_STATE(): string {
 export function WELCOME_VOTER(): string {
   switch (process.env.CLIENT_ORGANIZATION) {
     case 'VOTE_AMERICA':
-      return "Welcome to VoteAmerica! Msg&data rates may apply.\n\nReply HELPLINE to connect with a trained volunteer, VOTED if you've already voted, STOP to unsubscribe.";
+      return "Welcome to VoteAmerica! Msg&data rates may apply.\n\nReply HELPLINE to connect with a trained volunteer, STOP to unsubscribe.";
     case 'VOTE_FROM_HOME_2020':
       return 'Vote From Home 2020 is excited to help you vote!\n\nPlease note this is not an official or government-affiliated service. Volunteers will do their best to share official links that support their answers to your questions, but by using this service you release Vote From Home 2020 of all liability for your personal voting experience.\n\nReply AGREE to confirm that you understand and would like to continue to receive automated text messages from this number with further information. (Msg & data rates may apply). Reply STOP to unsubscribe.';
     case 'VOTER_HELP_LINE':
