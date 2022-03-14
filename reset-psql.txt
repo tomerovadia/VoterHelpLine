@@ -1,0 +1,5 @@
+delete from threads;
+delete from messages;
+delete from voter_status_updates;
+delete from volunteer_voter_claims;
+delete from commands;
