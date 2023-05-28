@@ -260,20 +260,24 @@ export async function sendMessage(
     );
     Sentry.captureException(error);
     if (databaseMessageEntry) {
-      databaseMessageEntry.successfullySent = false;
-      databaseMessageEntry.slackError = error.error;
-
-      try {
-        await DbApiUtil.logMessageToDb(databaseMessageEntry);
-      } catch (error) {
-        logger.info(
-          `SLACKAPIUTIL.sendMessage: failed to log message send failure to DB: ${JSON.stringify(
-            error
-          )}`
-        );
-        Sentry.captureException(error);
+      if (typeof error === 'object' && error !== null && 'error' in error) {
+        databaseMessageEntry.successfullySent = false;
+        databaseMessageEntry.slackError = String(error.error);
+    
+        try {
+          await DbApiUtil.logMessageToDb(databaseMessageEntry);
+        } catch (error) {
+          if (typeof error === 'object' && error !== null) {
+            logger.info(
+              `SLACKAPIUTIL.sendMessage: failed to log message send failure to DB: ${JSON.stringify(
+                error
+              )}`
+            );
+            Sentry.captureException(error);
+          }
+        }
       }
-    }
+    }    
 
     throw error;
   }

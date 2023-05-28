@@ -90,34 +90,38 @@ export async function sendMessage(
       Sentry.captureException(error);
     }
   } catch (error) {
-    logger.error(`TWILIOAPIUTIL.sendMessage: ERROR in sending Twilio message,
+    if (typeof error === 'object' && error !== null) { // checking if error is an object and is not null
+      logger.error(`TWILIOAPIUTIL.sendMessage: ERROR in sending Twilio message,
                   message: ${message},
                   from: ${options.twilioPhoneNumber},
                   to: ${options.userPhoneNumber}`);
-    const twilioError = `Status: ${error.status ? error.status : ''}, Message:${
-      error.message ? error.message : ''
-    }, Code: ${error.code ? error.code : ''}, More Info: ${
-      error.more_info ? error.more_info : ''
-    }`;
-    logger.error(
-      `TWILIOAPIUTIL.sendMessage: ERROR in sending Twilio message. Error data from Twilio: ${twilioError}`
-    );
-    Sentry.captureException(error);
+      const twilioError = `Status: ${'status' in error ? error.status : ''}, Message:${
+        'message' in error ? error.message : ''
+      }, Code: ${'code' in error ? error.code : ''}, More Info: ${
+        'more_info' in error ? error.more_info : ''
+      }`;
+      logger.error(
+        `TWILIOAPIUTIL.sendMessage: ERROR in sending Twilio message. Error data from Twilio: ${twilioError}`
+      );
+      Sentry.captureException(error);
 
     // TODO: populate twilioMessageSid, which exists even for unsuccessful sends
     // Not sure how to find it.
-    databaseMessageEntry.successfullySent = false;
-    databaseMessageEntry.twilioError = twilioError;
+      databaseMessageEntry.successfullySent = false;
+      databaseMessageEntry.twilioError = twilioError;
 
-    try {
-      await DbApiUtil.logMessageToDb(databaseMessageEntry);
-    } catch (error) {
-      logger.error(
-        'TWILIOAPIUTIL.sendMessage: failed to log message send failure to DB'
-      );
-      Sentry.captureException(error);
+      try {
+        await DbApiUtil.logMessageToDb(databaseMessageEntry);
+      } catch (error) {
+        if (typeof error === 'object' && error !== null) {
+          logger.error(
+            'TWILIOAPIUTIL.sendMessage: failed to log message send failure to DB'
+          );
+          Sentry.captureException(error);
+        }
+      }
+
+      throw error;
     }
-
-    throw error;
   }
 }
