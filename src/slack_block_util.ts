@@ -229,8 +229,7 @@ export const voterStatusPanel: SlackBlock = {
         },
         text: {
           type: 'mrkdwn',
-          text:
-            "Please confirm that you'd like to update this voter's status to REFUSED. This will block volunteers and our other platforms from messaging the voter.",
+          text: "Please confirm that you'd like to update this voter's status to REFUSED. This will block volunteers and our other platforms from messaging the voter.",
         },
         confirm: {
           type: 'plain_text',
@@ -259,8 +258,7 @@ export const voterStatusPanel: SlackBlock = {
         },
         text: {
           type: 'mrkdwn',
-          text:
-            "Please confirm that you'd like to mark this phone number as SPAM. This will block their phone number from messaging us and all volunteers and our other platforms from messaging them.",
+          text: "Please confirm that you'd like to mark this phone number as SPAM. This will block their phone number from messaging us and all volunteers and our other platforms from messaging them.",
         },
         confirm: {
           type: 'plain_text',
@@ -287,8 +285,7 @@ export const voterStatusPanel: SlackBlock = {
         },
         text: {
           type: 'mrkdwn',
-          text:
-            'Are you sure you want to route this voter to a journey pod?\n\nPlease remember to let the voter know that someone will be following up with them.',
+          text: 'Are you sure you want to route this voter to a journey pod?\n\nPlease remember to let the voter know that someone will be following up with them.',
         },
         confirm: {
           type: 'plain_text',
@@ -549,8 +546,7 @@ export async function getVoterPanel(
         },
         text: {
           type: 'mrkdwn',
-          text:
-            'Are you sure you want to end your demo conversation with this volunteer?\n\nYou will no longer be able to send messages to or receive messages from them, and they will be treated as a new demo voter the next time they send a text to this phone number.',
+          text: 'Are you sure you want to end your demo conversation with this volunteer?\n\nYou will no longer be able to send messages to or receive messages from them, and they will be treated as a new demo voter the next time they send a text to this phone number.',
         },
         confirm: {
           type: 'plain_text',

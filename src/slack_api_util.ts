@@ -263,7 +263,7 @@ export async function sendMessage(
       if (typeof error === 'object' && error !== null && 'error' in error) {
         databaseMessageEntry.successfullySent = false;
         databaseMessageEntry.slackError = String(error.error);
-    
+
         try {
           await DbApiUtil.logMessageToDb(databaseMessageEntry);
         } catch (error) {
@@ -277,7 +277,7 @@ export async function sendMessage(
           }
         }
       }
-    }    
+    }
 
     throw error;
   }

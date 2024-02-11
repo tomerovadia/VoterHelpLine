@@ -14,7 +14,10 @@ provider:
   # your Redis and Postgres servers
   vpc:
     securityGroupIds:
-      { 'Fn::Split': [',', '${ssm:helpline.${self:custom.stage}.securityGroups~true}'] }
+      {
+        'Fn::Split':
+          [',', '${ssm:helpline.${self:custom.stage}.securityGroups~true}'],
+      }
     subnetIds: { 'Fn::Split': [',', '${ssm:helpline.common.subnets~true}'] }
 
   # 30-second timeout by default

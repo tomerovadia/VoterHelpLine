@@ -58,36 +58,34 @@ const getOptionForWeight = (n: number): SlackOption => ({
 
 const weightOptions: SlackOption[] = times(10, getOptionForWeight);
 
-const getBlocksForChannelInfo = (entrypoint: EntryPoint) => ({
-  id,
-  channelName,
-  weight,
-}: PodUtil.ChannelInfo): SlackBlock => {
-  const blockId = PodUtil.getBlockId({
-    channelName,
-    entrypoint,
-  });
-  const text = id
-    ? channelName
-    : `${channelName} :warning: _channel not found_`;
+const getBlocksForChannelInfo =
+  (entrypoint: EntryPoint) =>
+  ({ id, channelName, weight }: PodUtil.ChannelInfo): SlackBlock => {
+    const blockId = PodUtil.getBlockId({
+      channelName,
+      entrypoint,
+    });
+    const text = id
+      ? channelName
+      : `${channelName} :warning: _channel not found_`;
 
-  const accessory = {
-    type: 'static_select',
-    action_id: SlackActionId.MANAGE_ENTRY_POINTS_CHANNEL_STATE_DROPDOWN,
-    initial_option: getOptionForWeight(weight),
-    options: weightOptions,
-  };
+    const accessory = {
+      type: 'static_select',
+      action_id: SlackActionId.MANAGE_ENTRY_POINTS_CHANNEL_STATE_DROPDOWN,
+      initial_option: getOptionForWeight(weight),
+      options: weightOptions,
+    };
 
-  return {
-    type: 'section',
-    block_id: blockId,
-    text: {
-      type: 'mrkdwn',
-      text,
-    },
-    accessory,
+    return {
+      type: 'section',
+      block_id: blockId,
+      text: {
+        type: 'mrkdwn',
+        text,
+      },
+      accessory,
+    };
   };
-};
 
 export async function getOpenCloseModal({
   redisClient,
@@ -261,8 +259,7 @@ export function openCloseConfirmationView({
       type: 'section',
       text: {
         type: 'mrkdwn',
-        text:
-          ':warning: There are no *frontline* pods associated with this state or region.',
+        text: ':warning: There are no *frontline* pods associated with this state or region.',
       },
     });
   }
@@ -271,8 +268,7 @@ export function openCloseConfirmationView({
       type: 'section',
       text: {
         type: 'mrkdwn',
-        text:
-          ':warning: There are no *journey* pods associated with this state or region.',
+        text: ':warning: There are no *journey* pods associated with this state or region.',
       },
     });
   }

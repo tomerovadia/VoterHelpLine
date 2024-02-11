@@ -157,9 +157,8 @@ async function slackInteractivityHandler(
 
   // Message shortcut
   if (payload.type === 'message_action') {
-    const originatingSlackChannelName = await SlackApiUtil.fetchSlackChannelName(
-      payload.channel.id
-    );
+    const originatingSlackChannelName =
+      await SlackApiUtil.fetchSlackChannelName(payload.channel.id);
 
     const redisHashKey = `${payload.channel.id}:${payload.message.ts}`;
     const redisData = await RedisApiUtil.getHash(redisClient, redisHashKey);
@@ -403,9 +402,8 @@ async function slackInteractivityHandler(
     }
 
     // Fallback behavior for block actions introduced prior to use of action IDs
-    const originatingSlackChannelName = await SlackApiUtil.fetchSlackChannelName(
-      payload.channel.id
-    );
+    const originatingSlackChannelName =
+      await SlackApiUtil.fetchSlackChannelName(payload.channel.id);
     if (!originatingSlackChannelName) {
       throw new Error(
         `Could not get slack channel name for Slack channel ${payload.channel.id}`
@@ -456,7 +454,8 @@ async function slackInteractivityHandler(
       await SlackInteractionHandler.handleVoterStatusUpdate({
         userInfo,
         payload,
-        selectedVoterStatus: selectedVoterStatus as SlackInteractionHandler.VoterStatusUpdate,
+        selectedVoterStatus:
+          selectedVoterStatus as SlackInteractionHandler.VoterStatusUpdate,
         originatingSlackUserName,
         slackChannelName: originatingSlackChannelName,
         userPhoneNumber: redisData.userPhoneNumber,
@@ -563,9 +562,10 @@ async function slackInteractivityHandler(
       }
 
       case SlackCallbackId.ROUTE_TO_JOURNEY: {
-        const modalPrivateMetadata = SlackInteractionHandler.parseSlackModalPrivateMetadata(
-          payload.view.private_metadata
-        );
+        const modalPrivateMetadata =
+          SlackInteractionHandler.parseSlackModalPrivateMetadata(
+            payload.view.private_metadata
+          );
         if (
           modalPrivateMetadata &&
           modalPrivateMetadata.commandType !== 'ROUTE_TO_JOURNEY'
@@ -709,7 +709,7 @@ export async function enqueueBackgroundTask(
   // that `taskName` must be one of the keys of BACKGROUND_TASKS, and that
   // `args` must match the arguments of that function
   taskName: keyof typeof BACKGROUND_TASKS,
-  ...args: Parameters<typeof BACKGROUND_TASKS[typeof taskName]>
+  ...args: Parameters<(typeof BACKGROUND_TASKS)[typeof taskName]>
 ): Promise<void> {
   if (process.env.LAMBDA_BACKGROUND_TASK_FUNCTION) {
     // We require and instantiate the lambda client here rather than

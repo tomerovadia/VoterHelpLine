@@ -549,9 +549,8 @@ export async function handleNewVoter(
         `ROUTER.handleNewVoter (${userInfo.userId}): New voter will enter Slack channel: ${slackChannelName}`
       );
     } else if (entryPoint === LoadBalancer.PUSH_ENTRY_POINT) {
-      userInfo.stateName = LoadBalancer.getPushPhoneNumberState(
-        twilioPhoneNumber
-      );
+      userInfo.stateName =
+        LoadBalancer.getPushPhoneNumberState(twilioPhoneNumber);
       logger.debug(
         `ROUTER.handleNewVoter (${userInfo.userId}): Determined that twilioPhoneNumber ${twilioPhoneNumber} corresponds to U.S. state ${userInfo.stateName} based on hard coding in LoadBalancer.`
       );

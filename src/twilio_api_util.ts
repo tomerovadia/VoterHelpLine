@@ -90,23 +90,24 @@ export async function sendMessage(
       Sentry.captureException(error);
     }
   } catch (error) {
-    if (typeof error === 'object' && error !== null) { // checking if error is an object and is not null
+    if (typeof error === 'object' && error !== null) {
+      // checking if error is an object and is not null
       logger.error(`TWILIOAPIUTIL.sendMessage: ERROR in sending Twilio message,
                   message: ${message},
                   from: ${options.twilioPhoneNumber},
                   to: ${options.userPhoneNumber}`);
-      const twilioError = `Status: ${'status' in error ? error.status : ''}, Message:${
-        'message' in error ? error.message : ''
-      }, Code: ${'code' in error ? error.code : ''}, More Info: ${
-        'more_info' in error ? error.more_info : ''
-      }`;
+      const twilioError = `Status: ${
+        'status' in error ? error.status : ''
+      }, Message:${'message' in error ? error.message : ''}, Code: ${
+        'code' in error ? error.code : ''
+      }, More Info: ${'more_info' in error ? error.more_info : ''}`;
       logger.error(
         `TWILIOAPIUTIL.sendMessage: ERROR in sending Twilio message. Error data from Twilio: ${twilioError}`
       );
       Sentry.captureException(error);
 
-    // TODO: populate twilioMessageSid, which exists even for unsuccessful sends
-    // Not sure how to find it.
+      // TODO: populate twilioMessageSid, which exists even for unsuccessful sends
+      // Not sure how to find it.
       databaseMessageEntry.successfullySent = false;
       databaseMessageEntry.twilioError = twilioError;
 

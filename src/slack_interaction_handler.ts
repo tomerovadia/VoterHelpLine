@@ -837,7 +837,8 @@ export async function handleCommandBroadcast(
       if (preamble) {
         preamble += '\n\n';
       }
-      const volunteerStats = await DbApiUtil.getThreadsNeedingAttentionByVolunteer();
+      const volunteerStats =
+        await DbApiUtil.getThreadsNeedingAttentionByVolunteer();
       for (const v of volunteerStats) {
         const ulines = await getNeedsAttentionList(v.volunteerSlackUserId);
         await SlackApiUtil.sendMessage(
@@ -1190,7 +1191,8 @@ export async function receiveRouteToJourney({
         );
 
         // Store the destinationSlackChannelName for when the modal is confirmed.
-        modalPrivateMetadata.destinationSlackChannelName = selectedSlackChannelName;
+        modalPrivateMetadata.destinationSlackChannelName =
+          selectedSlackChannelName;
 
         // Store the relevant information in the modal so that when the requested action is confirmed
         // the data needed for the necessary actions is available.
@@ -1200,10 +1202,11 @@ export async function receiveRouteToJourney({
           'Are you sure you want to route this voter to a journey pod?\n\nPlease remember to let the voter know that someone will be following up with them.'
         );
       } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
         logger.warn(error);
         slackView = SlackBlockUtil.getErrorSlackView(
           'route_to_journey_error',
-          error
+          errorMessage
         );
       }
     }

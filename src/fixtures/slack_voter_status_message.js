@@ -15,8 +15,7 @@ export const makeVoterStatusMessageWithoutActionIds = () => ({
       block_id: 'NjLm',
       text: {
         type: 'mrkdwn',
-        text:
-          '<!channel> New *Ohio* voter\nf39f57796f6ca7eac2aac2fdd794375 via +18559032361',
+        text: '<!channel> New *Ohio* voter\nf39f57796f6ca7eac2aac2fdd794375 via +18559032361',
         verbatim: false,
       },
     },
@@ -116,8 +115,7 @@ export const makeVoterStatusMessageWithoutActionIds = () => ({
             },
             text: {
               type: 'mrkdwn',
-              text:
-                "Please confirm that you'd like to update this voter's status to VOTED.",
+              text: "Please confirm that you'd like to update this voter's status to VOTED.",
               verbatim: false,
             },
             confirm: {
@@ -150,8 +148,7 @@ export const makeVoterStatusMessageWithoutActionIds = () => ({
             },
             text: {
               type: 'mrkdwn',
-              text:
-                "Please confirm that you'd like to update this voter's status to REFUSED. This will block volunteers and our other platforms from messaging the voter.",
+              text: "Please confirm that you'd like to update this voter's status to REFUSED. This will block volunteers and our other platforms from messaging the voter.",
               verbatim: false,
             },
             confirm: {
@@ -180,8 +177,7 @@ export const makeVoterStatusMessageWithoutActionIds = () => ({
             },
             text: {
               type: 'mrkdwn',
-              text:
-                "Please confirm that you'd like to mark this phone number as SPAM. This will block their phone number from messaging us and all volunteers and our other platforms from messaging them.",
+              text: "Please confirm that you'd like to mark this phone number as SPAM. This will block their phone number from messaging us and all volunteers and our other platforms from messaging them.",
               verbatim: false,
             },
             confirm: {

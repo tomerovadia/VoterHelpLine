@@ -30,10 +30,14 @@ import { handleTwilioStatusCallback } from './twilio_status_callback_handler';
 import { SlackInteractionEventPayload } from './slack_interaction_handler';
 import { TwilioRequestBody } from './twilio_util';
 import * as KeywordParser from './keyword_parser';
+import ConstituentManagementService from './constituent_management_service';
+import ServiceCoordinator from './service_coordinator';
 
 /**************************/
 /* SETUP */
 /**************************/
+const use_refactored_path = true;
+
 const app = express();
 
 const rawBodySaver = (
@@ -88,13 +92,6 @@ app.use(
   })
 );
 
-app.use(Sentry.Handlers.errorHandler());
-
-app.use(function (err: Error, req: express.Request, res: express.Response) {
-  logger.error(err);
-  res.sendStatus(500);
-});
-
 /**************************/
 /* ADDITIONAL FUNCTIONS */
 /**************************/
@@ -144,12 +141,6 @@ export async function handleKnownVoterBlockLogic(
       false
     );
   }
-
-
-
-
-
-
 
   // If outbound texts are prohibited to this user, we return --
   // but first, we relay the message to Slack if a thread exists for
@@ -257,16 +248,6 @@ const handleIncomingTwilioMessage = async (
     returningVoter = true;
   }
 
-
-
-
-
-
-
-
-
-
-
   const twilioCallbackURL = TwilioUtil.twilioCallbackURL(req);
 
   // Rejoin?
@@ -366,15 +347,6 @@ const handleIncomingTwilioMessage = async (
       return;
     }
   }
-
-
-
-
-
-
-
-
-
 
   // Seen this voter before
   if (userInfo != null) {
@@ -635,7 +607,13 @@ app.post(
 
     if (TwilioUtil.passesAuth(req)) {
       logger.info('SERVER POST /twilio-pull: Passes Twilio auth.');
-      await handleIncomingTwilioMessage(req, LoadBalancer.PULL_ENTRY_POINT);
+      if (use_refactored_path) {
+        const constituentManagementService = new ConstituentManagementService();
+        const serviceCoordinator = new ServiceCoordinator(constituentManagementService);
+        await serviceCoordinator.handleIncomingTwilioMessage(req, LoadBalancer.PULL_ENTRY_POINT);
+      } else {
+        await handleIncomingTwilioMessage(req, LoadBalancer.PULL_ENTRY_POINT);
+      }
       res.writeHead(200, { 'Content-Type': 'text/xml' });
       res.send();
     } else {
@@ -840,9 +818,10 @@ app.post(
     ) {
       // Check if we need to render a confirmation modal. This needs to happen
       // synchronously to avoid 3 second timeout.
-      const confirmationModal = SlackInteractionHandler.maybeGetManageEntryPointsConfirmationModal(
-        payload
-      );
+      const confirmationModal =
+        SlackInteractionHandler.maybeGetManageEntryPointsConfirmationModal(
+          payload
+        );
       if (confirmationModal) {
         logger.info(
           `SERVER POST /slack-interactivity: Determined ${payload.view?.callback_id} pushes a view onto modal`
@@ -890,7 +869,7 @@ app.post(
   })
 );
 
-// /twilio-callback 
+// /twilio-callback
 app.post(
   '/twilio-callback',
   runAsyncWrapper(async (req, res) => {
@@ -1111,5 +1090,12 @@ app.post(
     }
   })
 );
+
+app.use(Sentry.Handlers.errorHandler());
+
+app.use(function (err: Error, req: express.Request, res: express.Response) {
+  logger.error(err);
+  res.sendStatus(500);
+});
 
 export { app };
