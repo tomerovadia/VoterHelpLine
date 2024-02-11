@@ -30,11 +30,12 @@
     "start": "node -r source-map-support/register build/server.js",
     "develop": "NODE_ENV=development nodemon --watch ./src --exec 'ts-node' --files ./src/server.ts",
     "heroku-postbuild": "npm install && npm run build",
-    "test": "LOG_LEVEL=fatal DOTENV_CONFIG_PATH=.env.test NODE_ENV=test node -r dotenv/config ./node_modules/.bin/jest --config=jest.config.js",
+    "test": "LOG_LEVEL=fatal DOTENV_CONFIG_PATH=.env.test NODE_ENV=test node -r dotenv/config ./node_modules/.bin/jest --config=jest.config.js --watch",
     "sls": "serverless",
     "format:check": "prettier --check --ignore-path .gitignore ./src",
     "format:write": "prettier --write --ignore-path .gitignore ./src",
-    "eslint": "eslint ./src --ext .js,.ts --max-warnings 0"
+    "eslint": "eslint ./src --ext .js,.ts --max-warnings 0",
+    "watch": "npx tsc -w"
   },
   "browserslist": {
     "production": [
@@ -57,7 +58,7 @@
     "@types/express": "^4.17.8",
     "@types/lodash": "^4.14.161",
     "@types/morgan": "^1.9.1",
-    "@types/node": "^14.11.2",
+    "@types/node": "^14.18.63",
     "@types/pg": "^7.14.5",
     "@types/redis": "^2.8.27",
     "@types/twilio": "^2.11.0",
@@ -75,6 +76,6 @@
     "serverless-plugin-typescript": "^1.1.9",
     "serverless-prune-plugin": "^1.4.3",
     "ts-node": "^9.0.0",
-    "typescript": "^4.0.3"
+    "typescript": "^4.9.5"
   }
 }

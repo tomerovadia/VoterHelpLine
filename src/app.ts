@@ -31,6 +31,9 @@ import { SlackInteractionEventPayload } from './slack_interaction_handler';
 import { TwilioRequestBody } from './twilio_util';
 import * as KeywordParser from './keyword_parser';
 
+/**************************/
+/* SETUP */
+/**************************/
 const app = express();
 
 const rawBodySaver = (
@@ -61,6 +64,7 @@ function runAsyncWrapper(
 }
 
 app.use(Sentry.Handlers.requestHandler());
+
 app.use(
   morgan('combined', {
     stream: {
@@ -72,7 +76,9 @@ app.use(
 );
 
 app.use(bodyParser.json({ verify: rawBodySaver }));
+
 app.use(bodyParser.urlencoded({ verify: rawBodySaver, extended: false }));
+
 app.use(
   bodyParser.raw({
     verify: rawBodySaver,
@@ -82,64 +88,16 @@ app.use(
   })
 );
 
-app.post(
-  '/push',
-  runAsyncWrapper(async (req: Request, res: express.Response) => {
-    const TWILIO_PHONE_NUMBER = '+18557041009';
-    const MESSAGE =
-      'This is Voter Help Line! We sent you an absentee ballot request form. Did you receive it? Text STOP to stop messages. Msg & data rates may apply.';
+app.use(Sentry.Handlers.errorHandler());
 
-    const redisUserPhoneNumbersKey = 'userPhoneNumbers';
-    const userPhoneNumbers = await redisClient.lrangeAsync(
-      redisUserPhoneNumbersKey,
-      0,
-      1000
-    );
+app.use(function (err: Error, req: express.Request, res: express.Response) {
+  logger.error(err);
+  res.sendStatus(500);
+});
 
-    if (!userPhoneNumbers) {
-      logger.info('Could not read phone numbers from redis');
-      return;
-    }
-
-    logger.info('userPhoneNumbers:');
-    logger.info(userPhoneNumbers);
-    let delay = 0;
-    const INTERVAL_MILLISECONDS = 2000;
-    for (const idx in userPhoneNumbers) {
-      const userPhoneNumber = userPhoneNumbers[idx];
-      logger.info(`Sending push message to phone number: ${userPhoneNumber}`);
-
-      const MD5 = new Hashes.MD5();
-      const userId = MD5.hex(userPhoneNumber);
-
-      const dbMessageEntry: DbApiUtil.DatabaseMessageEntry = {
-        direction: 'OUTBOUND',
-        automated: true,
-        userId,
-        entryPoint: LoadBalancer.PUSH_ENTRY_POINT,
-      };
-
-      await new Promise((resolve) => {
-        setTimeout(resolve, delay);
-      });
-
-      await TwilioApiUtil.sendMessage(
-        MESSAGE,
-        {
-          twilioPhoneNumber: TWILIO_PHONE_NUMBER,
-          userPhoneNumber,
-          twilioCallbackURL: TwilioUtil.twilioCallbackURL(req),
-        },
-        dbMessageEntry
-      );
-
-      delay += INTERVAL_MILLISECONDS;
-    }
-
-    res.sendStatus(200);
-  })
-);
-
+/**************************/
+/* ADDITIONAL FUNCTIONS */
+/**************************/
 export async function handleKnownVoterBlockLogic(
   userInfo: UserInfo,
   userMessage: string,
@@ -186,6 +144,12 @@ export async function handleKnownVoterBlockLogic(
       false
     );
   }
+
+
+
+
+
+
 
   // If outbound texts are prohibited to this user, we return --
   // but first, we relay the message to Slack if a thread exists for
@@ -293,6 +257,16 @@ const handleIncomingTwilioMessage = async (
     returningVoter = true;
   }
 
+
+
+
+
+
+
+
+
+
+
   const twilioCallbackURL = TwilioUtil.twilioCallbackURL(req);
 
   // Rejoin?
@@ -392,6 +366,15 @@ const handleIncomingTwilioMessage = async (
       return;
     }
   }
+
+
+
+
+
+
+
+
+
 
   // Seen this voter before
   if (userInfo != null) {
@@ -635,32 +618,10 @@ const handleIncomingTwilioMessage = async (
   }
 };
 
-app.post(
-  '/twilio-push',
-  runAsyncWrapper(async (req, res) => {
-    logger.info(
-      '**************************************************************************************************'
-    );
-    logger.info(
-      '******************************************************************************************************'
-    );
-    logger.info('Entering SERVER POST /twilio-push');
-
-    if (TwilioUtil.passesAuth(req)) {
-      logger.info('SERVER POST /twilio-push: Passes Twilio auth.');
-      await handleIncomingTwilioMessage(req, LoadBalancer.PUSH_ENTRY_POINT);
-      res.writeHead(200, { 'Content-Type': 'text/xml' });
-      res.send();
-    } else {
-      logger.error(
-        'SERVER POST /twilio-push: ERROR authenticating /twilio-push request is from Twilio.'
-      );
-      res.writeHead(401, { 'Content-Type': 'text/xml' });
-      res.send();
-    }
-  })
-);
-
+/**************************/
+/* IMPORTANT ENTRYPOINTS */
+/**************************/
+// /twilio-pull is the main entrypoint for the Twilio API for most clients.
 app.post(
   '/twilio-pull',
   runAsyncWrapper(async (req, res) => {
@@ -687,6 +648,8 @@ app.post(
   })
 );
 
+// /slack is the main entrypoint for the Slack API,
+// including volunteer messages posted on Slack.
 app.post(
   '/slack',
   runAsyncWrapper(async (req, res) => {
@@ -769,6 +732,10 @@ app.post(
   })
 );
 
+/**************************************/
+/* ADDITIONAL FEATURE ENTRYPOINTS */
+/**************************************/
+// /slack-command is the entrypoint for Slack commands.
 app.post(
   '/slack-command',
   runAsyncWrapper(async (req, res) => {
@@ -807,6 +774,8 @@ app.post(
   })
 );
 
+// /slack-interactivity is the entrypoint for Slack interactivity,
+// excluding Slack commands, which are handled by /slack_command.
 app.post(
   '/slack-interactivity',
   runAsyncWrapper(async (req, res) => {
@@ -921,6 +890,7 @@ app.post(
   })
 );
 
+// /twilio-callback 
 app.post(
   '/twilio-callback',
   runAsyncWrapper(async (req, res) => {
@@ -941,6 +911,10 @@ app.post(
   })
 );
 
+/**************************/
+/* DEVELOPER ENTRYPOINTS */
+/**************************/
+// /debug-sentry
 app.get(
   '/debug-sentry',
   runAsyncWrapper(async function mainHandler() {
@@ -951,12 +925,32 @@ app.get(
   })
 );
 
+// /debug-success
 app.get(
   '/debug-success',
   runAsyncWrapper(async function mainHandler(req, res) {
     await new Promise((resolve) => setTimeout(resolve, 100));
 
     res.sendStatus(200);
+  })
+);
+
+// /debug-connect
+app.get(
+  '/debug-connect',
+  runAsyncWrapper(async function mainHandler(
+    req: Request,
+    res: express.Response
+  ) {
+    const httpPromise = testHTTP();
+    const redisPromise = testRedis();
+    const pgPromise = testPostgres();
+
+    res.json({
+      http: await httpPromise,
+      redis: await redisPromise,
+      pg: await pgPromise,
+    });
   })
 );
 
@@ -1028,29 +1022,94 @@ function testPostgres() {
   });
 }
 
-app.get(
-  '/debug-connect',
-  runAsyncWrapper(async function mainHandler(
-    req: Request,
-    res: express.Response
-  ) {
-    const httpPromise = testHTTP();
-    const redisPromise = testRedis();
-    const pgPromise = testPostgres();
+/***********************/
+/* RARE ENTRYPOINTS */
+/***********************/
+// /push is the rarely used push entrypoint, which is for
+// initiating conversations with voters.
+app.post(
+  '/push',
+  runAsyncWrapper(async (req: Request, res: express.Response) => {
+    const TWILIO_PHONE_NUMBER = '+18557041009';
+    const MESSAGE =
+      'This is Voter Help Line! We sent you an absentee ballot request form. Did you receive it? Text STOP to stop messages. Msg & data rates may apply.';
 
-    res.json({
-      http: await httpPromise,
-      redis: await redisPromise,
-      pg: await pgPromise,
-    });
+    const redisUserPhoneNumbersKey = 'userPhoneNumbers';
+    const userPhoneNumbers = await redisClient.lrangeAsync(
+      redisUserPhoneNumbersKey,
+      0,
+      1000
+    );
+
+    if (!userPhoneNumbers) {
+      logger.info('Could not read phone numbers from redis');
+      return;
+    }
+
+    logger.info('userPhoneNumbers:');
+    logger.info(userPhoneNumbers);
+    let delay = 0;
+    const INTERVAL_MILLISECONDS = 2000;
+    for (const idx in userPhoneNumbers) {
+      const userPhoneNumber = userPhoneNumbers[idx];
+      logger.info(`Sending push message to phone number: ${userPhoneNumber}`);
+
+      const MD5 = new Hashes.MD5();
+      const userId = MD5.hex(userPhoneNumber);
+
+      const dbMessageEntry: DbApiUtil.DatabaseMessageEntry = {
+        direction: 'OUTBOUND',
+        automated: true,
+        userId,
+        entryPoint: LoadBalancer.PUSH_ENTRY_POINT,
+      };
+
+      await new Promise((resolve) => {
+        setTimeout(resolve, delay);
+      });
+
+      await TwilioApiUtil.sendMessage(
+        MESSAGE,
+        {
+          twilioPhoneNumber: TWILIO_PHONE_NUMBER,
+          userPhoneNumber,
+          twilioCallbackURL: TwilioUtil.twilioCallbackURL(req),
+        },
+        dbMessageEntry
+      );
+
+      delay += INTERVAL_MILLISECONDS;
+    }
+
+    res.sendStatus(200);
   })
 );
 
-app.use(Sentry.Handlers.errorHandler());
+// /twilio-push is also a rarely used path, by /push users of VHL.
+app.post(
+  '/twilio-push',
+  runAsyncWrapper(async (req, res) => {
+    logger.info(
+      '**************************************************************************************************'
+    );
+    logger.info(
+      '******************************************************************************************************'
+    );
+    logger.info('Entering SERVER POST /twilio-push');
 
-app.use(function (err: Error, req: express.Request, res: express.Response) {
-  logger.error(err);
-  res.sendStatus(500);
-});
+    if (TwilioUtil.passesAuth(req)) {
+      logger.info('SERVER POST /twilio-push: Passes Twilio auth.');
+      await handleIncomingTwilioMessage(req, LoadBalancer.PUSH_ENTRY_POINT);
+      res.writeHead(200, { 'Content-Type': 'text/xml' });
+      res.send();
+    } else {
+      logger.error(
+        'SERVER POST /twilio-push: ERROR authenticating /twilio-push request is from Twilio.'
+      );
+      res.writeHead(401, { 'Content-Type': 'text/xml' });
+      res.send();
+    }
+  })
+);
 
 export { app };
