@@ -8,6 +8,7 @@
  * worker Lambda function (which runs this same codebase) asynchronously.
  */
 import * as Sentry from '@sentry/node';
+import { cloneDeep } from 'lodash';
 
 import * as SlackApiUtil from './slack_api_util';
 import * as RedisApiUtil from './redis_api_util';
@@ -18,7 +19,6 @@ import redisClient from './redis_client';
 import Hashes from 'jshashes';
 import * as DbApiUtil from './db_api_util';
 import * as SlackBlockUtil from './slack_block_util';
-import { cloneDeep } from 'lodash';
 import * as LoadBalancer from './load_balancer';
 
 import {

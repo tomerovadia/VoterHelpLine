@@ -32,6 +32,7 @@ import { TwilioRequestBody } from './twilio_util';
 import * as KeywordParser from './keyword_parser';
 import ConstituentManagementService from './constituent_management_service';
 import ServiceCoordinator from './service_coordinator';
+import AgentManagementService from './agent_management_service';
 
 /**************************/
 /* SETUP */
@@ -688,22 +689,43 @@ app.post(
         process.env.SLACK_BOT_USER_ID &&
       !reqBody.event.hidden
     ) {
-      await enqueueBackgroundTask(
-        'slackMessageEventHandler',
-        reqBody,
-        TwilioUtil.twilioCallbackURL(req),
-        {
-          retryCount,
-          retryReason,
-        }
-      );
+      if (use_refactored_path) {
+        const agentManagementService = new AgentManagementService();
+        await agentManagementService.enqueueBackgroundTask(
+          'handleSlackMessageEvent',
+          reqBody,
+          TwilioUtil.twilioCallbackURL(req),
+          {
+            retryCount,
+            retryReason,
+          }
+        );
+      } else {
+        await enqueueBackgroundTask(
+          'slackMessageEventHandler',
+          reqBody,
+          TwilioUtil.twilioCallbackURL(req),
+          {
+            retryCount,
+            retryReason,
+          }
+        );
+      }
     } else if (
       reqBody.event.type === 'app_mention' &&
       // Require that the Slack bot be the (first) user mentioned.
       reqBody.event.text.startsWith(`<@${process.env.SLACK_BOT_USER_ID}>`) &&
       !retryReason
     ) {
-      await enqueueBackgroundTask('slackAppMentionEventHandler', reqBody);
+      if (use_refactored_path) {
+        const agentManagementService = new AgentManagementService();
+        await agentManagementService.enqueueBackgroundTask(
+          'handleSlackAppMentionEvent',
+          reqBody
+        );
+      } else {
+        await enqueueBackgroundTask('slackAppMentionEventHandler', reqBody);
+      }
     }
 
     res.sendStatus(200);
@@ -733,8 +755,10 @@ app.post(
     }
     logger.info('SERVER POST /slack-command: PASSES AUTH');
 
-    await enqueueBackgroundTask(
-      'slackCommandHandler',
+    const agentManagementService = new AgentManagementService();
+
+    await agentManagementService.enqueueBackgroundTask(
+      'handleSlackCommand',
       req.body.channel_id,
       req.body.channel_name,
       req.body.user_id,
@@ -849,11 +873,16 @@ app.post(
     // On AWS Lambda, returning a response will immediately pause execution. So it's
     // important to enqueue the background task BEFORE responding with anything.
     if (shouldEnqueueBackgroundTask) {
-      await enqueueBackgroundTask(
-        'slackInteractivityHandler',
-        payload,
-        metadata
-      );
+      if (use_refactored_path) {
+        const agentManagementService = new AgentManagementService();
+        agentManagementService.enqueueBackgroundTask('handleSlackInteractivity', payload, metadata);
+      } else {
+        await enqueueBackgroundTask(
+          'slackInteractivityHandler',
+          payload,
+          metadata
+        );
+      }
     }
 
     if (response) {
@@ -1091,6 +1120,9 @@ app.post(
   })
 );
 
+/**************************/
+/* ADDITIONAL SETUP */
+/**************************/
 app.use(Sentry.Handlers.errorHandler());
 
 app.use(function (err: Error, req: express.Request, res: express.Response) {
