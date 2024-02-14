@@ -740,7 +740,7 @@ export default class AgentManagementService {
       logger.info(`Running background task ${taskName} as a background promise`);
   
       // @ts-ignore Typescript can't follow this kind of dynamic function call
-      BACKGROUND_TASKS[taskName](...args).catch((err) => {
+      this.BACKGROUND_TASKS[taskName](...args).catch((err) => {
         logger.error(err);
         Sentry.captureException(err);
       });
