@@ -12,98 +12,156 @@ import * as Router from './router';
 import * as KeywordParser from './keyword_parser';
 import * as SlackApiUtil from './slack_api_util';
 import * as MessageConstants from './message_constants';
-import ConstituentManagementService  from './constituent_management_service';
+import AgentManagementService from './agent_management_service';
+import ConstituentManagementService from './constituent_management_service';
 import logger from './logger';
+import * as SlackBlockUtil from './slack_block_util';
+import {
+  InteractivityHandlerMetadata,
+} from './async_jobs';
+import { SlackCallbackId } from './slack_interaction_ids';
+import { SlackInteractionEventPayload } from './slack_interaction_handler';
+import * as SlackInteractionHandler from './slack_interaction_handler';
+import * as Sentry from '@sentry/node';
+import { wrapLambdaHandlerForSentry } from './sentry_wrapper';
 
 export default class ServiceCoordinator {
   // Example of storing references to service instances
-//   private slackService: any; // Replace 'any' with the actual type of your Slack service
-//   private twilioService: any; // Replace 'any' with the actual type of your Twilio service
-  private constituentManagementService: ConstituentManagementService; // Replace 'any' with the actual type of your constituent management service
-//   private agentManagementService: any; // Replace 'any' with the actual type of your agent management service
+  //   private slackService: any; // Replace 'any' with the actual type of your Slack service
+  //   private twilioService: any; // Replace 'any' with the actual type of your Twilio service
+  private constituentManagementService: ConstituentManagementService;
+  private agentManagementService: AgentManagementService;
+
+
+  private BACKGROUND_TASKS = {
+    handleIncomingSlackCommand: this.handleIncomingSlackCommand,
+    handleIncomingSlackInteractivity: this.handleIncomingSlackInteractivity,
+    handleIncomingSlackMessageEvent: this.handleIncomingSlackMessageEvent,
+    handleIncomingSlackAppMentionEvent: this.handleIncomingSlackAppMentionEvent
+  };
 
   constructor(
     constituentManagementService: ConstituentManagementService,
-    // agentManagementService: any,
+    agentManagementService: AgentManagementService,
     // slackService: any,
     // twilioService: any
   ) {
     this.constituentManagementService = constituentManagementService;
-    // this.agentManagementService = agentManagementService;
+    this.agentManagementService = agentManagementService;
     // this.slackService = slackService;
     // this.twilioService = twilioService;
   }
 
-  // Method to handle incoming messages from Slack
-  public async handleIncomingSlackMessage(reqBody: Router.SlackEventRequestBody,
+  // Method to handle incoming messages from Slack.
+  public async handleIncomingSlackMessageEvent(reqBody: Router.SlackEventRequestBody,
     twilioCallbackURL: string,
     {
       retryCount,
       retryReason,
     }: { retryCount: number | undefined; retryReason: string | undefined }): Promise<void> {
-        logger.info(
-          `SERVER POST /slack: Slack event listener caught non-bot Slack message from ${reqBody.event.user}.`
-        );
-        const redisHashKey = `${reqBody.event.channel}:${reqBody.event.thread_ts}`;
-      
-        // Pass Slack message to Twilio
-        const redisData = (await RedisApiUtil.getHash(
-          redisClient,
-          redisHashKey
-        )) as UserInfo;
-      
-        if (redisData != null) {
-          logger.info(
-            'SERVER POST /slack: Server received non-bot Slack message INSIDE a voter thread.'
-          );
-      
-          const outboundTextsBlocked = await RedisApiUtil.getHashField(
-            redisClient,
-            'slackBlockedUserPhoneNumbers',
-            redisData.userPhoneNumber
-          );
-          if (outboundTextsBlocked != '1') {
-            const originatingSlackUserName = await SlackApiUtil.fetchSlackUserName(
-              reqBody.event.user
-            );
-            if (!originatingSlackUserName) {
-              throw new Error(
-                `Could not get slack user name for slack user ${reqBody.event.user}`
-              );
-            }
-      
-            logger.info(
-              `SERVER POST /slack: Successfully determined Slack user name of message sender: ${originatingSlackUserName}, from Slack user ID: ${reqBody.event.user}`
-            );
-            await Router.handleSlackVoterThreadMessage(
-              reqBody,
-              redisClient,
-              redisData,
-              originatingSlackUserName,
-              twilioCallbackURL,
-              { retryCount, retryReason }
-            );
-          } else {
-            logger.info(
-              `SERVER POST /slack: Received attempted Slack message to blocked phone number: ${redisData.userPhoneNumber}`
-            );
-            await SlackApiUtil.sendMessage(
-              `*Operator:* Your message was not relayed, as this phone number has been added to our blocklist.`,
-              {
-                channel: reqBody.event.channel,
-                parentMessageTs: reqBody.event.thread_ts,
-              }
-            );
-          }
-        } else {
-          // Hash doesn't exist (this message is likely outside of a voter thread).
-          logger.info(
-            'SERVER POST /slack: Server received non-bot Slack message OUTSIDE a voter thread. Doing nothing.'
-          );
-        }
+    this.agentManagementService.handleSlackMessageEvent(
+      reqBody,
+      twilioCallbackURL,
+      {
+        retryCount,
+        retryReason,
+      }
+    );
   }
 
-  // Method to handle incoming SMS messages from Twilio
+  // Method to handle incoming messages that contain a mention of the Slack app (unofficial Slack commands).
+  public async handleIncomingSlackAppMentionEvent(reqBody: Router.SlackEventRequestBody): Promise<void> {
+    await this.agentManagementService.handleSlackAppMentionEvent(
+      reqBody
+    );
+  }
+
+  // Method to handle incoming messages that contain slack commands (official)
+  public async handleIncomingSlackCommand(channelId: string,
+    channelName: string,
+    userId: string,
+    userName: string,
+    command: string,
+    text: string,
+    responseUrl: string): Promise<void> {
+    await this.agentManagementService.handleSlackCommand(
+      channelId, channelName, userId, userName, command, text, responseUrl
+    );
+  }
+
+  // Method to handle incoming slack interactivity.
+  public async handleIncomingSlackInteractivity(payload: SlackInteractionEventPayload): Promise<any> {
+    let response: any;
+    let shouldEnqueueBackgroundTask = true;
+    const metadata: InteractivityHandlerMetadata = {};
+
+    if (
+      [
+        SlackCallbackId.RESET_DEMO,
+        SlackCallbackId.MANAGE_ENTRY_POINTS,
+        SlackCallbackId.SHOW_NEEDS_ATTENTION,
+        SlackCallbackId.ROUTE_TO_JOURNEY,
+      ].includes(payload.callback_id as SlackCallbackId)
+    ) {
+      logger.info(
+        `SERVER POST /slack-interactivity: Determined ${payload.callback_id} opens a modal`
+      );
+
+      // For certain actions, we always show a modal. Because we have to show
+      // this modal within 3 seconds, we immediately make the call to show a
+      // loading state, and then pass the modal ID on to the async task to
+      // update the modal
+      metadata.viewId = await SlackApiUtil.renderModal(
+        payload.trigger_id,
+        SlackBlockUtil.loadingSlackView()
+      );
+    }
+
+    if (
+      payload.type === 'view_submission' &&
+      (payload.view?.callback_id as SlackCallbackId) ===
+      SlackCallbackId.MANAGE_ENTRY_POINTS
+    ) {
+      // Check if we need to render a confirmation modal. This needs to happen
+      // synchronously to avoid 3 second timeout.
+      const confirmationModal =
+        SlackInteractionHandler.maybeGetManageEntryPointsConfirmationModal(
+          payload
+        );
+      if (confirmationModal) {
+        logger.info(
+          `SERVER POST /slack-interactivity: Determined ${payload.view?.callback_id} pushes a view onto modal`
+        );
+
+        response = {
+          response_action: 'push',
+          view: confirmationModal,
+        };
+
+        shouldEnqueueBackgroundTask = false;
+      } else {
+        logger.info(
+          `SERVER POST /slack-interactivity: Determined ${payload.view?.callback_id} updates the view in modal`
+        );
+
+        // This will change, so show loading state again.
+        response = {
+          response_action: 'update',
+          view: SlackBlockUtil.loadingSlackView(),
+        };
+      }
+    }
+
+    // On AWS Lambda, returning a response will immediately pause execution. So it's
+    // important to enqueue the background task BEFORE responding with anything.
+    if (shouldEnqueueBackgroundTask) {
+      await this.agentManagementService.handleSlackInteractivity(payload, metadata);
+    }
+
+    return response;
+  }
+
+  // Method to handle incoming SMS messages from Twilio.
   public async handleIncomingTwilioMessage(
     req: Request,
     // TODO: Return a status of some kind, instead of void.
@@ -388,7 +446,7 @@ export default class ServiceCoordinator {
           userInfo.stateName ||
           userInfo.volunteerEngaged ||
           userInfo.numStateSelectionAttempts >=
-            Router.NUM_STATE_SELECTION_ATTEMPTS_LIMIT
+          Router.NUM_STATE_SELECTION_ATTEMPTS_LIMIT
         ) {
           logger.info(
             `SERVER.handleIncomingTwilioMessage (${userId}): Known U.S. state for voter (${userInfo.stateName}) or volunteer has engaged (${userInfo.volunteerEngaged}). Automated system no longer active.`
@@ -529,14 +587,74 @@ export default class ServiceCoordinator {
     }
   }
 
-  // Add more methods as needed to facilitate communication and coordination between services
+  public async enqueueBackgroundTask(
+    // These type declarations are a bit complicated -- basically, this is saying
+    // that `taskName` must be one of the keys of BACKGROUND_TASKS, and that
+    // `args` must match the arguments of that function
+    taskName: keyof typeof this.BACKGROUND_TASKS,
+    ...args: Parameters<(typeof this.BACKGROUND_TASKS)[typeof taskName]>
+  ): Promise<void> {
+    if (process.env.LAMBDA_BACKGROUND_TASK_FUNCTION) {
+      // We require and instantiate the lambda client here rather than
+      // at the top of the file so that we don't require aws-sdk in non-lambda
+      // environment -- it's a very large library and it's included by default
+      // in the Lambda environment so we don't need to declare it as a
+      // dependency
+  
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const AWS = require('aws-sdk');
+      const lambda = new AWS.Lambda();
+  
+      // use an async lambda invocation to run the background task
+      logger.info(
+        `Running background task ${taskName} via async lambda invocation`
+      );
+      const result = await lambda
+        .invoke({
+          FunctionName: process.env.LAMBDA_BACKGROUND_TASK_FUNCTION,
+          Payload: JSON.stringify({
+            taskName,
+            args,
+          }),
+          InvocationType: 'Event',
+        })
+        .promise();
+      logger.info(`Invoke result: ${result.StatusCode}`);
+    } else {
+      // just run the function, but don't await the promise so we don't block
+      // on completion
+      logger.info(`Running background task ${taskName} as a background promise`);
+  
+      // @ts-ignore Typescript can't follow this kind of dynamic function call
+      this.BACKGROUND_TASKS[taskName](...args).catch((err) => {
+        logger.error(err);
+        Sentry.captureException(err);
+      });
+    }
+  }
+  
+  public backgroundLambdaHandler = wrapLambdaHandlerForSentry(
+    async (event: any): Promise<void> => {
+      logger.info(
+        `Running Lambda background function with payload: ${JSON.stringify(
+          event
+        )}`
+      );
+  
+      const { taskName, args } = event;
+  
+      if (!(taskName in this.BACKGROUND_TASKS)) {
+        throw new Error(`Got an invalid task name: ${taskName}`);
+      }
+  
+      // @ts-ignore Typescript can't check this -- everything's coming in from the
+      // dynamic payload
+      await BACKGROUND_TASKS[taskName](...args);
+    }
+  );
 }
 
-// // Example instantiation and usage
-// const slackServiceInstance = {}; // Replace with actual Slack service instance
-// const twilioServiceInstance = {}; // Replace with actual Twilio service instance
-
-// const coordinator = new ServiceCoordinator(slackServiceInstance, twilioServiceInstance);
-
-// coordinator.handleSlackMessage("Example Slack message");
-// coordinator.handleTwilioSMS("Example Twilio SMS");
+const agentManagementServiceInstance = new AgentManagementService();
+const constituentManagementServiceInstance = new ConstituentManagementService();
+const serviceCoordinatorInstance = new ServiceCoordinator(constituentManagementServiceInstance, agentManagementServiceInstance);
+module.exports.backgroundLambdaHandler = serviceCoordinatorInstance.backgroundLambdaHandler.bind(serviceCoordinatorInstance);

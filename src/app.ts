@@ -37,7 +37,7 @@ import AgentManagementService from './agent_management_service';
 /**************************/
 /* SETUP */
 /**************************/
-const use_refactored_path = true;
+const use_refactored_path = false;
 
 const app = express();
 
@@ -610,7 +610,8 @@ app.post(
       logger.info('SERVER POST /twilio-pull: Passes Twilio auth.');
       if (use_refactored_path) {
         const constituentManagementService = new ConstituentManagementService();
-        const serviceCoordinator = new ServiceCoordinator(constituentManagementService);
+        const agentManagementService = new AgentManagementService();
+        const serviceCoordinator = new ServiceCoordinator(constituentManagementService, agentManagementService);
         await serviceCoordinator.handleIncomingTwilioMessage(req, LoadBalancer.PULL_ENTRY_POINT);
       } else {
         await handleIncomingTwilioMessage(req, LoadBalancer.PULL_ENTRY_POINT);
@@ -678,6 +679,10 @@ app.post(
 
     const retryReason = req.header('X-Slack-Retry-Reason');
 
+    const agentManagementService = new AgentManagementService();
+    const constituentManagementService = new ConstituentManagementService();
+    const serviceCoordinator = new ServiceCoordinator(constituentManagementService, agentManagementService);
+
     // We do some first-order routing here to make sure this is an event we
     // actually care about -- we want to quickly ignore things like
     // messages from the bot itself, hidden events, etc.
@@ -690,9 +695,7 @@ app.post(
       !reqBody.event.hidden
     ) {
       if (use_refactored_path) {
-        const agentManagementService = new AgentManagementService();
-        await agentManagementService.enqueueBackgroundTask(
-          'handleSlackMessageEvent',
+        await serviceCoordinator.enqueueBackgroundTask('handleIncomingSlackMessageEvent',
           reqBody,
           TwilioUtil.twilioCallbackURL(req),
           {
@@ -718,11 +721,7 @@ app.post(
       !retryReason
     ) {
       if (use_refactored_path) {
-        const agentManagementService = new AgentManagementService();
-        await agentManagementService.enqueueBackgroundTask(
-          'handleSlackAppMentionEvent',
-          reqBody
-        );
+        await serviceCoordinator.enqueueBackgroundTask('handleIncomingSlackAppMentionEvent', reqBody);
       } else {
         await enqueueBackgroundTask('slackAppMentionEventHandler', reqBody);
       }
@@ -755,18 +754,16 @@ app.post(
     }
     logger.info('SERVER POST /slack-command: PASSES AUTH');
 
+    const constituentManagementService = new ConstituentManagementService();
     const agentManagementService = new AgentManagementService();
-
-    await agentManagementService.enqueueBackgroundTask(
-      'handleSlackCommand',
-      req.body.channel_id,
+    const serviceCoordinator = new ServiceCoordinator(constituentManagementService, agentManagementService);
+    serviceCoordinator.enqueueBackgroundTask('handleIncomingSlackCommand',req.body.channel_id,
       req.body.channel_name,
       req.body.user_id,
       req.body.user_name,
       req.body.command,
       req.body.text,
-      req.body.response_url
-    );
+      req.body.response_url);
 
     // Use res.end instead of res.sendStatus because the latter sends the code as
     // a string in the body, and modal responses require an empty body in some cases.
@@ -806,87 +803,87 @@ app.post(
       return;
     }
 
-    let response: any;
-    let shouldEnqueueBackgroundTask = true;
-
     const payload: SlackInteractionEventPayload = JSON.parse(req.body.payload);
+    let response: any;
 
-    const metadata: InteractivityHandlerMetadata = {};
-
-    if (
-      [
-        SlackCallbackId.RESET_DEMO,
-        SlackCallbackId.MANAGE_ENTRY_POINTS,
-        SlackCallbackId.SHOW_NEEDS_ATTENTION,
-        SlackCallbackId.ROUTE_TO_JOURNEY,
-      ].includes(payload.callback_id as SlackCallbackId)
-    ) {
-      logger.info(
-        `SERVER POST /slack-interactivity: Determined ${payload.callback_id} opens a modal`
-      );
-
-      // For certain actions, we always show a modal. Because we have to show
-      // this modal within 3 seconds, we immediately make the call to show a
-      // loading state, and then pass the modal ID on to the async task to
-      // update the modal
-      metadata.viewId = await SlackApiUtil.renderModal(
-        payload.trigger_id,
-        SlackBlockUtil.loadingSlackView()
-      );
-    }
-
-    if (
-      payload.type === 'view_submission' &&
-      (payload.view?.callback_id as SlackCallbackId) ===
-        SlackCallbackId.MANAGE_ENTRY_POINTS
-    ) {
-      // Check if we need to render a confirmation modal. This needs to happen
-      // synchronously to avoid 3 second timeout.
-      const confirmationModal =
-        SlackInteractionHandler.maybeGetManageEntryPointsConfirmationModal(
-          payload
-        );
-      if (confirmationModal) {
+    if (use_refactored_path) {
+      const constituentManagementService = new ConstituentManagementService();
+      const agentManagementService = new AgentManagementService();
+      const serviceCoordinator = new ServiceCoordinator(constituentManagementService, agentManagementService);
+      response = await serviceCoordinator.enqueueBackgroundTask('handleIncomingSlackInteractivity',payload);
+    } else {
+      let shouldEnqueueBackgroundTask = true;
+      const metadata: InteractivityHandlerMetadata = {};
+      if (
+        [
+          SlackCallbackId.RESET_DEMO,
+          SlackCallbackId.MANAGE_ENTRY_POINTS,
+          SlackCallbackId.SHOW_NEEDS_ATTENTION,
+          SlackCallbackId.ROUTE_TO_JOURNEY,
+        ].includes(payload.callback_id as SlackCallbackId)
+      ) {
         logger.info(
-          `SERVER POST /slack-interactivity: Determined ${payload.view?.callback_id} pushes a view onto modal`
+          `SERVER POST /slack-interactivity: Determined ${payload.callback_id} opens a modal`
         );
-
-        response = {
-          response_action: 'push',
-          view: confirmationModal,
-        };
-
-        shouldEnqueueBackgroundTask = false;
-      } else {
-        logger.info(
-          `SERVER POST /slack-interactivity: Determined ${payload.view?.callback_id} updates the view in modal`
+  
+        // For certain actions, we always show a modal. Because we have to show
+        // this modal within 3 seconds, we immediately make the call to show a
+        // loading state, and then pass the modal ID on to the async task to
+        // update the modal
+        metadata.viewId = await SlackApiUtil.renderModal(
+          payload.trigger_id,
+          SlackBlockUtil.loadingSlackView()
         );
-
-        // This will change, so show loading state again.
-        response = {
-          response_action: 'update',
-          view: SlackBlockUtil.loadingSlackView(),
-        };
       }
-    }
-
-    // On AWS Lambda, returning a response will immediately pause execution. So it's
-    // important to enqueue the background task BEFORE responding with anything.
-    if (shouldEnqueueBackgroundTask) {
-      if (use_refactored_path) {
-        const agentManagementService = new AgentManagementService();
-        agentManagementService.enqueueBackgroundTask('handleSlackInteractivity', payload, metadata);
-      } else {
+  
+      if (
+        payload.type === 'view_submission' &&
+        (payload.view?.callback_id as SlackCallbackId) ===
+          SlackCallbackId.MANAGE_ENTRY_POINTS
+      ) {
+        // Check if we need to render a confirmation modal. This needs to happen
+        // synchronously to avoid 3 second timeout.
+        const confirmationModal =
+          SlackInteractionHandler.maybeGetManageEntryPointsConfirmationModal(
+            payload
+          );
+        if (confirmationModal) {
+          logger.info(
+            `SERVER POST /slack-interactivity: Determined ${payload.view?.callback_id} pushes a view onto modal`
+          );
+  
+          response = {
+            response_action: 'push',
+            view: confirmationModal,
+          };
+  
+          shouldEnqueueBackgroundTask = false;
+        } else {
+          logger.info(
+            `SERVER POST /slack-interactivity: Determined ${payload.view?.callback_id} updates the view in modal`
+          );
+  
+          // This will change, so show loading state again.
+          response = {
+            response_action: 'update',
+            view: SlackBlockUtil.loadingSlackView(),
+          };
+        }
+      }
+  
+      // On AWS Lambda, returning a response will immediately pause execution. So it's
+      // important to enqueue the background task BEFORE responding with anything.
+      if (shouldEnqueueBackgroundTask) {
         await enqueueBackgroundTask(
-          'slackInteractivityHandler',
-          payload,
-          metadata
-        );
+              'slackInteractivityHandler',
+              payload,
+              metadata
+            );
       }
     }
 
     if (response) {
-      // If there's an explicit response we want to send, use that
+      // If there's an explicit response we want to send, use that.
       res.json(response);
     } else {
       // Use res.end instead of res.sendStatus because the latter sends the code as

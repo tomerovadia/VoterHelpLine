@@ -135,6 +135,6 @@ functions:
     reservedConcurrency: ${self:custom.reservedConcurrency.${self:custom.stage}}
     provisionedConcurrency: ${self:custom.provisionedConcurrency.${self:custom.stage}}
   worker:
-    handler: src/agent_management_service.backgroundLambdaHandler
+    handler: src/service_coordinator.backgroundLambdaHandler
     reservedConcurrency: ${self:custom.reservedConcurrency.${self:custom.stage}}
     provisionedConcurrency: ${self:custom.provisionedConcurrency.${self:custom.stage}}

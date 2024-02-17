@@ -1,4 +1,3 @@
-import * as Sentry from '@sentry/node';
 import Hashes from 'jshashes';
 import { cloneDeep } from 'lodash';
 
@@ -8,7 +7,6 @@ import {
   } from './slack_interaction_handler';
 import * as SlackInteractionHandler from './slack_interaction_handler';
 import logger from './logger';
-import { wrapLambdaHandlerForSentry } from './sentry_wrapper';
 import * as SlackApiUtil from './slack_api_util';
 import * as DbApiUtil from './db_api_util';
 import { SlackActionId, SlackCallbackId } from './slack_interaction_ids';
@@ -28,13 +26,6 @@ export default class AgentManagementService {
   constructor() {
     // Constructor can be used to initialize the service with predefined data
   }
-
-  private BACKGROUND_TASKS = {
-    handleSlackCommand: this.handleSlackCommand,
-    handleSlackInteractivity: this.handleSlackInteractivity,
-    handleSlackMessageEvent: this.handleSlackMessageEvent,
-    handleSlackAppMentionEvent: this.handleSlackAppMentionEvent
-  };
 
   public async handleSlackCommand(
     channelId: string,
@@ -700,73 +691,4 @@ export default class AgentManagementService {
       );
     }
   }
-  
-  public async enqueueBackgroundTask(
-    // These type declarations are a bit complicated -- basically, this is saying
-    // that `taskName` must be one of the keys of BACKGROUND_TASKS, and that
-    // `args` must match the arguments of that function
-    taskName: keyof typeof this.BACKGROUND_TASKS,
-    ...args: Parameters<(typeof this.BACKGROUND_TASKS)[typeof taskName]>
-  ): Promise<void> {
-    if (process.env.LAMBDA_BACKGROUND_TASK_FUNCTION) {
-      // We require and instantiate the lambda client here rather than
-      // at the top of the file so that we don't require aws-sdk in non-lambda
-      // environment -- it's a very large library and it's included by default
-      // in the Lambda environment so we don't need to declare it as a
-      // dependency
-  
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const AWS = require('aws-sdk');
-      const lambda = new AWS.Lambda();
-  
-      // use an async lambda invocation to run the background task
-      logger.info(
-        `Running background task ${taskName} via async lambda invocation`
-      );
-      const result = await lambda
-        .invoke({
-          FunctionName: process.env.LAMBDA_BACKGROUND_TASK_FUNCTION,
-          Payload: JSON.stringify({
-            taskName,
-            args,
-          }),
-          InvocationType: 'Event',
-        })
-        .promise();
-      logger.info(`Invoke result: ${result.StatusCode}`);
-    } else {
-      // just run the function, but don't await the promise so we don't block
-      // on completion
-      logger.info(`Running background task ${taskName} as a background promise`);
-  
-      // @ts-ignore Typescript can't follow this kind of dynamic function call
-      this.BACKGROUND_TASKS[taskName](...args).catch((err) => {
-        logger.error(err);
-        Sentry.captureException(err);
-      });
-    }
-  }
-  
-  public backgroundLambdaHandler = wrapLambdaHandlerForSentry(
-    async (event: any): Promise<void> => {
-      logger.info(
-        `Running Lambda background function with payload: ${JSON.stringify(
-          event
-        )}`
-      );
-  
-      const { taskName, args } = event;
-  
-      if (!(taskName in this.BACKGROUND_TASKS)) {
-        throw new Error(`Got an invalid task name: ${taskName}`);
-      }
-  
-      // @ts-ignore Typescript can't check this -- everything's coming in from the
-      // dynamic payload
-      await BACKGROUND_TASKS[taskName](...args);
-    }
-  );
 }
-
-const agentManagementServiceInstance = new AgentManagementService();
-module.exports.backgroundLambdaHandler = agentManagementServiceInstance.backgroundLambdaHandler.bind(agentManagementServiceInstance);
