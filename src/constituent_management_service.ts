@@ -10,7 +10,7 @@ import * as SlackApiUtil from './slack_api_util';
 import logger from './logger';
 
 export default class ConstituentManagementService {
-  private Constituent: any; // Stores constituents in memory
+  private Constituent: any;
 
   constructor() {
     // Constructor can be used to initialize the service with predefined data
@@ -104,5 +104,15 @@ export default class ConstituentManagementService {
       }
     }
     return outboundTextsBlocked;
+  }
+
+  async isPhoneNumberBlocked(userPhoneNumber: string): Promise<boolean> {
+    const redisBlockedUserPhoneNumberValue = await RedisApiUtil.getHashField(
+      redisClient,
+      'twilioBlockedUserPhoneNumbers',
+      userPhoneNumber
+    );
+    
+    return redisBlockedUserPhoneNumberValue == '1';
   }
 }

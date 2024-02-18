@@ -16,14 +16,14 @@ import AgentManagementService from './agent_management_service';
 import ConstituentManagementService from './constituent_management_service';
 import logger from './logger';
 import * as SlackBlockUtil from './slack_block_util';
-import {
-  InteractivityHandlerMetadata,
-} from './async_jobs';
 import { SlackCallbackId } from './slack_interaction_ids';
 import { SlackInteractionEventPayload } from './slack_interaction_handler';
 import * as SlackInteractionHandler from './slack_interaction_handler';
 import * as Sentry from '@sentry/node';
 import { wrapLambdaHandlerForSentry } from './sentry_wrapper';
+import DbService from './db_service';
+
+export type InteractivityHandlerMetadata = { viewId?: string };
 
 export default class ServiceCoordinator {
   // Example of storing references to service instances
@@ -31,26 +31,28 @@ export default class ServiceCoordinator {
   //   private twilioService: any; // Replace 'any' with the actual type of your Twilio service
   private constituentManagementService: ConstituentManagementService;
   private agentManagementService: AgentManagementService;
-
-
-  private BACKGROUND_TASKS = {
-    handleIncomingSlackCommand: this.handleIncomingSlackCommand,
-    handleIncomingSlackInteractivity: this.handleIncomingSlackInteractivity,
-    handleIncomingSlackMessageEvent: this.handleIncomingSlackMessageEvent,
-    handleIncomingSlackAppMentionEvent: this.handleIncomingSlackAppMentionEvent
-  };
+  private dbService: DbService;
 
   constructor(
     constituentManagementService: ConstituentManagementService,
     agentManagementService: AgentManagementService,
+    dbService: DbService,
     // slackService: any,
     // twilioService: any
   ) {
     this.constituentManagementService = constituentManagementService;
     this.agentManagementService = agentManagementService;
+    this.dbService = dbService;
     // this.slackService = slackService;
     // this.twilioService = twilioService;
   }
+
+  private BACKGROUND_TASKS = {
+    handleIncomingSlackCommand: this.handleIncomingSlackCommand.bind(this),
+    handleSlackInteractivity: this.handleSlackInteractivity.bind(this),
+    handleIncomingSlackMessageEvent: this.handleIncomingSlackMessageEvent.bind(this),
+    handleIncomingSlackAppMentionEvent: this.handleIncomingSlackAppMentionEvent.bind(this)
+  };
 
   // Method to handle incoming messages from Slack.
   public async handleIncomingSlackMessageEvent(reqBody: Router.SlackEventRequestBody,
@@ -89,7 +91,19 @@ export default class ServiceCoordinator {
     );
   }
 
+  // This wrapper is necessary because agentManagementServiceInstance.handleSlackInteractivity
+  // ban't be listed in BACKGROUND_TASKS directly.
+  private async handleSlackInteractivity(
+    payload: SlackInteractionEventPayload,
+    metadata: InteractivityHandlerMetadata
+  ): Promise<void> {
+    await agentManagementServiceInstance.handleSlackInteractivity(payload, metadata);
+  }
+
   // Method to handle incoming slack interactivity.
+  // This is the only public Slack method of ServiceCoordinator that isn't itself meant to be
+  // called enqueued as a background task. Instead, it itself enqueues background tasks
+  // conditionally based on the type of interactivity.
   public async handleIncomingSlackInteractivity(payload: SlackInteractionEventPayload): Promise<any> {
     let response: any;
     let shouldEnqueueBackgroundTask = true;
@@ -155,7 +169,7 @@ export default class ServiceCoordinator {
     // On AWS Lambda, returning a response will immediately pause execution. So it's
     // important to enqueue the background task BEFORE responding with anything.
     if (shouldEnqueueBackgroundTask) {
-      await this.agentManagementService.handleSlackInteractivity(payload, metadata);
+      await this.enqueueBackgroundTask('handleSlackInteractivity', payload, metadata);
     }
 
     return response;
@@ -172,17 +186,25 @@ export default class ServiceCoordinator {
     const reqBody = req.body as TwilioRequestBody;
     const userPhoneNumber = reqBody.From;
 
-    const inboundTextsBlocked = await RedisApiUtil.getHashField(
-      redisClient,
-      'twilioBlockedUserPhoneNumbers',
-      userPhoneNumber
-    );
-
-    if (inboundTextsBlocked === '1') {
-      logger.info(
-        `SERVER.handleIncomingTwilioMessage: Received text from blocked phone number: ${userPhoneNumber}.`
+    if (process.env.USE_REFACTORED_PATH) {
+      if (await this.constituentManagementService.isPhoneNumberBlocked(userPhoneNumber)) {
+        logger.info(
+          `SERVER.handleIncomingTwilioMessage: Received text from blocked phone number: ${userPhoneNumber}.`
+        );
+        return;
+        }
+    } else {
+      const inboundTextsBlocked = await RedisApiUtil.getHashField(
+        redisClient,
+        'twilioBlockedUserPhoneNumbers',
+        userPhoneNumber
       );
-      return;
+      if (inboundTextsBlocked === '1') {
+        logger.info(
+          `SERVER.handleIncomingTwilioMessage: Received text from blocked phone number: ${userPhoneNumber}.`
+        );
+        return;
+      }
     }
 
     const twilioPhoneNumber = reqBody.To;
@@ -196,8 +218,9 @@ export default class ServiceCoordinator {
                           userMessage: ${userMessage},
                           userId: ${userId}`);
 
-    const inboundDbMessageEntry =
-      DbApiUtil.populateIncomingDbMessageTwilioEntry({
+    let inboundDbMessageEntry;
+    if (process.env.USE_REFACTORED_PATH) {
+      inboundDbMessageEntry = this.dbService.populateInitialIncomingConstituentMessageDbEntry({
         userMessage,
         userPhoneNumber,
         twilioPhoneNumber,
@@ -205,6 +228,17 @@ export default class ServiceCoordinator {
         twilioAttachments: userAttachments,
         entryPoint: LoadBalancer.PUSH_ENTRY_POINT,
       });
+    } else {
+      inboundDbMessageEntry =
+        DbApiUtil.populateIncomingDbMessageTwilioEntry({
+          userMessage,
+          userPhoneNumber,
+          twilioPhoneNumber,
+          twilioMessageSid: reqBody.SmsMessageSid,
+          twilioAttachments: userAttachments,
+          entryPoint: LoadBalancer.PUSH_ENTRY_POINT,
+        });
+    }
 
     const redisHashKey = `${userId}:${twilioPhoneNumber}`;
 
@@ -587,6 +621,15 @@ export default class ServiceCoordinator {
     }
   }
 
+  /**
+ * Slack requires that you respond to webhooks within 3 seconds. So when
+ * responding to Slack webhooks, we kick off a background job and then respond
+ * immediately with a 200.
+ *
+ * How we run background tasks depends on how we're deployed. By default, we
+ * just run the task in the background. On Lambda, we instead invoke the
+ * worker Lambda function (which runs this same codebase) asynchronously.
+ */
   public async enqueueBackgroundTask(
     // These type declarations are a bit complicated -- basically, this is saying
     // that `taskName` must be one of the keys of BACKGROUND_TASKS, and that
@@ -654,7 +697,9 @@ export default class ServiceCoordinator {
   );
 }
 
+// Used by serverless.yml.
 const agentManagementServiceInstance = new AgentManagementService();
 const constituentManagementServiceInstance = new ConstituentManagementService();
-const serviceCoordinatorInstance = new ServiceCoordinator(constituentManagementServiceInstance, agentManagementServiceInstance);
+const dbServiceInstance = new DbService();
+const serviceCoordinatorInstance = new ServiceCoordinator(constituentManagementServiceInstance, agentManagementServiceInstance, dbServiceInstance);
 module.exports.backgroundLambdaHandler = serviceCoordinatorInstance.backgroundLambdaHandler.bind(serviceCoordinatorInstance);

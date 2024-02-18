@@ -33,12 +33,11 @@ import * as KeywordParser from './keyword_parser';
 import ConstituentManagementService from './constituent_management_service';
 import ServiceCoordinator from './service_coordinator';
 import AgentManagementService from './agent_management_service';
+import DbService from './db_service';
 
 /**************************/
 /* SETUP */
 /**************************/
-const use_refactored_path = false;
-
 const app = express();
 
 const rawBodySaver = (
@@ -608,10 +607,11 @@ app.post(
 
     if (TwilioUtil.passesAuth(req)) {
       logger.info('SERVER POST /twilio-pull: Passes Twilio auth.');
-      if (use_refactored_path) {
+      if (process.env.USE_REFACTORED_PATH) {
         const constituentManagementService = new ConstituentManagementService();
         const agentManagementService = new AgentManagementService();
-        const serviceCoordinator = new ServiceCoordinator(constituentManagementService, agentManagementService);
+        const dbService = new DbService();
+        const serviceCoordinator = new ServiceCoordinator(constituentManagementService, agentManagementService, dbService);
         await serviceCoordinator.handleIncomingTwilioMessage(req, LoadBalancer.PULL_ENTRY_POINT);
       } else {
         await handleIncomingTwilioMessage(req, LoadBalancer.PULL_ENTRY_POINT);
@@ -681,7 +681,8 @@ app.post(
 
     const agentManagementService = new AgentManagementService();
     const constituentManagementService = new ConstituentManagementService();
-    const serviceCoordinator = new ServiceCoordinator(constituentManagementService, agentManagementService);
+    const dbService = new DbService();
+    const serviceCoordinator = new ServiceCoordinator(constituentManagementService, agentManagementService, dbService);
 
     // We do some first-order routing here to make sure this is an event we
     // actually care about -- we want to quickly ignore things like
@@ -694,7 +695,7 @@ app.post(
         process.env.SLACK_BOT_USER_ID &&
       !reqBody.event.hidden
     ) {
-      if (use_refactored_path) {
+      if (process.env.USE_REFACTORED_PATH) {
         await serviceCoordinator.enqueueBackgroundTask('handleIncomingSlackMessageEvent',
           reqBody,
           TwilioUtil.twilioCallbackURL(req),
@@ -720,7 +721,7 @@ app.post(
       reqBody.event.text.startsWith(`<@${process.env.SLACK_BOT_USER_ID}>`) &&
       !retryReason
     ) {
-      if (use_refactored_path) {
+      if (process.env.USE_REFACTORED_PATH) {
         await serviceCoordinator.enqueueBackgroundTask('handleIncomingSlackAppMentionEvent', reqBody);
       } else {
         await enqueueBackgroundTask('slackAppMentionEventHandler', reqBody);
@@ -756,7 +757,8 @@ app.post(
 
     const constituentManagementService = new ConstituentManagementService();
     const agentManagementService = new AgentManagementService();
-    const serviceCoordinator = new ServiceCoordinator(constituentManagementService, agentManagementService);
+    const dbService = new DbService();
+    const serviceCoordinator = new ServiceCoordinator(constituentManagementService, agentManagementService, dbService);
     serviceCoordinator.enqueueBackgroundTask('handleIncomingSlackCommand',req.body.channel_id,
       req.body.channel_name,
       req.body.user_id,
@@ -806,11 +808,12 @@ app.post(
     const payload: SlackInteractionEventPayload = JSON.parse(req.body.payload);
     let response: any;
 
-    if (use_refactored_path) {
+    if (process.env.USE_REFACTORED_PATH) {
       const constituentManagementService = new ConstituentManagementService();
       const agentManagementService = new AgentManagementService();
-      const serviceCoordinator = new ServiceCoordinator(constituentManagementService, agentManagementService);
-      response = await serviceCoordinator.enqueueBackgroundTask('handleIncomingSlackInteractivity',payload);
+      const dbService = new DbService();
+      const serviceCoordinator = new ServiceCoordinator(constituentManagementService, agentManagementService, dbService);
+      response = await serviceCoordinator.handleIncomingSlackInteractivity(payload);
     } else {
       let shouldEnqueueBackgroundTask = true;
       const metadata: InteractivityHandlerMetadata = {};
