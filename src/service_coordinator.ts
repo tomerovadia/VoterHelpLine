@@ -175,7 +175,7 @@ export default class ServiceCoordinator {
   }
 
   // Method to handle incoming SMS messages from Twilio.
-  public async handleIncomingTwilioMessage(
+  public async handleIncomingSmsMessage(
     req: Request,
     // TODO: Return a status of some kind, instead of void.
     entryPoint: EntryPoint

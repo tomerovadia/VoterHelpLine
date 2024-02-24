@@ -613,7 +613,7 @@ app.post(
         const agentManagementService = new AgentManagementService();
         const dbService = new DbService();
         const serviceCoordinator = new ServiceCoordinator(constituentManagementService, agentManagementService, dbService);
-        await serviceCoordinator.handleIncomingTwilioMessage(req, LoadBalancer.PULL_ENTRY_POINT);
+        await serviceCoordinator.handleIncomingSmsMessage(req, LoadBalancer.PULL_ENTRY_POINT);
       } else {
         await handleIncomingTwilioMessage(req, LoadBalancer.PULL_ENTRY_POINT);
       }
