@@ -1365,6 +1365,9 @@ export async function logInitialVoterStatusToDb(
   }
 }
 
+// TODO: Deprecate this. REJOIN isn't a voter status.
+// Voter status is about the constituent's status as a voter,
+// not their relationship to the client.
 export async function logRejoinStatusToDb(
   userId: string,
   userPhoneNumber: string,

@@ -17,6 +17,7 @@ import { UserInfo } from './types';
 import * as LoadBalancer from './load_balancer';
 import { SlackEventRequestBody } from './router';
 import * as Router from './router';
+import { PromisifiedRedisClient } from './redis_client';
 
 export type InteractivityHandlerMetadata = { viewId?: string };
 
@@ -25,6 +26,54 @@ export default class AgentManagementService {
 
   constructor() {
     // Constructor can be used to initialize the service with predefined data
+  }
+
+  // Whether the phone number was blocked by the client/volunteers.
+  public async isPhoneNumberBlocked(userPhoneNumber: string): Promise<boolean> {
+    const redisBlockedUserPhoneNumberValue = await RedisApiUtil.getHashField(
+      redisClient,
+      'twilioBlockedUserPhoneNumbers',
+      userPhoneNumber
+    );
+    
+    return redisBlockedUserPhoneNumberValue == '1';
+  }
+
+  public async endVoterSession(  redisClient: PromisifiedRedisClient,
+    userInfo: UserInfo,
+    twilioPhoneNumber: string
+  ): Promise<void> {
+    // end old session thread(s)
+    await DbApiUtil.setSessionEnd(userInfo.userId, twilioPhoneNumber);
+  
+    // clear any assigned volunteer
+    await DbApiUtil.logVolunteerVoterClaimToDb({
+      userId: userInfo.userId,
+      userPhoneNumber: userInfo.userPhoneNumber,
+      twilioPhoneNumber,
+      isDemo: LoadBalancer.phoneNumbersAreDemo(
+        twilioPhoneNumber,
+        userInfo.userPhoneNumber
+      ),
+      volunteerSlackUserName: null,
+      volunteerSlackUserId: null,
+      originatingSlackUserName: null,
+      originatingSlackUserId: null,
+      slackChannelName: null,
+      slackChannelId: null,
+      slackParentMessageTs: null,
+      actionTs: null,
+    });
+  
+    // delete userInfo
+    const redisHashKey = `${userInfo.userId}:${twilioPhoneNumber}`;
+    await RedisApiUtil.deleteKeys(redisClient, [redisHashKey]);
+  
+    // update old session thread's panel async; do not await
+    void SlackBlockUtil.closeVoterPanel(
+      userInfo,
+      'This voter helpline session is closed'
+    );
   }
 
   public async handleSlackCommand(

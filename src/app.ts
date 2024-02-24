@@ -34,6 +34,7 @@ import ConstituentManagementService from './constituent_management_service';
 import ServiceCoordinator from './service_coordinator';
 import AgentManagementService from './agent_management_service';
 import DbService from './db_service';
+import config from './config';
 
 /**************************/
 /* SETUP */
@@ -607,7 +608,7 @@ app.post(
 
     if (TwilioUtil.passesAuth(req)) {
       logger.info('SERVER POST /twilio-pull: Passes Twilio auth.');
-      if (process.env.USE_REFACTORED_PATH) {
+      if (config.useRefactoredPath) {
         const constituentManagementService = new ConstituentManagementService();
         const agentManagementService = new AgentManagementService();
         const dbService = new DbService();
@@ -695,7 +696,7 @@ app.post(
         process.env.SLACK_BOT_USER_ID &&
       !reqBody.event.hidden
     ) {
-      if (process.env.USE_REFACTORED_PATH) {
+      if (config.useRefactoredPath) {
         await serviceCoordinator.enqueueBackgroundTask('handleIncomingSlackMessageEvent',
           reqBody,
           TwilioUtil.twilioCallbackURL(req),
@@ -721,7 +722,7 @@ app.post(
       reqBody.event.text.startsWith(`<@${process.env.SLACK_BOT_USER_ID}>`) &&
       !retryReason
     ) {
-      if (process.env.USE_REFACTORED_PATH) {
+      if (config.useRefactoredPath) {
         await serviceCoordinator.enqueueBackgroundTask('handleIncomingSlackAppMentionEvent', reqBody);
       } else {
         await enqueueBackgroundTask('slackAppMentionEventHandler', reqBody);
@@ -808,7 +809,7 @@ app.post(
     const payload: SlackInteractionEventPayload = JSON.parse(req.body.payload);
     let response: any;
 
-    if (process.env.USE_REFACTORED_PATH) {
+    if (config.useRefactoredPath) {
       const constituentManagementService = new ConstituentManagementService();
       const agentManagementService = new AgentManagementService();
       const dbService = new DbService();

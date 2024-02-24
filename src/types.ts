@@ -1,8 +1,12 @@
 import type express from 'express';
 
 export type MessageDirection = 'INBOUND' | 'OUTBOUND';
-export type EntryPoint = 'PULL' | 'PUSH';
+// TODO: Deprecate UNKNOWN EntryPoint.
+export type EntryPoint = 'PULL' | 'PUSH' | 'UNKNOWN';
 export type ChannelType = 'DEMO' | 'NORMAL';
+
+// The status of a voter as determined by
+// conversations with the voter.
 export type VoterStatus =
   | 'UNKNOWN'
   | 'UNREGISTERED'
@@ -15,6 +19,30 @@ export type VoterStatus =
   | 'REFUSED'
   | 'REJOIN'
   | 'SPAM';
+
+// The status of a constituent for a particular
+// API call. This is not the same as the voter status.
+export enum ConstituentStatus {
+  // Constituent status has not yet been determined.
+  UNKNOWN = 'UNKNOWN',
+  // This is the constituent's first message to us.
+  // If their message qualifies them to be ENTERING,
+  // their status will be ENTERING instead.
+  NEW = 'NEW',
+  // The constituent is engaging with the automated
+  // system prior to entering the helpline.
+  PRE_ENTERING_AUTOMATED = 'PRE_ENTERING_AUTOMATED',
+  // The constituent should enter the helpline in this request.
+  ENTERING = 'ENTERING',
+  // The constituent has entered the helpline and the
+  // automated system should handle replying to this request.
+  HAS_ENTERED_AUTOMATED = 'HAS_ENTERED_AUTOMATED',
+  // The constituent has entered the helpline and no
+  // automated replies are active.
+  HAS_ENTERED_CONVERSATION = 'HAS_ENTERED_CONVERSATION',
+  // We know this voter, but this is their first message in a new cycle.
+  RETURNING = 'RETURNING',
+}
 
 type UserInfoCore = {
   userId: string;
