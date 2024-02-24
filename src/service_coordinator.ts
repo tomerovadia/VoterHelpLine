@@ -180,33 +180,19 @@ export default class ServiceCoordinator {
     // TODO: Return a status of some kind, instead of void.
     entryPoint: EntryPoint
   ): Promise<void> {
-    logger.info('Entering SERVER.handleIncomingTwilioMessage');
+    logger.info('Entering ServiceCoordinator.handleIncomingTwilioMessage');
 
     const reqBody = req.body as TwilioRequestBody;
     const userPhoneNumber = reqBody.From;
 
-    if (config.useRefactoredPath) {
-      // TODO: Have the logic within this block encapsulated within a method of constituentManagementService,
-      // so that clients can modify the behavior (e.g. reply with unsubscribe confirmation).
-      // Have this be one of the major paths (with constitutent status STOP).
-      if (await this.agentManagementService.isPhoneNumberBlocked(userPhoneNumber)) {
-        logger.info(
-          `SERVER.handleIncomingTwilioMessage: Received text from blocked phone number: ${userPhoneNumber}.`
-        );
-        return;
-      }
-    } else {
-      const inboundTextsBlocked = await RedisApiUtil.getHashField(
-        redisClient,
-        'twilioBlockedUserPhoneNumbers',
-        userPhoneNumber
+    // TODO: Have the logic within this block encapsulated within a method of constituentManagementService,
+    // so that clients can modify the behavior (e.g. reply with unsubscribe confirmation).
+    // Have this be one of the major paths (with constitutent status STOP).
+    if (await this.agentManagementService.isPhoneNumberBlocked(userPhoneNumber)) {
+      logger.info(
+        `ServiceCoordinator.handleIncomingTwilioMessage: Received text from blocked phone number: ${userPhoneNumber}.`
       );
-      if (inboundTextsBlocked === '1') {
-        logger.info(
-          `SERVER.handleIncomingTwilioMessage: Received text from blocked phone number: ${userPhoneNumber}.`
-        );
-        return;
-      }
+      return;
     }
 
     const twilioPhoneNumber = reqBody.To;
@@ -223,92 +209,79 @@ export default class ServiceCoordinator {
     this.constituentManagementService.setTwilioPhoneNumber(twilioPhoneNumber);
     this.constituentManagementService.setEntryPoint(entryPoint);
     this.constituentManagementService.setTwilioCallbackURL(twilioCallbackURL);
-    logger.info(`SERVER.handleIncomingTwilioMessage: Receiving Twilio message from ${entryPoint} entry point voter,
+    logger.info(`ServiceCoordinator.handleIncomingTwilioMessage: Receiving Twilio message from ${entryPoint} entry point voter,
                           userPhoneNumber: ${userPhoneNumber},
                           twilioPhoneNumber: ${twilioPhoneNumber},
                           userMessage: ${userMessage},
                           userId: ${userId}`);
 
-    let inboundDbMessageEntry;
-    if (config.useRefactoredPath) {
-      inboundDbMessageEntry = this.dbService.populateInitialIncomingConstituentMessageDbEntry({
-        userMessage,
-        userPhoneNumber,
-        twilioPhoneNumber,
-        twilioMessageSid: reqBody.SmsMessageSid,
-        twilioAttachments: userAttachments,
-        entryPoint: LoadBalancer.PUSH_ENTRY_POINT,
-      });
-      this.constituentManagementService.setInboundDbMessageEntry(inboundDbMessageEntry);
-    } else {
-      inboundDbMessageEntry =
-        DbApiUtil.populateIncomingDbMessageTwilioEntry({
-          userMessage,
-          userPhoneNumber,
-          twilioPhoneNumber,
-          twilioMessageSid: reqBody.SmsMessageSid,
-          twilioAttachments: userAttachments,
-          entryPoint: LoadBalancer.PUSH_ENTRY_POINT,
-        });
-    }
+    const inboundDbMessageEntry = this.dbService.populateInitialIncomingConstituentMessageDbEntry({
+      userMessage,
+      userPhoneNumber,
+      twilioPhoneNumber,
+      twilioMessageSid: reqBody.SmsMessageSid,
+      twilioAttachments: userAttachments,
+      entryPoint: LoadBalancer.PUSH_ENTRY_POINT,
+    });
+    this.constituentManagementService.setInboundDbMessageEntry(inboundDbMessageEntry);
 
-    let userInfo: UserInfo | null = null;
-    const redisHashKey = `${userId}:${twilioPhoneNumber}`;
     let returningVoter = false;
-    if (config.useRefactoredPath) {
-      userInfo = await this.constituentManagementService.fetchAndLoadConstituentInfo(twilioPhoneNumber);
-      await this.constituentManagementService.fetchAndLoadOptOutStatus();
-      this.constituentManagementService.determineConstituentStatus();
-      // userInfo should always be true here.
-      if (config.enableMultiCycleFeature && userInfo && this.constituentManagementService.getConstituentStatus() == ConstituentStatus.RETURNING) {
-        await this.agentManagementService.endVoterSession(redisClient, userInfo, twilioPhoneNumber);
-      }
-    } else {
-      logger.info(
-        `SERVER.handleIncomingTwilioMessage (${userId}): Retrieving userInfo using redisHashKey: ${redisHashKey}`
-      );
-  
-      userInfo = (await RedisApiUtil.getHash(
-        redisClient,
-        redisHashKey
-      )) as UserInfo | null;
-      logger.info(
-        `SERVER.handleIncomingTwilioMessage (${userId}): Successfully received Redis response for userInfo retrieval with redisHashKey ${redisHashKey}, userInfo: ${JSON.stringify(
-          userInfo
-        )}`
-      );
-
-      // New session?
-      let returningVoter = false;
-      if (userInfo && Router.isStaleSession(userInfo)) {
-        logger.info(
-          `SERVER.handleIncomingTwilioMessage (${userId}): no sessionStartEpoch, starting with fresh userInfo`
-        );
-        await Router.endVoterSession(redisClient, userInfo, twilioPhoneNumber);
-        userInfo = null;
-        returningVoter = true;
-      }
+    let userInfo = await this.constituentManagementService.fetchAndLoadConstituentInfo(twilioPhoneNumber);
+    await this.constituentManagementService.fetchAndLoadOptOutStatus();
+    this.constituentManagementService.determineConstituentStatus();
+    // userInfo should always be true here.
+    if (config.enableMultiCycleFeature && userInfo && this.constituentManagementService.getConstituentStatus() == ConstituentStatus.RETURNING) {
+      await this.agentManagementService.endVoterSession(redisClient, userInfo, twilioPhoneNumber);
     }
 
+    logger.info("ServiceCoordinator.handleIncomingTwilioMessage ConstituentStatus: ", this.constituentManagementService.getConstituentStatus());
+    const constituentIsAllowedToContinue = await this.constituentManagementService.handleOptOutLogic(twilioPhoneNumber, inboundDbMessageEntry);
+    if (!constituentIsAllowedToContinue) return;
 
+    switch (this.constituentManagementService.getConstituentStatus()) {
+      /********************
+        NEW
+      ********************/
+      case ConstituentStatus.NEW:
+        let userOptions = {
+          userPhoneNumber,
+          userMessage,
+          userAttachments,
+          userId,
+        };
+        userInfo = Router.prepareUserInfoForNewVoter({
+          userOptions,
+          twilioPhoneNumber,
+          entryPoint,
+          returningVoter,
+        });
 
-
-
-
-
-
-
-
-
-
-
-    if (config.useRefactoredPath) {
-      logger.info("ConstituentStatus: ", this.constituentManagementService.getConstituentStatus());
-      const constituentIsAllowedToContinue = await this.constituentManagementService.handleOptOutLogic(twilioPhoneNumber, inboundDbMessageEntry);
-      if (!constituentIsAllowedToContinue) return;
-
-      switch (this.constituentManagementService.getConstituentStatus()) {
-        case ConstituentStatus.NEW:
+        await Router.welcomePotentialVoter(
+          userInfo,
+          userOptions,
+          redisClient,
+          twilioPhoneNumber,
+          inboundDbMessageEntry,
+          entryPoint,
+          twilioCallbackURL
+        );
+        break;
+      /********************
+        PRE_ENTERING_AUTOMATED
+      ********************/
+      case ConstituentStatus.PRE_ENTERING_AUTOMATED:
+        await Router.clarifyHelplineRequest(
+          { userInfo: userInfo!, userPhoneNumber, userAttachments, userMessage },
+          redisClient,
+          twilioPhoneNumber,
+          inboundDbMessageEntry,
+          twilioCallbackURL
+        );
+        break;
+      case ConstituentStatus.ENTERING:
+        let includeWelcome = false;
+        if (!userInfo) {
+          includeWelcome = true;
           let userOptions = {
             userPhoneNumber,
             userMessage,
@@ -321,448 +294,115 @@ export default class ServiceCoordinator {
             entryPoint,
             returningVoter,
           });
-  
-          await Router.welcomePotentialVoter(
-            userInfo,
-            userOptions,
-            redisClient,
-            twilioPhoneNumber,
-            inboundDbMessageEntry,
-            entryPoint,
-            twilioCallbackURL
-          );
-          break;
-        case ConstituentStatus.PRE_ENTERING_AUTOMATED:
-          await Router.clarifyHelplineRequest(
-            { userInfo: userInfo!, userPhoneNumber, userAttachments, userMessage },
-            redisClient,
-            twilioPhoneNumber,
-            inboundDbMessageEntry,
-            twilioCallbackURL
-          );
-          break;
-        case ConstituentStatus.ENTERING:
-          let includeWelcome = false;
-          if (!userInfo) {
-            includeWelcome = true;
-            let userOptions = {
-              userPhoneNumber,
-              userMessage,
-              userAttachments,
-              userId,
-            };
-            userInfo = Router.prepareUserInfoForNewVoter({
-              userOptions,
-              twilioPhoneNumber,
-              entryPoint,
-              returningVoter,
-            });
-          }
+        }
 
-          await Router.handleNewVoter(
+        await Router.handleNewVoter(
+          userInfo!,
+          { userPhoneNumber, userMessage, userAttachments, userId },
+          redisClient,
+          twilioPhoneNumber,
+          inboundDbMessageEntry,
+          entryPoint,
+          twilioCallbackURL,
+          // If this is a first-time texter we've never seen before, we should welcome them
+          // as part of the automated response text.
+          includeWelcome
+        );
+
+        break;
+      /********************
+        HAS_ENTERED_AUTOMATED
+      ********************/
+      case ConstituentStatus.HAS_ENTERED_AUTOMATED:
+        const isVotedKeyword = KeywordParser.isVotedKeyword(userMessage);
+        if (isVotedKeyword) {
+          await Router.recordVotedStatus(userInfo!, twilioPhoneNumber);
+        }
+        if (isVotedKeyword) {
+          await Router.replyToVoted(
             userInfo!,
-            { userPhoneNumber, userMessage, userAttachments, userId },
-            redisClient,
             twilioPhoneNumber,
-            inboundDbMessageEntry,
-            entryPoint,
             twilioCallbackURL,
-            // If this is a first-time texter we've never seen before, we should welcome them
-            // as part of the automated response text.
-            includeWelcome
+            userMessage,
+            inboundDbMessageEntry
           );
-
-          break;
-        case ConstituentStatus.HAS_ENTERED_AUTOMATED:
-          const isVotedKeyword = KeywordParser.isVotedKeyword(userMessage);
-          if (isVotedKeyword) {
-            await Router.recordVotedStatus(userInfo!, twilioPhoneNumber);
-          }
-          if (isVotedKeyword) {
-            await Router.replyToVoted(
-              userInfo!,
-              twilioPhoneNumber,
-              twilioCallbackURL,
-              userMessage,
-              inboundDbMessageEntry
-            );
-          } else {
-            logger.info(
-              `SERVER.handleIncomingTwilioMessage (${userId}): U.S. state for voter is not known. Automated system will attempt to determine.`
-            );
-            await Router.determineVoterState(
-              { userInfo: userInfo!, userPhoneNumber, userMessage, userAttachments },
-              redisClient,
-              twilioPhoneNumber,
-              inboundDbMessageEntry,
-              twilioCallbackURL
-            );
-          }
-          break;
-        case ConstituentStatus.HAS_ENTERED_CONVERSATION:
-          if (KeywordParser.isVotedKeyword(userMessage)
-          ) {
-            await Router.recordVotedStatus(userInfo!, twilioPhoneNumber);
-          }
+        } else {
           logger.info(
-            `SERVER.handleIncomingTwilioMessage (${userId}): Known U.S. state for voter (${userInfo!.stateName}) or volunteer has engaged (${userInfo!.volunteerEngaged}). Automated system no longer active.`
+            `ServiceCoordinator.handleIncomingTwilioMessage (${userId}): U.S. state for voter is not known. Automated system will attempt to determine.`
           );
-          await Router.handleClearedVoter(
+          await Router.determineVoterState(
             { userInfo: userInfo!, userPhoneNumber, userMessage, userAttachments },
             redisClient,
             twilioPhoneNumber,
             inboundDbMessageEntry,
             twilioCallbackURL
           );
-          break;
-        case ConstituentStatus.RETURNING:
-          if (KeywordParser.isVotedKeyword(userMessage)
-          ) {
-            await Router.recordVotedStatus(userInfo!, twilioPhoneNumber);
-          }
-          // Treat this as a new session
-          await Router.endVoterSession(
-            redisClient,
-            userInfo!,
-            twilioPhoneNumber
-          );
-          // TODO: Reconcile this with the userOptions defined above in a separate switch branch.
-          userOptions = {
-            userPhoneNumber,
-            userMessage,
-            userAttachments,
-            userId,
-          };
-          userInfo = Router.prepareUserInfoForNewVoter({
-            userOptions,
-            twilioPhoneNumber,
-            entryPoint,
-            returningVoter,
-          });
-  
-          await Router.handleNewVoter(
-            userInfo,
-            userOptions,
-            redisClient,
-            twilioPhoneNumber,
-            inboundDbMessageEntry,
-            entryPoint,
-            twilioCallbackURL,
-            true /* includeWelcome */
-          );
-          break;
-        case ConstituentStatus.UNKNOWN:
-          // TODO: Throw some kind of error here.
-          return;
-      }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    } else {
-      // Rejoin?
-      if (KeywordParser.isJoinKeyword(userMessage)) {
-        const outboundTextsBlocked = await RedisApiUtil.getHashField(
-          redisClient,
-          'slackBlockedUserPhoneNumbers',
-          userPhoneNumber
-        );
-        if (outboundTextsBlocked) {
-          logger.info(
-            `SERVER.handleIncomingTwilioMessage: Received JOIN from refused phone number: ${userPhoneNumber}, unblocking.`
-          );
-          // Start allowing texts to this voter
-          await RedisApiUtil.deleteHashField(
-            redisClient,
-            'slackBlockedUserPhoneNumbers',
-            userPhoneNumber
-          );
-          const MD5 = new Hashes.MD5();
-          // TODO: Get rid fo this db write. Rejoin is not a voter status.
-          await DbApiUtil.logRejoinStatusToDb(
-            MD5.hex(userPhoneNumber),
-            userPhoneNumber,
-            twilioPhoneNumber,
-            LoadBalancer.phoneNumbersAreDemo(twilioPhoneNumber, userPhoneNumber)
-          );
-          if (userInfo) {
-            // Treat this as a new session
-            await Router.endVoterSession(
-              redisClient,
-              userInfo,
-              twilioPhoneNumber
-            );
-            userInfo = null;
-            returningVoter = true;
-          }
         }
-      } else if (
-        (process.env.CLIENT_ORGANIZATION === 'VOTE_AMERICA' ||
-          process.env.CLIENT_ORGANIZATION === 'GADEMS') &&
-        KeywordParser.isHelplineKeyword(userMessage)
-      ) {
-        this.constituentManagementService.handleHelplineFromOptedOutConstituent();
-      }
-
-      // Seen this voter before
-      if (userInfo != null) {
-        logger.info(
-          `SERVER.handleIncomingTwilioMessage (${userId}): Voter is known to us (Redis returned userInfo for redisHashKey ${redisHashKey})`
-        );
-
-        const outboundTextsBlocked = await this.constituentManagementService.handleKnownVoterBlockLogic(
-          userInfo,
-          userMessage,
-          userPhoneNumber,
-          twilioPhoneNumber,
-          inboundDbMessageEntry
-        );
-        if (outboundTextsBlocked) return;
-
-        // Voter is known but has no Slack thread.
-        // Context: Certain organizations require an extra step before a Slack
-        // thread is created for a voter. In these cases we still record whether
-        // we've seen voters, but we may not have an active channel for them.
-        if (!('activeChannelId' in userInfo)) {
-          logger.info(
-            `SERVER.handleIncomingTwilioMessage (${userId}): Voter is known but doesn't have a Slack thread yet.`
-          );
-          if (
-            process.env.CLIENT_ORGANIZATION === 'VOTE_AMERICA' ||
-            process.env.CLIENT_ORGANIZATION === 'GADEMS'
-          ) {
-            const userMessageNoPunctuation = userMessage
-              .toLowerCase()
-              .replace(/[^a-zA-Z]/g, '');
-            if (
-              userMessageNoPunctuation.startsWith('helpline') ||
-              (process.env.CLIENT_ORGANIZATION === 'VOTE_AMERICA' &&
-                Router.parseStateKeyword(redisClient, userInfo, userMessage))
-            ) {
-              await Router.handleNewVoter(
-                userInfo,
-                { userPhoneNumber, userMessage, userAttachments, userId },
-                redisClient,
-                twilioPhoneNumber,
-                inboundDbMessageEntry,
-                entryPoint,
-                twilioCallbackURL,
-                false /* includeWelcome */
-              );
-              return;
-            } else {
-              await Router.clarifyHelplineRequest(
-                { userInfo, userPhoneNumber, userAttachments, userMessage },
-                redisClient,
-                twilioPhoneNumber,
-                inboundDbMessageEntry,
-                twilioCallbackURL
-              );
-              return;
-            }
-          } else {
-            // For other organizations, all known and unblocked voters should have a Slack thread.
-            throw new Error(
-              `Redis has a userInfo that unexpectedly doesn't have an activeChannelId (userId: ${userId}, twilioPhoneNumber: ${twilioPhoneNumber})`
-            );
-          }
-        }
-
-        // PUSH
-        if (entryPoint === LoadBalancer.PUSH_ENTRY_POINT) {
-          logger.info(
-            `SERVER.handleIncomingTwilioMessage (${userId}): Skipping automated system since entrypoint is ${LoadBalancer.PUSH_ENTRY_POINT}.`
-          );
-          // Don't do dislcaimer or U.S. state checks for push voters.
-          await Router.handleClearedVoter(
-            { userInfo, userAttachments, userPhoneNumber, userMessage },
-            redisClient,
-            twilioPhoneNumber,
-            inboundDbMessageEntry,
-            twilioCallbackURL
-          );
-          // PULL
-        } else if (
-          userInfo.confirmedDisclaimer ||
-          process.env.CLIENT_ORGANIZATION === 'VOTE_AMERICA' ||
-          process.env.CLIENT_ORGANIZATION === 'GADEMS'
+        break;
+      /********************
+        HAS_ENTERED_CONVERSATION
+      ********************/
+      case ConstituentStatus.HAS_ENTERED_CONVERSATION:
+        if (KeywordParser.isVotedKeyword(userMessage)
         ) {
-          logger.info(
-            `SERVER.handleIncomingTwilioMessage (${userId}): Activating automated system since entrypoint is ${LoadBalancer.PULL_ENTRY_POINT}.`
-          );
-          logger.info(
-            `SERVER.handleIncomingTwilioMessage (${userId}): Voter has previously confirmed the disclaimer, or one is not required for this organization.`
-          );
-
-          // Always update the status if user texts VOTED, regardless of what mode
-          // we are in below.
-          if (
-            process.env.CLIENT_ORGANIZATION === 'VOTE_AMERICA' &&
-            KeywordParser.isVotedKeyword(userMessage)
-          ) {
-            await Router.recordVotedStatus(userInfo, twilioPhoneNumber);
-          }
-
-          // Voter has a state determined. The U.S. state name is used for
-          // operator messages as well as to know whether a U.S. state is known
-          // for the voter. This may not be ideal (create separate bool?).
-          // Turn off automated replies if:
-          // 1. a volunteer has intervened, or
-          // 2. we've asked for their U.S. state too many times.
-          if (
-            userInfo.stateName ||
-            userInfo.volunteerEngaged ||
-            userInfo.numStateSelectionAttempts >=
-            Router.NUM_STATE_SELECTION_ATTEMPTS_LIMIT
-          ) {
-            logger.info(
-              `SERVER.handleIncomingTwilioMessage (${userId}): Known U.S. state for voter (${userInfo.stateName}) or volunteer has engaged (${userInfo.volunteerEngaged}). Automated system no longer active.`
-            );
-            await Router.handleClearedVoter(
-              { userInfo, userPhoneNumber, userMessage, userAttachments },
-              redisClient,
-              twilioPhoneNumber,
-              inboundDbMessageEntry,
-              twilioCallbackURL
-            );
-            // Voter texted VOTED during the state determination
-          } else if (
-            process.env.CLIENT_ORGANIZATION === 'VOTE_AMERICA' &&
-            KeywordParser.isVotedKeyword(userMessage)
-          ) {
-            await Router.replyToVoted(
-              userInfo,
-              twilioPhoneNumber,
-              twilioCallbackURL,
-              userMessage,
-              inboundDbMessageEntry
-            );
-            // Voter has no state determined
-          } else {
-            logger.info(
-              `SERVER.handleIncomingTwilioMessage (${userId}): U.S. state for voter is not known. Automated system will attempt to determine.`
-            );
-            await Router.determineVoterState(
-              { userInfo, userPhoneNumber, userMessage, userAttachments },
-              redisClient,
-              twilioPhoneNumber,
-              inboundDbMessageEntry,
-              twilioCallbackURL
-            );
-          }
-        } else {
-          logger.info(
-            `SERVER.handleIncomingTwilioMessage (${userId}): Activating automated system since entrypoint is ${LoadBalancer.PULL_ENTRY_POINT}`
-          );
-          logger.info(
-            `SERVER.handleIncomingTwilioMessage (${userId}): Voter has NOT previously confirmed the disclaimer. Automated system will attempt to confirm.`
-          );
-          await Router.handleDisclaimer(
-            { userInfo, userPhoneNumber, userMessage, userAttachments },
-            redisClient,
-            twilioPhoneNumber,
-            inboundDbMessageEntry,
-            twilioCallbackURL
-          );
+          await Router.recordVotedStatus(userInfo!, twilioPhoneNumber);
         }
-        // This is the first time we're seeing this voter.
-      } else {
         logger.info(
-          `SERVER.handleIncomingTwilioMessage (${userId}): Voter is new to us (Redis returned no userInfo for redisHashKey ${redisHashKey})`
+          `ServiceCoordinator.handleIncomingTwilioMessage (${userId}): Known U.S. state for voter (${userInfo!.stateName}) or volunteer has engaged (${userInfo!.volunteerEngaged}). Automated system no longer active.`
         );
-
-        if (KeywordParser.isStopKeyword(userMessage)) {
-          logger.info(
-            `SERVER.handleIncomingTwilioMessage: Received STOP text from phone number: ${userPhoneNumber}.`
-          );
-          // Block volunteers or automated system from sending messages to this number in the future,
-          // even though there is no thread from which volunteers could do so.
-          await RedisApiUtil.setHash(
-            redisClient,
-            'slackBlockedUserPhoneNumbers',
-            {
-              [userPhoneNumber]: '1',
-            }
-          );
-          // If the voter's first messsage to us is STOP, ignore any and all subsequent messages.
-          await RedisApiUtil.setHash(
-            redisClient,
-            'twilioBlockedUserPhoneNumbers',
-            {
-              [userPhoneNumber]: '1',
-            }
-          );
-          // Return so that there is no logging in PG, no Slack thread is created, and
-          // no automated response is sent to the voter.
-          return;
+        await Router.handleClearedVoter(
+          { userInfo: userInfo!, userPhoneNumber, userMessage, userAttachments },
+          redisClient,
+          twilioPhoneNumber,
+          inboundDbMessageEntry,
+          twilioCallbackURL
+        );
+        break;
+      /********************
+        RETURNING
+      ********************/
+      case ConstituentStatus.RETURNING:
+        if (KeywordParser.isVotedKeyword(userMessage)
+        ) {
+          await Router.recordVotedStatus(userInfo!, twilioPhoneNumber);
         }
-
-        const userOptions = {
+        // Treat this as a new session
+        await Router.endVoterSession(
+          redisClient,
+          userInfo!,
+          twilioPhoneNumber
+        );
+        // TODO: Reconcile this with the userOptions defined above in a separate switch branch.
+        userOptions = {
           userPhoneNumber,
           userMessage,
           userAttachments,
           userId,
         };
-        const userInfo = Router.prepareUserInfoForNewVoter({
+        userInfo = Router.prepareUserInfoForNewVoter({
           userOptions,
           twilioPhoneNumber,
           entryPoint,
           returningVoter,
         });
 
-        if (
-          process.env.CLIENT_ORGANIZATION === 'VOTE_AMERICA' ||
-          process.env.CLIENT_ORGANIZATION === 'GADEMS'
-        ) {
-          if (
-            KeywordParser.isHelplineKeyword(userMessage) ||
-            (process.env.CLIENT_ORGANIZATION === 'VOTE_AMERICA' &&
-              Router.parseStateKeyword(redisClient, userInfo, userMessage))
-          ) {
-            await Router.handleNewVoter(
-              userInfo,
-              userOptions,
-              redisClient,
-              twilioPhoneNumber,
-              inboundDbMessageEntry,
-              entryPoint,
-              twilioCallbackURL,
-              true /* includeWelcome */
-            );
-          } else {
-            await Router.welcomePotentialVoter(
-              userInfo,
-              userOptions,
-              redisClient,
-              twilioPhoneNumber,
-              inboundDbMessageEntry,
-              entryPoint,
-              twilioCallbackURL
-            );
-          }
-        } else {
-          await Router.handleNewVoter(
-            userInfo,
-            userOptions,
-            redisClient,
-            twilioPhoneNumber,
-            inboundDbMessageEntry,
-            entryPoint,
-            twilioCallbackURL
-          );
-        }
-      }
+        await Router.handleNewVoter(
+          userInfo,
+          userOptions,
+          redisClient,
+          twilioPhoneNumber,
+          inboundDbMessageEntry,
+          entryPoint,
+          twilioCallbackURL,
+          true /* includeWelcome */
+        );
+        break;
+      /********************
+        UNKNOWN
+      ********************/
+      case ConstituentStatus.UNKNOWN:
+        // TODO: Throw some kind of error here.
+        return;
     }
   }
 

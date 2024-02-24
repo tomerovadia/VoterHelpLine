@@ -85,7 +85,7 @@ export default class ConstituentManagementService {
     const redisHashKey = `${this.constituent.id}:${twilioPhoneNumber}`;
 
     logger.info(
-      `SERVER.handleIncomingTwilioMessage (${this.constituent.id}): Retrieving userInfo using redisHashKey: ${redisHashKey}`
+      `ConstituentManagementService.fetchAndLoadConstituentInfo (${this.constituent.id}): Retrieving userInfo using redisHashKey: ${redisHashKey}`
     );
 
     // If not using Redis, replace this with a different database call.
@@ -159,7 +159,7 @@ export default class ConstituentManagementService {
         // provide this (somewhat kludgey) fallback so that they still get the message just
         // in case they don't.
         logger.info(
-          `SERVER.handleIncomingTwilioMessage: Received HELPLINE on refused phone number ${this.constituent.phoneNumber}; creating missing UserInfo`
+          `ConstituentManagementService.handleHelplineFromOptedOutConstituent: Received HELPLINE on refused phone number ${this.constituent.phoneNumber}; creating missing UserInfo`
         );
         const userOptions = {
           userPhoneNumber: this.constituent.phoneNumber,
@@ -176,7 +176,7 @@ export default class ConstituentManagementService {
         });
       }
       logger.info(
-        `SERVER.handleIncomingTwilioMessage: Received HELPLINE on refused phone number ${this.constituent.phoneNumber}; instructing them to re-JOIN`
+        `ConstituentManagementService.handleHelplineFromOptedOutConstituent: Received HELPLINE on refused phone number ${this.constituent.phoneNumber}; instructing them to re-JOIN`
       );
 
       if (!this.constituent.info || !this.constituent.message) {
@@ -222,14 +222,14 @@ export default class ConstituentManagementService {
     const constituentId = this.constituent.id;
     if (this.constituent.info) {
       logger.info(
-        `SERVER.handleIncomingTwilioMessage (${constituentId}): Successfully received Redis response with userInfo: ${JSON.stringify(
+        `ConstituentManagementService.determineConstituentStatus (${constituentId}): Successfully received Redis response with userInfo: ${JSON.stringify(
           this.constituent.info
         )}`);
         if ('activeChannelId' in this.constituent.info) {
           if (config.enableMultiCycleFeature && this.isConstituentReturningFromPreviousCycle()) {
             // TODO: Add helper function to make these logs briefer, e.g. by prepending the location.
             logger.info(
-              `SERVER.handleIncomingTwilioMessage (${constituentId}): determined that voter is returning from a previous cycle, starting with fresh userInfo`
+              `ConstituentManagementService.determineConstituentStatus (${constituentId}): determined that voter is returning from a previous cycle, starting with fresh userInfo`
             );
             this.constituent.status = ConstituentStatus.RETURNING;
           } else if (this.constituent.info && 'activeChannelId' in this.constituent.info) {
@@ -249,7 +249,7 @@ export default class ConstituentManagementService {
         }
     } else {
       logger.info(
-        `SERVER.handleIncomingTwilioMessage (${constituentId}): No existing userInfo for user after Redis retrieval with redisHashKey ${`${constituentId}:${this.twilioPhoneNumber}`}`);
+        `ConstituentManagementService.determineConstituentStatus (${constituentId}): No existing userInfo for user after Redis retrieval with redisHashKey ${`${constituentId}:${this.twilioPhoneNumber}`}`);
         if (this.constituent.message && KeywordParser.isHelplineKeyword(this.constituent.message)) {
           // TODO: We might need a special message for constituents who are messaging for the very first
           // time and their message is HELPLINE. Rather than "ok..." we should have a bit of a welcome.
@@ -278,7 +278,7 @@ export default class ConstituentManagementService {
       // Constituent is now wanting to rejoin.
       if (KeywordParser.isJoinKeyword(this.constituent.message)) {
         logger.info(
-          `SERVER.handleIncomingTwilioMessage: Received JOIN from refused phone number: ${this.constituent.phoneNumber}, unblocking.`
+          `ConstituentManagementService.handleOptOutLogic: Received JOIN from refused phone number: ${this.constituent.phoneNumber}, unblocking.`
         );
         await RedisApiUtil.deleteHashField(
           redisClient,
@@ -295,7 +295,7 @@ export default class ConstituentManagementService {
       }
     } else if (constituentMessageIsOptOut) {
       logger.info(
-        `SERVER.handleIncomingTwilioMessage: Received STOP text from phone number: ${this.constituent.phoneNumber}.`
+        `ConstituentManagementService.handleOptOutLogic: Received STOP text from phone number: ${this.constituent.phoneNumber}.`
       );
       // Check is necessary in case a previously seen voter doesn't have a Slack thread
       // and their 2nd+ message is STOP, in which case there's nothing to collapse.
@@ -313,7 +313,7 @@ export default class ConstituentManagementService {
       }
 
       logger.info(
-        `SERVER.handleIncomingTwilioMessage: Received STOP text from phone number: ${this.constituent.phoneNumber}.`
+        `ConstituentManagementService.handleOptOutLogic: Received STOP text from phone number: ${this.constituent.phoneNumber}.`
       );
       // Block volunteers or automated system from sending messages to this number in the future,
       // even though there is no thread from which volunteers could do so.
@@ -367,7 +367,7 @@ export default class ConstituentManagementService {
         await DbApiUtil.logMessageToDb(inboundDbMessageEntry);
       } catch (error) {
         logger.info(
-          `SERVER.handleIncomingTwilioMessage: failed to log incoming voter message to DB`
+          `ConstituentManagementService.handleOptOutLogic: failed to log incoming voter message to DB`
         );
         Sentry.captureException(error);
       }
@@ -384,7 +384,7 @@ export default class ConstituentManagementService {
     twilioPhoneNumber: string,
     inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry
   ): Promise<boolean> {
-    logger.debug('ENTERING SERVER');
+    logger.debug('ENTERING ConstituentManagementService.handleKnownVoterBlockLogic');
     // Outbound texts should be blocked if either:
     // 1. this current message is STOP, or
     // 2. a prior interaction set outbound texts to be blocked for this user.
@@ -396,7 +396,7 @@ export default class ConstituentManagementService {
 
     if (KeywordParser.isStopKeyword(userMessage)) {
       logger.info(
-        `SERVER.handleIncomingTwilioMessage: Received STOP text from phone number: ${userPhoneNumber}.`
+        `ConstituentManagementService.handleKnownVoterBlockLogic: Received STOP text from phone number: ${userPhoneNumber}.`
       );
       // Check is necessary in case a previously seen voter doesn't have a Slack thread
       // and their 2nd+ message is STOP, in which case there's nothing to collapse.
@@ -458,7 +458,7 @@ export default class ConstituentManagementService {
           await DbApiUtil.logMessageToDb(inboundDbMessageEntry);
         } catch (error) {
           logger.info(
-            `SERVER.handleIncomingTwilioMessage: failed to log incoming voter message to DB`
+            `ConstituentManagementService.handleKnownVoterBlockLogic: failed to log incoming voter message to DB`
           );
           Sentry.captureException(error);
         }
