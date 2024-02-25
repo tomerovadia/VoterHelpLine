@@ -2,10 +2,8 @@ import Hashes from 'jshashes';
 
 import { EntryPoint, Request, UserInfo, ConstituentStatus } from './types';
 import { TwilioRequestBody } from './twilio_util';
-import * as RedisApiUtil from './redis_api_util';
 import redisClient from './redis_client';
 import * as TwilioUtil from './twilio_util';
-import * as DbApiUtil from './db_api_util';
 import * as LoadBalancer from './load_balancer';
 import * as Router from './router';
 import * as KeywordParser from './keyword_parser';
@@ -96,7 +94,7 @@ export default class ServiceCoordinator {
     payload: SlackInteractionEventPayload,
     metadata: InteractivityHandlerMetadata
   ): Promise<void> {
-    await agentManagementServiceInstance.handleSlackInteractivity(payload, metadata);
+    await this.agentManagementService.handleSlackInteractivity(payload, metadata);
   }
 
   // Method to handle incoming slack interactivity.
@@ -174,13 +172,13 @@ export default class ServiceCoordinator {
     return response;
   }
 
-  // Method to handle incoming SMS messages from Twilio.
+  // Method to handle incoming SMS messages.
   public async handleIncomingSmsMessage(
     req: Request,
     // TODO: Return a status of some kind, instead of void.
     entryPoint: EntryPoint
   ): Promise<void> {
-    logger.info('Entering ServiceCoordinator.handleIncomingTwilioMessage');
+    logger.info('Entering ServiceCoordinator.handleIncomingSmsMessage');
 
     const reqBody = req.body as TwilioRequestBody;
     const userPhoneNumber = reqBody.From;
@@ -190,7 +188,7 @@ export default class ServiceCoordinator {
     // Have this be one of the major paths (with constitutent status STOP).
     if (await this.agentManagementService.isPhoneNumberBlocked(userPhoneNumber)) {
       logger.info(
-        `ServiceCoordinator.handleIncomingTwilioMessage: Received text from blocked phone number: ${userPhoneNumber}.`
+        `ServiceCoordinator.handleIncomingSmsMessage: Received text from blocked phone number: ${userPhoneNumber}.`
       );
       return;
     }
@@ -209,7 +207,7 @@ export default class ServiceCoordinator {
     this.constituentManagementService.setTwilioPhoneNumber(twilioPhoneNumber);
     this.constituentManagementService.setEntryPoint(entryPoint);
     this.constituentManagementService.setTwilioCallbackURL(twilioCallbackURL);
-    logger.info(`ServiceCoordinator.handleIncomingTwilioMessage: Receiving Twilio message from ${entryPoint} entry point voter,
+    logger.info(`ServiceCoordinator.handleIncomingSmsMessage: Receiving Twilio message from ${entryPoint} entry point voter,
                           userPhoneNumber: ${userPhoneNumber},
                           twilioPhoneNumber: ${twilioPhoneNumber},
                           userMessage: ${userMessage},
@@ -234,19 +232,21 @@ export default class ServiceCoordinator {
       await this.agentManagementService.endVoterSession(redisClient, userInfo, twilioPhoneNumber);
     }
 
-    logger.info("ServiceCoordinator.handleIncomingTwilioMessage ConstituentStatus: ", this.constituentManagementService.getConstituentStatus());
+    logger.info("ServiceCoordinator.handleIncomingSmsMessage ConstituentStatus: ", this.constituentManagementService.getConstituentStatus());
     const constituentIsAllowedToContinue = await this.constituentManagementService.handleOptOutLogic(twilioPhoneNumber, inboundDbMessageEntry);
     if (!constituentIsAllowedToContinue) return;
 
+    let userOptions;
     switch (this.constituentManagementService.getConstituentStatus()) {
       /********************
         NEW
       ********************/
       case ConstituentStatus.NEW:
-        let userOptions = {
+        userOptions = {
           userPhoneNumber,
           userMessage,
           userAttachments,
+          // TODO: Consider only passing userPhoneNumber since userId is redundant.
           userId,
         };
         userInfo = Router.prepareUserInfoForNewVoter({
@@ -282,7 +282,7 @@ export default class ServiceCoordinator {
         let includeWelcome = false;
         if (!userInfo) {
           includeWelcome = true;
-          let userOptions = {
+          userOptions = {
             userPhoneNumber,
             userMessage,
             userAttachments,
@@ -314,11 +314,8 @@ export default class ServiceCoordinator {
         HAS_ENTERED_AUTOMATED
       ********************/
       case ConstituentStatus.HAS_ENTERED_AUTOMATED:
-        const isVotedKeyword = KeywordParser.isVotedKeyword(userMessage);
-        if (isVotedKeyword) {
+        if (KeywordParser.isVotedKeyword(userMessage)) {
           await Router.recordVotedStatus(userInfo!, twilioPhoneNumber);
-        }
-        if (isVotedKeyword) {
           await Router.replyToVoted(
             userInfo!,
             twilioPhoneNumber,
@@ -328,7 +325,7 @@ export default class ServiceCoordinator {
           );
         } else {
           logger.info(
-            `ServiceCoordinator.handleIncomingTwilioMessage (${userId}): U.S. state for voter is not known. Automated system will attempt to determine.`
+            `ServiceCoordinator.handleIncomingSmsMessage (${userId}): U.S. state for voter is not known. Automated system will attempt to determine.`
           );
           await Router.determineVoterState(
             { userInfo: userInfo!, userPhoneNumber, userMessage, userAttachments },
@@ -348,7 +345,7 @@ export default class ServiceCoordinator {
           await Router.recordVotedStatus(userInfo!, twilioPhoneNumber);
         }
         logger.info(
-          `ServiceCoordinator.handleIncomingTwilioMessage (${userId}): Known U.S. state for voter (${userInfo!.stateName}) or volunteer has engaged (${userInfo!.volunteerEngaged}). Automated system no longer active.`
+          `ServiceCoordinator.handleIncomingSmsMessage (${userId}): Known U.S. state for voter (${userInfo!.stateName}) or volunteer has engaged (${userInfo!.volunteerEngaged}). Automated system no longer active.`
         );
         await Router.handleClearedVoter(
           { userInfo: userInfo!, userPhoneNumber, userMessage, userAttachments },
@@ -484,8 +481,8 @@ export default class ServiceCoordinator {
 
 // TODO: Update this to allow constructors to take arguments. See discussion "JS AWS Lambda + Constructor Use."
 // Used by serverless.yml.
-const agentManagementServiceInstance = new AgentManagementService();
-const constituentManagementServiceInstance = new ConstituentManagementService();
-const dbServiceInstance = new DbService();
-const serviceCoordinatorInstance = new ServiceCoordinator(constituentManagementServiceInstance, agentManagementServiceInstance, dbServiceInstance);
-module.exports.backgroundLambdaHandler = serviceCoordinatorInstance.backgroundLambdaHandler.bind(serviceCoordinatorInstance);
+// const agentManagementServiceInstance = new AgentManagementService();
+// const constituentManagementServiceInstance = new ConstituentManagementService();
+// const dbServiceInstance = new DbService();
+// const serviceCoordinatorInstance = new ServiceCoordinator(constituentManagementServiceInstance, agentManagementServiceInstance, dbServiceInstance);
+// module.exports.backgroundLambdaHandler = serviceCoordinatorInstance.backgroundLambdaHandler.bind(serviceCoordinatorInstance);
