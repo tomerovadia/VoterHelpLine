@@ -22,7 +22,6 @@ import { PromisifiedRedisClient } from './redis_client';
 export type InteractivityHandlerMetadata = { viewId?: string };
 
 export default class AgentManagementService {
-  private Agent: any; // Stores agent in memory
 
   constructor() {
     // Constructor can be used to initialize the service with predefined data

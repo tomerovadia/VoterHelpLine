@@ -5,6 +5,7 @@ import { TwilioRequestBody } from './twilio_util';
 import redisClient from './redis_client';
 import * as TwilioUtil from './twilio_util';
 import * as LoadBalancer from './load_balancer';
+// TODO: Remove ServiceCoordinator's dependency on Router.
 import * as Router from './router';
 import * as KeywordParser from './keyword_parser';
 import * as SlackApiUtil from './slack_api_util';
@@ -19,6 +20,9 @@ import * as Sentry from '@sentry/node';
 import { wrapLambdaHandlerForSentry } from './sentry_wrapper';
 import DbService from './db_service';
 import config from './config';
+import * as MessageConstants from './message_constants';
+import * as DbApiUtil from './db_api_util';
+import * as RedisApiUtil from './redis_api_util';
 
 export type InteractivityHandlerMetadata = { viewId?: string };
 
@@ -225,10 +229,17 @@ export default class ServiceCoordinator {
 
     let returningVoter = false;
     let userInfo = await this.constituentManagementService.fetchAndLoadConstituentInfo(twilioPhoneNumber);
+    if (!userInfo) {
+      userInfo = this.constituentManagementService.loadInfoForNewConstituent({
+        userPhoneNumber,
+        constituentId: userId,
+        twilioPhoneNumber,
+        entryPoint,
+      });
+    }
     await this.constituentManagementService.fetchAndLoadOptOutStatus();
     this.constituentManagementService.determineConstituentStatus();
-    // userInfo should always be true here.
-    if (config.enableMultiCycleFeature && userInfo && this.constituentManagementService.getConstituentStatus() == ConstituentStatus.RETURNING) {
+    if (config.enableMultiCycleFeature && this.constituentManagementService.getConstituentStatus() == ConstituentStatus.RETURNING) {
       await this.agentManagementService.endVoterSession(redisClient, userInfo, twilioPhoneNumber);
     }
 
@@ -241,79 +252,357 @@ export default class ServiceCoordinator {
       /********************
         NEW
       ********************/
-      case ConstituentStatus.NEW:
-        userOptions = {
-          userPhoneNumber,
-          userMessage,
-          userAttachments,
-          // TODO: Consider only passing userPhoneNumber since userId is redundant.
-          userId,
-        };
-        userInfo = Router.prepareUserInfoForNewVoter({
-          userOptions,
-          twilioPhoneNumber,
-          entryPoint,
-          returningVoter,
-        });
+      case ConstituentStatus.NEW: {
+        //T OK TO KEEP THIS MESSAGE LOGIC HERE FOR NOW
+        let messageToVoter = MessageConstants.WELCOME_VOTER();
+        if (KeywordParser.isVotedKeyword(userMessage)) {
+          messageToVoter = MessageConstants.VOTED_WELCOME_RESPONSE();
 
-        await Router.welcomePotentialVoter(
-          userInfo,
-          userOptions,
-          redisClient,
-          twilioPhoneNumber,
-          inboundDbMessageEntry,
-          entryPoint,
-          twilioCallbackURL
-        );
-        break;
-      /********************
-        PRE_ENTERING_AUTOMATED
-      ********************/
-      case ConstituentStatus.PRE_ENTERING_AUTOMATED:
-        await Router.clarifyHelplineRequest(
-          { userInfo: userInfo!, userPhoneNumber, userAttachments, userMessage },
-          redisClient,
-          twilioPhoneNumber,
-          inboundDbMessageEntry,
-          twilioCallbackURL
-        );
-        break;
-      case ConstituentStatus.ENTERING:
-        let includeWelcome = false;
-        if (!userInfo) {
-          includeWelcome = true;
-          userOptions = {
-            userPhoneNumber,
-            userMessage,
-            userAttachments,
-            userId,
-          };
-          userInfo = Router.prepareUserInfoForNewVoter({
-            userOptions,
-            twilioPhoneNumber,
-            entryPoint,
-            returningVoter,
+          //T Should this pull from userinfo or User somewhere else?
+          //T Should there be one version of userinfo stored somewhere, and if so where?
+          await DbApiUtil.logVoterStatusToDb({
+            userId: userInfo.userId,
+            userPhoneNumber: userInfo.userPhoneNumber,
+            twilioPhoneNumber: twilioPhoneNumber,
+            isDemo: userInfo.isDemo,
+            voterStatus: 'VOTED',
+            originatingSlackUserName: null,
+            originatingSlackUserId: null,
+            slackChannelName: null,
+            slackChannelId: null,
+            slackParentMessageTs: null,
+            actionTs: null,
           });
         }
 
-        await Router.handleNewVoter(
-          userInfo!,
-          { userPhoneNumber, userMessage, userAttachments, userId },
+        await this.constituentManagementService.sendMessageToConstituent({
+          message: messageToVoter,
+          automated: true
+        });
+
+        DbApiUtil.updateDbMessageEntryWithUserInfo(userInfo!, inboundDbMessageEntry);
+
+        // The message isn't being relayed, so don't fill this field in Postgres.
+        inboundDbMessageEntry.successfullySent = null;
+        try {
+          // TODO: Use dbService for this intead.
+          await DbApiUtil.logMessageToDb(inboundDbMessageEntry);
+        } catch (error) {
+          logger.info(
+            `ServiceCoordinator.handleIncomingSmsMessage: failed to log incoming voter message to DB`
+          );
+          Sentry.captureException(error);
+        }
+      
+        // Add key/value such that given a user phone number we can see
+        // that the voter has been encountered before, even if there is not
+        // yet any Slack channel/thread info for this voter.
+        logger.debug(
+          `ServiceCoordinator.handleIncomingSmsMessage: Writing new voter userInfo to Redis.`
+        );
+        await RedisApiUtil.setHash(
           redisClient,
-          twilioPhoneNumber,
-          inboundDbMessageEntry,
-          entryPoint,
-          twilioCallbackURL,
-          // If this is a first-time texter we've never seen before, we should welcome them
-          // as part of the automated response text.
-          includeWelcome
+          `${userInfo.userId}:${twilioPhoneNumber}`,
+          userInfo
+        );
+        break;
+      }
+      /********************
+        PRE_ENTERING_AUTOMATED
+      ********************/
+      case ConstituentStatus.PRE_ENTERING_AUTOMATED: {
+        let messageToVoter = MessageConstants.CLARIFY_HELPLINE_REQUEST();
+        if (KeywordParser.isVotedKeyword(userMessage)) {
+          messageToVoter = MessageConstants.VOTED_WELCOME_RESPONSE();
+          await DbApiUtil.logVoterStatusToDb({
+            userId: userInfo.userId,
+            userPhoneNumber: userInfo.userPhoneNumber,
+            twilioPhoneNumber: twilioPhoneNumber,
+            isDemo: userInfo.isDemo,
+            voterStatus: 'VOTED',
+            originatingSlackUserName: null,
+            originatingSlackUserId: null,
+            slackChannelName: null,
+            slackChannelId: null,
+            slackParentMessageTs: null,
+            actionTs: null,
+          });
+        }
+      
+        await this.constituentManagementService.sendMessageToConstituent({
+          message: messageToVoter,
+          automated: true
+        });
+      
+        // The rest of this logic is the same as the NEW case. Consider consolidating somehow.
+        DbApiUtil.updateDbMessageEntryWithUserInfo(userInfo!, inboundDbMessageEntry);
+      
+        // The message isn't being relayed, so don't fill this field in Postgres.
+        inboundDbMessageEntry.successfullySent = null;
+        try {
+          // TODO: Use dbService for this intead.
+          await DbApiUtil.logMessageToDb(inboundDbMessageEntry);
+        } catch (error) {
+          logger.info(
+            `ROUTER.clarifyHelplineRequest: failed to log incoming voter message to DB`
+          );
+          Sentry.captureException(error);
+        }
+      
+        // Update Redis Twilio-to-Slack lookup.
+        logger.debug(
+          `ROUTER.clarifyHelplineRequest: Updating voter userInfo in Redis.`
+        );
+        await RedisApiUtil.setHash(
+          redisClient,
+          `${userInfo.userId}:${twilioPhoneNumber}`,
+          userInfo
         );
 
         break;
+      }
+      /********************
+        ENTERING
+      ********************/
+      case ConstituentStatus.ENTERING: {
+        await DbApiUtil.logInitialVoterStatusToDb(
+          userInfo.userId,
+          userInfo.userPhoneNumber,
+          twilioPhoneNumber,
+          userInfo.isDemo
+        );
+      
+        let slackChannelName;
+        if ((await RedisApiUtil.getKey(redisClient, 'skipLobby')) === 'true') {
+          slackChannelName = null;
+        } else {
+          slackChannelName = userInfo.isDemo ? 'demo-lobby' : 'lobby' as string | null;
+        }
+        let stateName;
+      
+        // Can we infer the voter's state from their phone number?
+        // TODO: Handle this in the determineConstituentStatus function in ConstituentManagementService.
+        if (
+          config.enableKnownStateFromPhoneNumber
+        ) {
+          stateName = this.constituentManagementService.fetchAndLoadKnownState();
+          if (stateName) {
+            const stateChannel = await LoadBalancer.selectSlackChannel(
+              redisClient,
+              LoadBalancer.PULL_ENTRY_POINT,
+              userInfo.stateName,
+              userInfo.isDemo
+            );
+            if (stateChannel) {
+              // We can route them too
+              slackChannelName = stateChannel;
+              logger.info(
+                `ROUTER.handleNewVoter (${userInfo.userId}): New voter is in known state ${stateName}, selected Slack channel ${slackChannelName}`
+              );
+            } else {
+              // That state doesn't route for some reason; go to lobby.
+              logger.warning(
+                `ROUTER.handleNewVoter (${userInfo.userId}): New voter is in known state ${stateName}, but no channel match`
+              );
+            }
+          }
+        }
+
+        // If the voter has previously communicated that they already voted, we have them
+        // enter the helpline with "Voted" prepopulated as their status.
+        const status = await DbApiUtil.getLatestVoterStatus(
+          userInfo.userId,
+          twilioPhoneNumber
+        );
+
+        let messageToConstituent;
+        if (!this.constituentManagementService.isConstituentKnown()) {
+          // Voter initiated conversation with "HELPLINE".
+          if (userInfo.stateName) {
+            messageToConstituent = MessageConstants.WELCOME_FINDING_VOLUNTEER(
+              userInfo.stateName
+            );
+          } else {
+            messageToConstituent = MessageConstants.WELCOME_AND_STATE_QUESTION();
+          }
+        } else {
+          // Voter has already received automated welcome and is just now responding with "HELPLINE".
+          if (userInfo.stateName) {
+            messageToConstituent = MessageConstants.FINDING_VOLUNTEER_IN_STATE(
+              userInfo.stateName
+            );
+          } else {
+            messageToConstituent = MessageConstants.STATE_QUESTION();
+          }
+        }
+
+        let slackParentMessageResponse;
+        if (slackChannelName) {
+          const topLevelThreadSlackBlocks = await SlackBlockUtil.getVoterPanel(
+            userInfo,
+            twilioPhoneNumber,
+            undefined,
+            status || 'UNKNOWN'
+          );
+
+          try {
+            slackParentMessageResponse = await SlackApiUtil.sendMessage(topLevelThreadSlackBlocks[0].text.text, {
+              channel: slackChannelName,
+              blocks: topLevelThreadSlackBlocks,
+            });
+          } catch(error) {
+            await this.constituentManagementService.sendMessageToConstituent({
+              message: `There was an unexpected error sending your message. Please wait a few minutes and try again.`,
+              automated: true
+            });
+            throw new Error(
+              `Could not send introduction slack message with voter info for voter ${userInfo.userPhoneNumber} texting ${twilioPhoneNumber}. Error: ${error}`
+            );
+          }
+
+          // This should never be null because SlackApiUtil.sendMessage always either returns a successful
+          // response or throws an error, which would be caught above.
+          // TODO: We should consolidate this with the error catch above.
+          if (!slackParentMessageResponse) {
+            await this.constituentManagementService.sendMessageToConstituent({
+              message: `There was an unexpected error sending your message. Please wait a few minutes and try again.`,
+              automated: true
+            });
+            throw new Error(
+              `Could not send introduction slack message with voter info for voter ${userInfo.userPhoneNumber} texting ${twilioPhoneNumber}.`
+            );
+          }
+
+          await this.constituentManagementService.sendMessageToConstituent({
+            message: messageToConstituent,
+            automated: true
+          });
+
+          logger.debug(`ROUTER.introduceNewVoterToSlackChannel: Successfully announced new voter via new thread in ${slackChannelName},
+            response.data.channel: ${slackParentMessageResponse.data.channel},
+            response.data.ts: ${slackParentMessageResponse.data.ts}`);
+
+          await DbApiUtil.logThreadToDb({
+            slackParentMessageTs: slackParentMessageResponse.data.ts,
+            channelId: slackParentMessageResponse.data.channel,
+            userId: userInfo.userId,
+            userPhoneNumber: userInfo.userPhoneNumber,
+            twilioPhoneNumber: twilioPhoneNumber,
+            needsAttention: true,
+            isDemo: userInfo.isDemo,
+            sessionStartEpoch: userInfo.sessionStartEpoch || null,
+          });
+
+          // Remember the thread for this user and this channel,
+          // using the ID version of the channel.
+          userInfo[slackParentMessageResponse.data.channel] = slackParentMessageResponse.data.ts;
+          // Set active channel to this first channel, since the voter is new.
+          // Makes sure subsequent messages from the voter go to this channel, unless
+          // this active channel is changed.
+          userInfo.activeChannelId = slackParentMessageResponse.data.channel;
+          userInfo.activeChannelName = slackChannelName;
+          inboundDbMessageEntry.slackChannel = slackParentMessageResponse.data.channel;
+          inboundDbMessageEntry.slackParentMessageTs = slackParentMessageResponse.data.ts;
+          DbApiUtil.updateDbMessageEntryWithUserInfo(
+            userInfo!,
+            inboundDbMessageEntry
+          );
+          inboundDbMessageEntry.slackChannel = slackParentMessageResponse.data.channel;
+          inboundDbMessageEntry.slackParentMessageTs = slackParentMessageResponse.data.ts;
+          inboundDbMessageEntry.slackSendTimestamp = new Date();
+          // The message will be relayed via the message history, so this field isn't relevant.
+          inboundDbMessageEntry.successfullySent = null;
+          try {
+            await DbApiUtil.logMessageToDb(inboundDbMessageEntry);
+          } catch (error) {
+            logger.info(
+              `ROUTER.introduceNewVoterToSlackChannel: failed to log incoming voter message to DB`
+            );
+            Sentry.captureException(error);
+          }
+          await Router.postUserMessageHistoryToSlack(
+            redisClient,
+            userInfo,
+            twilioPhoneNumber,
+            {
+              destinationSlackParentMessageTs: slackParentMessageResponse.data.ts,
+              destinationSlackChannelId: slackParentMessageResponse.data.channel,
+            }
+          );
+          // Add key/value such that given a user phone number we can get the
+          // Slack channel thread associated with that user.
+          logger.debug(
+            `ROUTER.introduceNewVoterToSlackChannel: Writing updated userInfo to Redis.`
+          );
+          await RedisApiUtil.setHash(
+            redisClient,
+            `${userInfo.userId}:${twilioPhoneNumber}`,
+            userInfo
+          );
+  
+          // Add key/value such that given Slack thread data we can get a
+          // user phone number.
+          logger.debug(
+            `ROUTER.introduceNewVoterToSlackChannel: Writing updated Slack-to-Twilio redisData to Redis.`
+          );
+          await RedisApiUtil.setHash(
+            redisClient,
+            `${slackParentMessageResponse.data.channel}:${slackParentMessageResponse.data.ts}`,
+            { userPhoneNumber: userInfo.userPhoneNumber, twilioPhoneNumber }
+          );
+          // Add key/value such that given Slack thread data we can get a
+          // user phone number.
+          logger.debug(
+            `ROUTER.introduceNewVoterToSlackChannel: Writing updated Slack-to-Twilio redisData to Redis.`
+          );
+          await RedisApiUtil.setHash(
+            redisClient,
+            `${slackParentMessageResponse.data.channel}:${slackParentMessageResponse.data.ts}`,
+            { userPhoneNumber: userInfo.userPhoneNumber, twilioPhoneNumber }
+          );
+        } else {
+          await this.constituentManagementService.sendMessageToConstituent({
+            message: messageToConstituent,
+            automated: true
+          });
+          userInfo["NONEXISTENT_LOBBY"] = "NONEXISTENT_LOBBY_TS";
+          // Set active channel to this first channel, since the voter is new.
+          // Makes sure subsequent messages from the voter go to this channel, unless
+          // this active channel is changed.
+          userInfo.activeChannelId = "NONEXISTENT_LOBBY";
+          userInfo.activeChannelName = "lobby";
+          inboundDbMessageEntry.slackChannel = "NONEXISTENT_LOBBY"
+          inboundDbMessageEntry.slackParentMessageTs = "NONEXISTENT_LOBBY_TS";
+          inboundDbMessageEntry.slackSendTimestamp = new Date();
+          // The message will be relayed via the message history, so this field isn't relevant.
+          inboundDbMessageEntry.successfullySent = null;
+          try {
+            await DbApiUtil.logMessageToDb(inboundDbMessageEntry);
+          } catch (error) {
+            logger.info(
+              `ROUTER.introduceNewVoterToSlackChannel: failed to log incoming voter message to DB`
+            );
+            Sentry.captureException(error);
+          }
+        }
+
+        // Add key/value such that given a user phone number we can get the
+        // Slack channel thread associated with that user.
+        logger.debug(
+          `ROUTER.introduceNewVoterToSlackChannel: Writing updated userInfo to Redis.`
+        );
+        await RedisApiUtil.setHash(
+          redisClient,
+          `${userInfo.userId}:${twilioPhoneNumber}`,
+          userInfo
+        );
+
+        break;
+      }
       /********************
         HAS_ENTERED_AUTOMATED
       ********************/
-      case ConstituentStatus.HAS_ENTERED_AUTOMATED:
+      case ConstituentStatus.HAS_ENTERED_AUTOMATED: {
         if (KeywordParser.isVotedKeyword(userMessage)) {
           await Router.recordVotedStatus(userInfo!, twilioPhoneNumber);
           await Router.replyToVoted(
@@ -336,10 +625,11 @@ export default class ServiceCoordinator {
           );
         }
         break;
+      }
       /********************
         HAS_ENTERED_CONVERSATION
       ********************/
-      case ConstituentStatus.HAS_ENTERED_CONVERSATION:
+      case ConstituentStatus.HAS_ENTERED_CONVERSATION: {
         if (KeywordParser.isVotedKeyword(userMessage)
         ) {
           await Router.recordVotedStatus(userInfo!, twilioPhoneNumber);
@@ -355,10 +645,11 @@ export default class ServiceCoordinator {
           twilioCallbackURL
         );
         break;
+      }
       /********************
         RETURNING
       ********************/
-      case ConstituentStatus.RETURNING:
+      case ConstituentStatus.RETURNING: {
         if (KeywordParser.isVotedKeyword(userMessage)
         ) {
           await Router.recordVotedStatus(userInfo!, twilioPhoneNumber);
@@ -394,12 +685,14 @@ export default class ServiceCoordinator {
           true /* includeWelcome */
         );
         break;
+      }
       /********************
         UNKNOWN
       ********************/
-      case ConstituentStatus.UNKNOWN:
+      case ConstituentStatus.UNKNOWN: {
         // TODO: Throw some kind of error here.
         return;
+      }
     }
   }
 

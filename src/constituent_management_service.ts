@@ -12,7 +12,10 @@ import Constituent from './constituent';
 import config from './config';
 import * as MessageConstants from './message_constants';
 import * as Router from './router';
+import * as TwilioApiUtil2 from './twilio_api_util_refactored';
 import * as TwilioApiUtil from './twilio_api_util';
+import * as LoadBalancer from './load_balancer';
+import * as StateParser from './state_parser';
 
 export default class ConstituentManagementService {
   private constituent: Constituent;
@@ -30,6 +33,7 @@ export default class ConstituentManagementService {
       phoneNumber: '',
       onOptOutList: false,
       message: undefined,
+      known: undefined,
     };
     this.userAttachments = [];
     this.twilioPhoneNumber = '';
@@ -75,6 +79,48 @@ export default class ConstituentManagementService {
     return this.constituent.status;
   }
 
+  public getConstituentStateName(): string | null {
+    return this.constituent.info ? this.constituent.info.stateName : null;
+  }
+
+  public isConstituentKnown(): boolean {
+    return this.constituent.known ? this.constituent.known : false;
+  }
+
+  public async fetchAndLoadKnownState(): Promise<string | null> {
+    const knownState = await DbApiUtil.getKnownPhoneState(
+      this.constituent.phoneNumber
+    );
+    if (knownState) {
+      // The knownState value from the db is probably a state abbreviation, so we need to resolve it
+      const stateName = StateParser.determineState(knownState);
+      if (stateName && this.constituent.info) {
+        // Success: we know the state
+        this.constituent.info.stateName = stateName;
+        this.constituent.info.panelmessage = 'known phone number';
+
+        // TODO: Move this logic to another function that is responsible for
+        // selecting a Slack channel under any conditions.
+        let slackChannelName = await LoadBalancer.selectSlackChannel(
+          redisClient,
+          LoadBalancer.PULL_ENTRY_POINT,
+          this.constituent.info.stateName,
+          this.constituent.info.isDemo
+        );
+        if (slackChannelName) {
+          return slackChannelName;
+        }
+      } else {
+        logger.warning(
+          `ConstituentManagementService.fetchAndLoadKnownState (${this.constituent.id}): unable to parse known state '${knownState}`
+        );
+        return null;
+      }
+    }
+
+    return null;
+  }
+
   public getOnOptOutList(): boolean {
     return this.constituent.onOptOutList;
   }
@@ -94,7 +140,62 @@ export default class ConstituentManagementService {
       redisHashKey
     )) as UserInfo | null;
 
+    logger.info(
+      `ConstituentManagementService.determineConstituentStatus (${this.constituent.id}): Successfully received Redis response with userInfo: ${JSON.stringify(
+        this.constituent.info
+      )}`);
+
+    this.constituent.known = this.constituent.info ? true : false;
+
     return this.constituent.info;
+  }
+
+  public loadInfoForNewConstituent({
+    userPhoneNumber,
+    constituentId,
+    twilioPhoneNumber,
+    entryPoint,
+  }: {
+    userPhoneNumber: string;
+    constituentId: string;
+    twilioPhoneNumber: string;
+    entryPoint: EntryPoint;
+  }): UserInfo {
+    let isDemo, confirmedDisclaimer, volunteerEngaged;
+    if (entryPoint === LoadBalancer.PULL_ENTRY_POINT) {
+      isDemo = LoadBalancer.phoneNumbersAreDemo(
+        twilioPhoneNumber,
+        userPhoneNumber
+      );
+      logger.debug(
+        `ConstituentManagementService.loadInfoForNewConstituent (${constituentId}): Evaluating isDemo based on userPhoneNumber/twilioPhoneNumber: ${isDemo}`
+      );
+      confirmedDisclaimer = false;
+      volunteerEngaged = false;
+    }
+
+    const userInfo = {
+      userId: constituentId,
+      twilioPhoneNumber: twilioPhoneNumber,
+      // Necessary for admin controls, so userPhoneNumber can be found even though
+      // admins specify only userId.
+      userPhoneNumber: userPhoneNumber,
+      isDemo,
+      confirmedDisclaimer,
+      volunteerEngaged,
+      lastVoterMessageSecsFromEpoch: Math.round(Date.now() / 1000),
+      // Not necessary except for DB logging purposes. The twilioPhoneNumber reveals
+      // the entry point. But to log for automated messages and Slack-to-Twilio
+      // messages, this is necessary.
+      entryPoint,
+      numStateSelectionAttempts: 0,
+      // Start time for this session, with a bit of slop to capture the first message
+      sessionStartEpoch: Math.round(Date.now() / 1000) - 10,
+    } as UserInfo;
+
+    this.constituent.info = userInfo;
+
+    return userInfo;
   }
 
   public async fetchAndLoadOptOutStatus(): Promise<void> {
@@ -104,6 +205,84 @@ export default class ConstituentManagementService {
       'slackBlockedUserPhoneNumbers',
       this.constituent.phoneNumber,
     );
+  }
+
+  public async sendMessageToConstituent({
+    message,
+    media,
+    deduplicationId,
+    automated
+  }: {
+    message: string;
+    media?: string[];
+    deduplicationId?: string;
+    automated: boolean
+  }
+  ): Promise<void> {
+    logger.info(`ENTERING ConstituentManagementService.sendMessageToConstituent`);
+    // TODO: Might need to initialize an object here for starters.
+    let databaseMessageEntry;
+    if (automated) {
+      databaseMessageEntry = DbApiUtil.populateAutomatedDbMessageEntry(this.constituent.info!);
+    } else {
+      // TODO: Change this once I come upon the human message send path.
+      databaseMessageEntry = DbApiUtil.populateAutomatedDbMessageEntry(this.constituent.info!);
+    }
+    
+    databaseMessageEntry.message = message;
+    databaseMessageEntry.fromPhoneNumber = this.twilioPhoneNumber;
+    databaseMessageEntry.toPhoneNumber = this.constituent.phoneNumber;
+    databaseMessageEntry.twilioSendTimestamp = new Date();
+
+    logger.info(
+      `TWILIOAPIUTIL.sendMessage: Including attachments ${JSON.stringify(
+        media
+      )}`
+    );
+
+    const twilioSendMessageResponse = await TwilioApiUtil2.sendMessage(message, media, {
+      deduplicationId,
+      twilioPhoneNumber: this.twilioPhoneNumber,
+      userPhoneNumber: this.constituent.phoneNumber,
+      twilioCallbackURL: this.twilioCallbackUrl,
+    });
+
+    if (twilioSendMessageResponse && twilioSendMessageResponse.success) {
+      databaseMessageEntry.successfullySent = true;
+      databaseMessageEntry.twilioMessageSid = twilioSendMessageResponse.sid;
+    } else {
+      const twilioError = twilioSendMessageResponse.error;
+      const twilioErrorMessage = !twilioError ? '' : `Status: ${
+        'status' in twilioError ? twilioError.status : ''
+      }, Message:${'message' in twilioError ? twilioError.message : ''}, Code: ${
+        'code' in twilioError ? twilioError.code : ''
+      }, More Info: ${'more_info' in twilioError ? twilioError.more_info : ''}`;
+      logger.error(
+        `TWILIOAPIUTIL.sendMessage: ERROR in sending Twilio message. Error data from Twilio: ${twilioErrorMessage}`
+      );
+
+      databaseMessageEntry.successfullySent = false;
+
+      if (twilioSendMessageResponse.errorMessage == 'helpline_deduplication_filtered') {
+        // TODO: Modify this to not use the db entry, which should only be for db purposes.
+        logger.warn(
+          'ConstituentManagementService.sendMessageToConstituent: Not sending duplicate Twilio message ' +
+            `triggered by Slack message ${databaseMessageEntry.slackMessageTs} in ` +
+            `channel ${databaseMessageEntry.slackChannel} to ${this.constituent.phoneNumber}: ${message}`
+        );
+      }
+      databaseMessageEntry.twilioError = twilioErrorMessage ? twilioErrorMessage : twilioSendMessageResponse.errorMessage;
+    }
+
+    try {
+      // TODO: Use dbService for this intead.
+      await DbApiUtil.logMessageToDb(databaseMessageEntry);
+    } catch (error) {
+      logger.error(
+        'ConstituentManagementService.sendMessageToConstituent: failed to log message send to DB'
+      );
+      Sentry.captureException(error);
+    }
   }
 
   // Method defining the logic for determining if a user is a returning constituent.
@@ -220,19 +399,16 @@ export default class ConstituentManagementService {
   // for an incoming constituent message.
   public determineConstituentStatus(): void {
     const constituentId = this.constituent.id;
-    if (this.constituent.info) {
-      logger.info(
-        `ConstituentManagementService.determineConstituentStatus (${constituentId}): Successfully received Redis response with userInfo: ${JSON.stringify(
-          this.constituent.info
-        )}`);
-        if ('activeChannelId' in this.constituent.info) {
+    if (this.constituent.known) {
+        if ('activeChannelId' in this.constituent.info!) {
           if (config.enableMultiCycleFeature && this.isConstituentReturningFromPreviousCycle()) {
             // TODO: Add helper function to make these logs briefer, e.g. by prepending the location.
             logger.info(
               `ConstituentManagementService.determineConstituentStatus (${constituentId}): determined that voter is returning from a previous cycle, starting with fresh userInfo`
             );
+            this.constituent.info.returningVoter = true;
             this.constituent.status = ConstituentStatus.RETURNING;
-          } else if (this.constituent.info && 'activeChannelId' in this.constituent.info) {
+          } else if (this.constituent.known && 'activeChannelId' in this.constituent.info) {
             if (this.constituent.info.stateName ||
               this.constituent.info.volunteerEngaged ||
               this.constituent.info.numStateSelectionAttempts >=
@@ -288,6 +464,7 @@ export default class ConstituentManagementService {
         if (this.constituent.status in [ConstituentStatus.HAS_ENTERED_AUTOMATED, ConstituentStatus.HAS_ENTERED_CONVERSATION]) {
           // TODO: Need logic here to re-open the Slack thread with the voter, if one exists.
         }
+        if (this.constituent.info) this.constituent.info.returningVoter = true;
         // We return true to allow the user to continue as normal, since they opted back in.
         return true;
       } else if (this.constituent.status == ConstituentStatus.ENTERING) {

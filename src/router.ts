@@ -205,7 +205,7 @@ export async function welcomePotentialVoter(
   );
 }
 
-async function introduceNewVoterToSlackChannel(
+export async function introduceNewVoterToSlackChannel(
   {
     userInfo,
     userMessage,
@@ -531,13 +531,13 @@ export async function handleNewVoter(
     if (slackChannelName) {
       // We can route them too
       logger.info(
-        `ROUTER.handleNewVoter (${userInfo.userId}): New voter is in known state {stateName}, selected Slack channel {slackChannelName}`
+        `ROUTER.handleNewVoter (${userInfo.userId}): New voter is in known state ${userInfo.stateName}, selected Slack channel ${slackChannelName}`
       );
     } else {
       // That state doesn't route for some reason; go to national
       slackChannelName = userInfo.isDemo ? 'demo-national' : 'national';
       logger.info(
-        `ROUTER.handleNewVoter (${userInfo.userId}): New voter is in known state {stateName}, but no channel match`
+        `ROUTER.handleNewVoter (${userInfo.userId}): New voter is in known state ${userInfo.stateName}, but no channel match`
       );
     }
   }
@@ -591,7 +591,7 @@ export async function handleNewVoter(
   );
 }
 
-async function postUserMessageHistoryToSlack(
+export async function postUserMessageHistoryToSlack(
   redisClient: PromisifiedRedisClient,
   userInfo: UserInfo,
   twilioPhoneNumber: string,

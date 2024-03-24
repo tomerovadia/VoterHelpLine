@@ -1,4 +1,4 @@
-import { UserInfo, ConstituentStatus } from './types';
+import { UserInfo, ConstituentStatus, EntryPoint } from './types';
 
 export default interface Constituent {
     info: UserInfo | null | undefined;
@@ -10,4 +10,6 @@ export default interface Constituent {
     // Whether the constituent is on the opt out list.
     onOptOutList: boolean;
     message: string | undefined;
+    // Whether this is the first time we're seeing this user.
+    known: boolean | undefined;
 }
