@@ -626,98 +626,6 @@ export default class ServiceCoordinator {
     } as UserInfo;
   }
 
-  public async handleClearedVoter(
-    userOptions: UserOptions & { userInfo: UserInfo },
-    redisClient: PromisifiedRedisClient,
-    twilioPhoneNumber: string,
-    inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry,
-    twilioCallbackURL: string
-  ): Promise<void> {
-    logger.debug('ENTERING ServiceCoordinator.handleClearedVoter');
-    const userInfo = userOptions.userInfo;
-    const userId = userInfo.userId;
-    const activeChannelMessageParams = {
-      parentMessageTs: userInfo[userInfo.activeChannelId],
-      channel: userInfo.activeChannelId,
-    };
-
-    const nowSecondsEpoch = Math.round(Date.now() / 1000);
-    // Remember the lastVoterMessageSecsFromEpoch, for use in calculation below.
-    const lastVoterMessageSecsFromEpoch = userInfo.lastVoterMessageSecsFromEpoch;
-    // Update the lastVoterMessageSecsFromEpoch, for use in DB write below.
-    userInfo.lastVoterMessageSecsFromEpoch = nowSecondsEpoch;
-
-    const blocks = SlackBlockUtil.formatMessageWithAttachmentLinks(
-      userOptions.userMessage,
-      userOptions.userAttachments
-    );
-
-    await SlackApiUtil.sendMessage(
-      '',
-      {
-        ...activeChannelMessageParams,
-        blocks,
-        isVoterMessage: true,
-      },
-      inboundDbMessageEntry,
-      userInfo
-    );
-
-    // Update thread needs attention status -> true
-    await DbApiUtil.setThreadNeedsAttentionToDb(
-      userInfo[userInfo.activeChannelId],
-      userInfo.activeChannelId,
-      true
-    );
-
-    logger.debug(
-      `ServiceCoordinator.handleClearedVoter: Seconds since last message from voter: ${nowSecondsEpoch - lastVoterMessageSecsFromEpoch
-      }`
-    );
-
-    if (
-      nowSecondsEpoch - lastVoterMessageSecsFromEpoch >
-      MINS_BEFORE_WELCOME_BACK_MESSAGE * 60
-    ) {
-      logger.debug(
-        `ServiceCoordinator.handleClearedVoter: Seconds since last message from voter > MINS_BEFORE_WELCOME_BACK_MESSAGE (${nowSecondsEpoch - lastVoterMessageSecsFromEpoch
-        } > : ${MINS_BEFORE_WELCOME_BACK_MESSAGE}), sending welcome back message.`
-      );
-      let userMessage = null as string | null;
-      if (isVotedKeyword(userOptions.userMessage)) {
-        userMessage = MessageConstants.VOTED_RESPONSE();
-      } else {
-        userMessage = MessageConstants.WELCOME_BACK();
-      }
-
-      await this.constituentManagementService.sendMessageToConstituent({
-        message: userMessage,
-        automated: true
-      });
-      await SlackApiUtil.sendMessage(userMessage, {
-        ...activeChannelMessageParams,
-        isAutomatedMessage: true,
-      });
-
-      if (process.env.CLIENT_ORGANIZATION === 'GADEMS') {
-        // GA Dems starts a new thread if an old voters comes back rather
-        // than continuing to use the existing thread. We do this by "routing"
-        // the voter back to the same channel
-        await this.routeVoterToSlackChannel(userInfo, redisClient, {
-          twilioPhoneNumber,
-          destinationSlackChannelName: userInfo.activeChannelName,
-        });
-      }
-    }
-
-    logger.debug(`ServiceCoordinator.handleClearedVoter: Writing updated userInfo to Redis.`);
-    await RedisApiUtil.setHash(
-      redisClient,
-      `${userId}:${twilioPhoneNumber}`,
-      userInfo
-    );
-  }
-
   public async replyToVoted(
     userInfo: UserInfo,
     twilioPhoneNumber: string,
@@ -1674,12 +1582,87 @@ export default class ServiceCoordinator {
     logger.info(
       `ServiceCoordinator.handleIncomingSmsMessage (${userId}): Known U.S. state for voter (${userInfo!.stateName}) or volunteer has engaged (${userInfo!.volunteerEngaged}). Automated system no longer active.`
     );
-    await this.handleClearedVoter(
-      { userInfo: userInfo!, userPhoneNumber, userMessage, userAttachments },
-      redisClient,
-      twilioPhoneNumber,
+    const userOptions = { userInfo: userInfo!, userPhoneNumber, userMessage, userAttachments };
+
+    const activeChannelMessageParams = {
+      parentMessageTs: userInfo[userInfo.activeChannelId],
+      channel: userInfo.activeChannelId,
+    };
+
+    const nowSecondsEpoch = Math.round(Date.now() / 1000);
+    // Remember the lastVoterMessageSecsFromEpoch, for use in calculation below.
+    const lastVoterMessageSecsFromEpoch = userInfo.lastVoterMessageSecsFromEpoch;
+    // Update the lastVoterMessageSecsFromEpoch, for use in DB write below.
+    userInfo.lastVoterMessageSecsFromEpoch = nowSecondsEpoch;
+
+    const blocks = SlackBlockUtil.formatMessageWithAttachmentLinks(
+      userOptions.userMessage,
+      userOptions.userAttachments
+    );
+
+    await SlackApiUtil.sendMessage(
+      '',
+      {
+        ...activeChannelMessageParams,
+        blocks,
+        isVoterMessage: true,
+      },
       inboundDbMessageEntry,
-      twilioCallbackURL
+      userInfo
+    );
+
+    // Update thread needs attention status -> true
+    await DbApiUtil.setThreadNeedsAttentionToDb(
+      userInfo[userInfo.activeChannelId],
+      userInfo.activeChannelId,
+      true
+    );
+
+    logger.debug(
+      `ServiceCoordinator.handleClearedVoter: Seconds since last message from voter: ${nowSecondsEpoch - lastVoterMessageSecsFromEpoch
+      }`
+    );
+
+    if (
+      nowSecondsEpoch - lastVoterMessageSecsFromEpoch >
+      MINS_BEFORE_WELCOME_BACK_MESSAGE * 60
+    ) {
+      logger.debug(
+        `ServiceCoordinator.handleClearedVoter: Seconds since last message from voter > MINS_BEFORE_WELCOME_BACK_MESSAGE (${nowSecondsEpoch - lastVoterMessageSecsFromEpoch
+        } > : ${MINS_BEFORE_WELCOME_BACK_MESSAGE}), sending welcome back message.`
+      );
+      let userMessage = null as string | null;
+      if (isVotedKeyword(userOptions.userMessage)) {
+        userMessage = MessageConstants.VOTED_RESPONSE();
+      } else {
+        userMessage = MessageConstants.WELCOME_BACK();
+      }
+
+      await this.constituentManagementService.sendMessageToConstituent({
+        message: userMessage,
+        automated: true
+      });
+      await SlackApiUtil.sendMessage(userMessage, {
+        ...activeChannelMessageParams,
+        isAutomatedMessage: true,
+      });
+
+      if (process.env.CLIENT_ORGANIZATION === 'GADEMS') {
+        // GA Dems starts a new thread if an old voters comes back rather
+        // than continuing to use the existing thread. We do this by "routing"
+        // the voter back to the same channel
+        await this.routeVoterToSlackChannel(userInfo, redisClient, {
+          twilioPhoneNumber,
+          destinationSlackChannelName: userInfo.activeChannelName,
+        });
+      }
+    }
+
+    logger.debug(`ServiceCoordinator.handleClearedVoter: Writing updated userInfo to Redis.`);
+    await RedisApiUtil.setHash(
+      redisClient,
+      `${userId}:${twilioPhoneNumber}`,
+      userInfo
     );
   }
 
