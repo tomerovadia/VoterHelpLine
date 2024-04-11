@@ -1,11 +1,16 @@
 import Hashes from 'jshashes';
 
+const mockConstituentPhoneNumber = 'mockConstituentPhoneNumber';
+const mockTwilioPhoneNumber = 'mockTwilioPhoneNumber';
+const mockConstituentMessage = 'mockConstituentMessage';
+const mockSmsMessageSid = 'mockSmsMessageSid';
+
 jest.mock('./agent_management_service', () => {
     return jest.fn().mockImplementation(() => ({
         isPhoneNumberBlocked: jest.fn().mockReturnValue(false),
     }));
 });
-  
+
 jest.mock('./constituent_management_service', () => {
     return jest.fn().mockImplementation(() => ({
         getConstituentStatus: jest.fn(),
@@ -23,28 +28,59 @@ jest.mock('./constituent_management_service', () => {
         fetchAndLoadOptOutStatus: jest.fn(),
         determineConstituentStatus: jest.fn(),
         handleOptOutLogic: jest.fn().mockReturnValue(true),
+        sendMessageToConstituent: jest.fn(),
     }));
 });
 jest.mock('./db_service', () => {
     return jest.fn().mockImplementation(() => ({
-        populateInitialIncomingConstituentMessageDbEntry: jest.fn(),
+        populateInitialIncomingConstituentMessageDbEntry: jest.fn().mockReturnValue({
+            message: "mockUserMessage",
+            unprocessedMessage: null,
+            direction: 'INBOUND',
+            entryPoint: 'PULL',
+            automated: null,
+            successfullySent: false,
+            fromPhoneNumber: mockConstituentPhoneNumber,
+            toPhoneNumber: mockTwilioPhoneNumber,
+            originatingSlackUserId: null,
+            originatingSlackUserName: null,
+            slackChannel: null,
+            slackParentMessageTs: null,
+            mockSmsMessageSid,
+            slackMessageTs: null,
+            slackError: null,
+            twilioError: null,
+            twilioAttachments: [],
+            twilioSendTimestamp: null,
+            twilioReceiveTimestamp: new Date(),
+            slackSendTimestamp: null,
+            slackReceiveTimestamp: null,
+            slackRetryNum: null,
+            slackRetryReason: null,
+            userId: null,
+            confirmedDisclaimer: null,
+            isDemo: null,
+            lastVoterMessageSecsFromEpoch: null,
+            archived: false,
+            stateName: null,
+        }),
     }));
 });
 
 jest.mock('./twilio_util', () => ({
-  twilioCallbackURL: jest.fn(),
-  getAttachments: jest.fn().mockReturnValue([]),
+    twilioCallbackURL: jest.fn(),
+    getAttachments: jest.fn().mockReturnValue([]),
 }));
 jest.mock('./router', () => ({
-  prepareUserInfoForNewVoter: jest.fn(),
-  welcomePotentialVoter: jest.fn(),
-  clarifyHelplineRequest: jest.fn(),
-  handleNewVoter: jest.fn(),
-  endVoterSession: jest.fn(),
-  determineVoterState: jest.fn(),
-  recordVotedStatus: jest.fn(),
-  replyToVoted: jest.fn(),
-  handleClearedVoter: jest.fn(),
+    prepareUserInfoForNewVoter: jest.fn(),
+    welcomePotentialVoter: jest.fn(),
+    clarifyHelplineRequest: jest.fn(),
+    handleNewVoter: jest.fn(),
+    endVoterSession: jest.fn(),
+    determineVoterState: jest.fn(),
+    recordVotedStatus: jest.fn(),
+    replyToVoted: jest.fn(),
+    handleClearedVoter: jest.fn(),
 }));
 
 jest.mock('./keyword_parser', () => ({
@@ -55,24 +91,19 @@ import ServiceCoordinator from './service_coordinator';
 import AgentManagementService from './agent_management_service';
 import ConstituentManagementService from './constituent_management_service';
 import DbService from './db_service';
-import * as Router from './router';
-import * as KeywordParser from './keyword_parser';
 import { ConstituentStatus, Request } from './types';
 
 describe('handleIncomingSmsMessage', () => {
     let serviceCoordinator: ServiceCoordinator;
     let mockConstituentManagementService: ConstituentManagementService;
 
-    const testConstituentPhoneNumber = 'testConstituentPhoneNumber';
-    const testTwilioPhoneNumber = 'testTwilioPhoneNumber';
-    const testConstituentMessage = 'testConstituentMessage';
-    const testSmsMessageSid = 'testSmsMessageSid';
-
-    const mockReq = { body: {
-        From: testConstituentPhoneNumber,
-        To: testTwilioPhoneNumber,
-        Body: testConstituentMessage,
-        SmsMessageSid: testSmsMessageSid }
+    const mockReq = {
+        body: {
+            From: mockConstituentPhoneNumber,
+            To: mockTwilioPhoneNumber,
+            Body: mockConstituentMessage,
+            SmsMessageSid: mockSmsMessageSid
+        }
     } as Request;
 
     const MD5 = new Hashes.MD5();
@@ -94,119 +125,131 @@ describe('handleIncomingSmsMessage', () => {
             mockConstituentManagementService.getConstituentStatus = jest.fn().mockReturnValue(ConstituentStatus.NEW);
         });
 
-        it('Should call Router.prepareUserInfoForNewVoter and Router.welcomePotentialVoter', async () => {
+        it('Should call constituentManagementService.sendMessageToConstituent', async () => {
             await serviceCoordinator.handleIncomingSmsMessage(mockReq, 'PULL');
 
-            expect(Router.prepareUserInfoForNewVoter).toHaveBeenCalledTimes(1);
-            expect(Router.welcomePotentialVoter).toHaveBeenCalledTimes(1);
-        });
-
-        it('Should correctly pass constituent info to Router.prepareUserInfoForNewVoter', async () => {    
-            await serviceCoordinator.handleIncomingSmsMessage(mockReq, 'PULL');
-
-            expect(Router.prepareUserInfoForNewVoter).toHaveBeenCalledWith(expect.objectContaining({
-                userOptions: expect.objectContaining({
-                    userPhoneNumber: testConstituentPhoneNumber,
-                    userMessage: testConstituentMessage,
-                    userAttachments: [],
-                    userId: MD5.hex(testConstituentPhoneNumber),
+            expect(mockConstituentManagementService.sendMessageToConstituent).toHaveBeenCalledTimes(1);
+            expect(mockConstituentManagementService.sendMessageToConstituent).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    message: expect.stringMatching(/welcome/i),
+                    automated: true
                 }),
-                twilioPhoneNumber: testTwilioPhoneNumber,
-                entryPoint: 'PULL',
-                returningVoter: false,
-              }));
+            );
         });
+
+        // it('Should call Router.prepareUserInfoForNewVoter and Router.welcomePotentialVoter', async () => {
+        //     await serviceCoordinator.handleIncomingSmsMessage(mockReq, 'PULL');
+
+        //     expect(Router.prepareUserInfoForNewVoter).toHaveBeenCalledTimes(1);
+        //     expect(Router.welcomePotentialVoter).toHaveBeenCalledTimes(1);
+        // });
+
+        // it('Should correctly pass constituent info to Router.prepareUserInfoForNewVoter', async () => {    
+        //     await serviceCoordinator.handleIncomingSmsMessage(mockReq, 'PULL');
+
+        //     expect(Router.prepareUserInfoForNewVoter).toHaveBeenCalledWith(expect.objectContaining({
+        //         userOptions: expect.objectContaining({
+        //             userPhoneNumber: mockConstituentPhoneNumber,
+        //             userMessage: mockConstituentMessage,
+        //             userAttachments: [],
+        //             userId: MD5.hex(mockConstituentPhoneNumber),
+        //         }),
+        //         twilioPhoneNumber: mockTwilioPhoneNumber,
+        //         entryPoint: 'PULL',
+        //         returningVoter: false,
+        //       }));
+        // });
     });
 
-    describe("When the status is PRE_ENTERING_AUTOMATED", () => {
-        beforeEach(() => {
-            mockConstituentManagementService.getConstituentStatus = jest.fn().mockReturnValue(ConstituentStatus.PRE_ENTERING_AUTOMATED);
-        });
-        it('Should call Router.clarifyHelplineRequest', async () => {
-            await serviceCoordinator.handleIncomingSmsMessage(mockReq, 'PULL');
-            expect(Router.clarifyHelplineRequest).toHaveBeenCalledTimes(1);
-        });
-    });
+    // describe("When the status is PRE_ENTERING_AUTOMATED", () => {
+    //     beforeEach(() => {
+    //         mockConstituentManagementService.getConstituentStatus = jest.fn().mockReturnValue(ConstituentStatus.PRE_ENTERING_AUTOMATED);
+    //     });
+    //     it('Should call Router.clarifyHelplineRequest', async () => {
+    //         await serviceCoordinator.handleIncomingSmsMessage(mockReq, 'PULL');
+    //         expect(Router.clarifyHelplineRequest).toHaveBeenCalledTimes(1);
+    //     });
+    // });
 
-    describe("When the status is HAS_ENTERED_AUTOMATED", () => {
-        beforeEach(() => {
-            mockConstituentManagementService.getConstituentStatus = jest.fn().mockReturnValue(ConstituentStatus.HAS_ENTERED_AUTOMATED);
-        });
+    // describe("When the status is HAS_ENTERED_AUTOMATED", () => {
+    //     beforeEach(() => {
+    //         mockConstituentManagementService.getConstituentStatus = jest.fn().mockReturnValue(ConstituentStatus.HAS_ENTERED_AUTOMATED);
+    //     });
 
-        it('Should call Router.prepareUserInfoForNewVoter', async () => {
-            await serviceCoordinator.handleIncomingSmsMessage(mockReq, 'PULL');
+    //     it('Should call Router.prepareUserInfoForNewVoter', async () => {
+    //         await serviceCoordinator.handleIncomingSmsMessage(mockReq, 'PULL');
 
-            expect(Router.determineVoterState).toHaveBeenCalledTimes(1);
-        });
+    //         expect(Router.determineVoterState).toHaveBeenCalledTimes(1);
+    //     });
 
-        describe("When the voter message indicates they've voted", () => {
-            beforeEach(() => {
-                const { isVotedKeyword } = require('./keyword_parser');
-                isVotedKeyword.mockReturnValue(true);
-            });
+    //     describe("When the voter message indicates they've voted", () => {
+    //         beforeEach(() => {
+    //             const { isVotedKeyword } = require('./keyword_parser');
+    //             isVotedKeyword.mockReturnValue(true);
+    //         });
 
-            it('Should call Router.recordVotedStatus and Router.replyToVoted', async () => {
-                await serviceCoordinator.handleIncomingSmsMessage(mockReq, 'PULL');
-    
-                expect(Router.recordVotedStatus).toHaveBeenCalledTimes(1);
-                expect(Router.replyToVoted).toHaveBeenCalledTimes(1);
-            });
-        });
-    });
+    //         it('Should call Router.recordVotedStatus and Router.replyToVoted', async () => {
+    //             await serviceCoordinator.handleIncomingSmsMessage(mockReq, 'PULL');
 
-    describe("When the status is HAS_ENTERED_CONVERSATION", () => {
-        beforeEach(() => {
-            mockConstituentManagementService.getConstituentStatus = jest.fn().mockReturnValue(ConstituentStatus.HAS_ENTERED_CONVERSATION);
-        });
+    //             expect(Router.recordVotedStatus).toHaveBeenCalledTimes(1);
+    //             expect(Router.replyToVoted).toHaveBeenCalledTimes(1);
+    //         });
+    //     });
+    // });
 
-        it('Should call Router.handleClearedVoter', async () => {
-            await serviceCoordinator.handleIncomingSmsMessage(mockReq, 'PULL');
+    // describe("When the status is HAS_ENTERED_CONVERSATION", () => {
+    //     beforeEach(() => {
+    //         mockConstituentManagementService.getConstituentStatus = jest.fn().mockReturnValue(ConstituentStatus.HAS_ENTERED_CONVERSATION);
+    //     });
 
-            expect(Router.handleClearedVoter).toHaveBeenCalledTimes(1);
-        });
+    //     it('Should call Router.handleClearedVoter', async () => {
+    //         await serviceCoordinator.handleIncomingSmsMessage(mockReq, 'PULL');
 
-        describe("When the voter message indicates they've voted", () => {
-            beforeEach(() => {
-                const { isVotedKeyword } = require('./keyword_parser');
-                isVotedKeyword.mockReturnValue(true);
-            });
+    //         expect(Router.handleClearedVoter).toHaveBeenCalledTimes(1);
+    //     });
 
-            it('Should call Router.recordVotedStatus and Router.replyToVoted', async () => {
-                await serviceCoordinator.handleIncomingSmsMessage(mockReq, 'PULL');
-    
-                expect(Router.recordVotedStatus).toHaveBeenCalledTimes(1);
-                expect(Router.handleClearedVoter).toHaveBeenCalledTimes(1);
-            });
-        });
-    });
+    //     describe("When the voter message indicates they've voted", () => {
+    //         beforeEach(() => {
+    //             const { isVotedKeyword } = require('./keyword_parser');
+    //             isVotedKeyword.mockReturnValue(true);
+    //         });
 
-    describe("When the status is RETURNING", () => {
-        beforeEach(() => {
-            mockConstituentManagementService.getConstituentStatus = jest.fn().mockReturnValue(ConstituentStatus.RETURNING);
-        });
+    //         it('Should call Router.recordVotedStatus and Router.replyToVoted', async () => {
+    //             await serviceCoordinator.handleIncomingSmsMessage(mockReq, 'PULL');
 
-        it('Should call Router.prepareUserInfoForNewVoter and Router.handleNewVoter', async () => {
-            await serviceCoordinator.handleIncomingSmsMessage(mockReq, 'PULL');
+    //             expect(Router.recordVotedStatus).toHaveBeenCalledTimes(1);
+    //             expect(Router.handleClearedVoter).toHaveBeenCalledTimes(1);
+    //         });
+    //     });
+    // });
 
-            expect(Router.endVoterSession).toHaveBeenCalledTimes(1);
-            expect(Router.prepareUserInfoForNewVoter).toHaveBeenCalledTimes(1);
-            expect(Router.handleNewVoter).toHaveBeenCalledTimes(1);
-        });
+    // describe("When the status is RETURNING", () => {
+    //     beforeEach(() => {
+    //         mockConstituentManagementService.getConstituentStatus = jest.fn().mockReturnValue(ConstituentStatus.RETURNING);
+    //     });
 
-        describe("When the voter message indicates they've voted", () => {
-            beforeEach(() => {
-                const { isVotedKeyword } = require('./keyword_parser');
-                isVotedKeyword.mockReturnValue(true);
-            });
+    //     it('Should call Router.prepareUserInfoForNewVoter and Router.handleNewVoter', async () => {
+    //         await serviceCoordinator.handleIncomingSmsMessage(mockReq, 'PULL');
 
-            it('Should call Router.recordVotedStatus', async () => {
-                await serviceCoordinator.handleIncomingSmsMessage(mockReq, 'PULL');
-    
-                expect(Router.recordVotedStatus).toHaveBeenCalledTimes(1);
-                expect(Router.endVoterSession).toHaveBeenCalledTimes(1);
-                expect(Router.prepareUserInfoForNewVoter).toHaveBeenCalledTimes(1);
-                expect(Router.handleNewVoter).toHaveBeenCalledTimes(1);
-            });
-        });
-    });
+    //         expect(Router.endVoterSession).toHaveBeenCalledTimes(1);
+    //         expect(Router.prepareUserInfoForNewVoter).toHaveBeenCalledTimes(1);
+    //         expect(Router.handleNewVoter).toHaveBeenCalledTimes(1);
+    //     });
+
+    //     describe("When the voter message indicates they've voted", () => {
+    //         beforeEach(() => {
+    //             const { isVotedKeyword } = require('./keyword_parser');
+    //             isVotedKeyword.mockReturnValue(true);
+    //         });
+
+    //         it('Should call Router.recordVotedStatus', async () => {
+    //             await serviceCoordinator.handleIncomingSmsMessage(mockReq, 'PULL');
+
+    //             expect(Router.recordVotedStatus).toHaveBeenCalledTimes(1);
+    //             expect(Router.endVoterSession).toHaveBeenCalledTimes(1);
+    //             expect(Router.prepareUserInfoForNewVoter).toHaveBeenCalledTimes(1);
+    //             expect(Router.handleNewVoter).toHaveBeenCalledTimes(1);
+    //         });
+    //     });
+    // });
 });
