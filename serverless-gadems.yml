@@ -1,0 +1,135 @@
+service: helpline
+
+provider:
+  name: aws
+  runtime: nodejs12.x
+
+  # Deploy to staging by default
+  stage: staging
+
+  # Set the AWS region
+  region: us-east-1
+
+  vpc:
+    securityGroupIds:
+      { 'Fn::Split': [',', '${ssm:helpline.common.securityGroups~true}'] }
+    subnetIds: { 'Fn::Split': [',', '${ssm:helpline.common.subnets~true}'] }
+
+  # 30-second timeout by default
+  timeout: 30
+
+  # Tags that will be added to each of the deployment resources
+  tags:
+    env: ${self:custom.stage}
+
+  # Environment variables
+  environment:
+    # Sentry integration: sends Lambda errors to Sentry. Remove this if you don't want to
+    # use Sentry
+    SENTRY_DSN: ${ssm:helpline.common.sentry_dsn~true}
+    SENTRY_ENVIRONMENT: ${self:custom.stage}
+
+    # Voter Helpline parameters
+    SLACK_BOT_USER_ID: ${ssm:helpline.${self:custom.stage}.slack_bot_user_id~true}
+    SLACK_BOT_ACCESS_TOKEN: ${ssm:helpline.${self:custom.stage}.slack_bot_access_token~true}
+    SLACK_USER_ACCESS_TOKEN: ${ssm:helpline.${self:custom.stage}.slack_user_access_token~true}
+    SLACK_AUTH_TOKEN_HASH: ${ssm:helpline.${self:custom.stage}.slack_auth_token_hash~true}
+    SLACK_SIGNING_SECRET: ${ssm:helpline.${self:custom.stage}.slack_signing_secret~true}
+    ADMIN_CONTROL_ROOM_SLACK_CHANNEL_ID: ${ssm:helpline.${self:custom.stage}.admin_control_room_slack_channel_id~true}
+    ATTACHMENTS_SLACK_CHANNEL_ID: ${ssm:helpline.${self:custom.stage}.attachments_slack_channel_id~true}
+    TEAM_ID: ${ssm:helpline.${self:custom.stage}.team_id~true}
+    TWILIO_ACCOUNT_SID: ${ssm:helpline.${self:custom.stage}.twilio_account_sid~true}
+    TWILIO_AUTH_TOKEN: ${ssm:helpline.${self:custom.stage}.twilio_auth_token~true}
+    CLIENT_ORGANIZATION: ${ssm:helpline.${self:custom.stage}.client_organization~true}
+    DEMO_PHONE_NUMBER: ${ssm:helpline.${self:custom.stage}.demo_phone_number~true}
+    REDISCLOUD_URL: ${ssm:helpline.${self:custom.stage}.redis_url~true}
+    REDISCLOUD_URL_DEDUPLICATION: ${ssm:helpline.${self:custom.stage}.redis_deduplication_url~true}
+    DATABASE_URL: ${ssm:helpline.${self:custom.stage}.database_url~true}
+    LAMBDA_BACKGROUND_TASK_FUNCTION: helpline-${self:custom.stage}-worker
+
+    CONNECTION_POOL_MAX: '2'
+    LOG_FORMAT: json
+
+  # Memory allocated to each lambda function
+  memorySize: 1024
+
+  # Allow the app server to invoke the background worker
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - lambda:InvokeFunction
+        - lambda:InvokeAsync
+      Resource: arn:aws:lambda:${self:custom.region}:*:function:helpline-${self:custom.stage}-worker
+
+package:
+  exclude:
+    - 'images/**'
+
+plugins:
+  # Clean up old versions so we don't exceed our code storage quota
+  - serverless-prune-plugin
+
+  # Datadog integration: remove this if you don't use datadog
+  - serverless-plugin-datadog
+
+  # Custom domains: remove this to use an API Gateway-provided domain instead
+  - serverless-domain-manager
+
+  # Compile typescript
+  - serverless-plugin-typescript
+
+custom:
+  # The custom domain name to use for the muxer. You can remove this and
+  # the serverless-domain-manager plugin to use an API Gateway-provided domain
+  # instead.
+  customDomain:
+    domainName: ${self:custom.stage}.jonossoff.codes
+
+  # Make stage/region accessible to other parts of the config
+  stage: ${opt:stage, self:provider.stage}
+  region: ${opt:region, self:provider.region}
+
+  # Configure DataDog integration. If you've removed serverless-plugin-datadog
+  # above, you can remove this. flushMetricsToLogs requires that you have
+  # the datadog forwarder installed; see
+  # https://github.com/DataDog/datadog-serverless-functions/tree/master/aws/logs_monitoring#installation
+  # for details.
+  datadog:
+    flushMetricsToLogs: true
+    forwarder: ${ssm:common.dd_forwarder_arn~true}
+
+  # Automatically remove old function versions to avoid filling up your lambda code storage
+  # quota.
+  prune:
+    automatic: true
+    number: 3
+
+  # Maximum number of parallel instances of the lambda function that can be
+  # running at the same time. Make sure that this is less than the maximum
+  # number of concurrent database connections your Postgres and Redis instances
+  # can accept.
+  #
+  # This applies to the app server and background worker SEPARATELY. So the
+  # actual max concurrency is twice this value.
+  reservedConcurrency:
+    staging: 10
+    prod: 50
+
+  # Provisioned concurrency for the app -- Slack requires responses in 3 seconds so cold starts
+  # can cause timeouts.
+  provisionedConcurrency:
+    staging: 2
+    prod: 3
+
+functions:
+  app:
+    handler: src/server_lambda.handler
+    events:
+      - http: ANY /
+      - http: 'ANY {proxy+}'
+    reservedConcurrency: ${self:custom.reservedConcurrency.${self:custom.stage}}
+    provisionedConcurrency: ${self:custom.provisionedConcurrency.${self:custom.stage}}
+  worker:
+    handler: src/async_jobs.backgroundLambdaHandler
+    reservedConcurrency: ${self:custom.reservedConcurrency.${self:custom.stage}}
+    provisionedConcurrency: ${self:custom.provisionedConcurrency.${self:custom.stage}}
