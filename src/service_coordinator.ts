@@ -9,6 +9,8 @@ import * as KeywordParser from './keyword_parser';
 import * as SlackApiUtil from './slack_api_util';
 import AgentManagementService from './agent_management_service';
 import ConstituentManagementService from './constituent_management_service';
+import ConstituentCommunicator from './constituent_communicator';
+import AgentCommunicator from './agent_communicator';
 import logger from './logger';
 import * as SlackInteractionApiUtil from './slack_interaction_api_util';
 import * as SlackBlockUtil from './slack_block_util';
@@ -70,15 +72,21 @@ export default class ServiceCoordinator {
   private constituentManagementService: ConstituentManagementService;
   private agentManagementService: AgentManagementService;
   private dbService: DbService;
+  private constituentCommunicator: ConstituentCommunicator;
+  private agentCommunicator: AgentCommunicator;
 
   constructor(
     constituentManagementService: ConstituentManagementService,
     agentManagementService: AgentManagementService,
     dbService: DbService,
+    constituentCommunicator: ConstituentCommunicator,
+    agentCommunicator: AgentCommunicator
   ) {
     this.constituentManagementService = constituentManagementService;
     this.agentManagementService = agentManagementService;
     this.dbService = dbService;
+    this.constituentCommunicator = constituentCommunicator;
+    this.agentCommunicator = agentCommunicator;
   }
 
   private BACKGROUND_TASKS = {
@@ -267,7 +275,7 @@ export default class ServiceCoordinator {
     } as SlackApiUtil.SlackSendMessageResponse | null;
 
     if (slackChannelName !== 'lobby' || !skipLobby) {
-      response = await SlackApiUtil.sendMessage(slackBlocks[0].text.text, {
+      response = await this.agentCommunicator.sendMessage(slackBlocks[0].text.text, {
         channel: slackChannelName,
         blocks: slackBlocks,
       });
@@ -307,15 +315,23 @@ export default class ServiceCoordinator {
           `ServiceCoordinator.introduceNewVoterToSlackChannel: Entry point is PULL, so sending automated welcome to voter.`
         );
         // Welcome the voter
-        await this.constituentManagementService.sendMessageToConstituent({
+        await this.constituentCommunicator.sendMessage({
           message: messageToVoter,
-          automated: true
+          automated: true,
+          userInfo,
+          twilioPhoneNumber,
+          constituentPhoneNumber: userInfo.userPhoneNumber,
+          twilioCallbackUrl: twilioCallbackURL,
         });
       }
     } else {
-      await this.constituentManagementService.sendMessageToConstituent({
+      await this.constituentCommunicator.sendMessage({
         message: `There was an unexpected error sending your message. Please wait a few minutes and try again.`,
-        automated: true
+        automated: true,
+        userInfo,
+        twilioPhoneNumber,
+        constituentPhoneNumber: userInfo.userPhoneNumber,
+        twilioCallbackUrl: twilioCallbackURL,
       });
       throw new Error(
         `Could not send introduction slack message with voter info for voter ${userInfo.userPhoneNumber} texting ${twilioPhoneNumber}`
@@ -408,7 +424,7 @@ export default class ServiceCoordinator {
           userMessage,
           userAttachments
         );
-        await SlackApiUtil.sendMessage(
+        await this.agentCommunicator.sendMessage(
           blocks[0].text.text,
           {
             parentMessageTs: response.data.ts,
@@ -424,7 +440,7 @@ export default class ServiceCoordinator {
       logger.debug(
         `ServiceCoordinator.introduceNewVoterToSlackChannel: Passing automated welcome message to Slack, slackChannelName: ${slackChannelName}, parentMessageTs: ${response.data.channel}.`
       );
-      await SlackApiUtil.sendMessage(messageToVoter, {
+      await this.agentCommunicator.sendMessage(messageToVoter, {
         parentMessageTs: response.data.ts,
         channel: response.data.channel,
         isAutomatedMessage: true,
@@ -630,7 +646,7 @@ export default class ServiceCoordinator {
     inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry
   ): Promise<void> {
     // record the incoming user message
-    await SlackApiUtil.sendMessage(
+    await this.agentCommunicator.sendMessage(
       userMessage,
       {
         parentMessageTs: userInfo[userInfo.activeChannelId],
@@ -638,15 +654,18 @@ export default class ServiceCoordinator {
         isVoterMessage: true,
       },
       inboundDbMessageEntry,
-      userInfo
-    );
+      userInfo);
     const replyMessage = MessageConstants.VOTED_RESPONSE();
 
-    await this.constituentManagementService.sendMessageToConstituent({
+    await this.constituentCommunicator.sendMessage({
       message: replyMessage,
-      automated: true
+      automated: true,
+      userInfo,
+      twilioPhoneNumber,
+      constituentPhoneNumber: userInfo.userPhoneNumber,
+      twilioCallbackUrl: twilioCallbackURL,
     });
-    await SlackApiUtil.sendMessage(replyMessage, {
+    await this.agentCommunicator.sendMessage(replyMessage, {
       parentMessageTs: userInfo[userInfo.activeChannelId],
       channel: userInfo.activeChannelId,
       isAutomatedMessage: true,
@@ -671,7 +690,7 @@ export default class ServiceCoordinator {
       slackParentMessageTs: null,
       actionTs: null,
     });
-    await SlackApiUtil.sendMessage(
+    await this.agentCommunicator.sendMessage(
       `*Operator:* Voter status changed to *VOTED* by user text.`,
       {
         channel: userInfo.activeChannelId,
@@ -743,7 +762,7 @@ export default class ServiceCoordinator {
               })
               .join(', ');
         }
-        await SlackApiUtil.sendMessage('', {
+        await this.agentCommunicator.sendMessage('', {
           parentMessageTs: destinationSlackParentMessageTs,
           channel: destinationSlackChannelId,
           blocks: [
@@ -804,7 +823,7 @@ export default class ServiceCoordinator {
       userInfo.userId.substring(0, 5)
     ).join('\n\n');
 
-    const msgInfo = await SlackApiUtil.sendMessage(
+    const msgInfo = await this.agentCommunicator.sendMessage(
       `${messageHistoryContext}\n\n${formattedMessageHistory}`,
       {
         parentMessageTs: destinationSlackParentMessageTs,
@@ -886,7 +905,7 @@ export default class ServiceCoordinator {
           adminCommandParams.commandParentMessageTs &&
           adminCommandParams.commandMessageTs
         ) {
-          await SlackApiUtil.sendMessage(
+          await this.agentCommunicator.sendMessage(
             `*Operator:* Slack channel ${destinationSlackChannelName} not found.`,
             {
               channel: adminCommandParams.commandChannel,
@@ -906,7 +925,7 @@ export default class ServiceCoordinator {
       logger.debug(
         'ServiceCoordinator.routeVoterToSlackChannel: Routing of voter should succeed from here on out. Letting the admin (if applicable) know.'
       );
-      await SlackApiUtil.sendMessage(
+      await this.agentCommunicator.sendMessage(
         `*Operator:* Voter is being routed to ${SlackApiUtil.linkToSlackChannel(
           destinationSlackChannelId,
           destinationSlackChannelName
@@ -933,7 +952,7 @@ export default class ServiceCoordinator {
         )}.`;
       }
 
-      await SlackApiUtil.sendMessage(msg, {
+      await this.agentCommunicator.sendMessage(msg, {
         channel: userInfo.activeChannelId,
         parentMessageTs: userInfo[userInfo.activeChannelId],
       });
@@ -976,7 +995,7 @@ export default class ServiceCoordinator {
       userInfo,
       twilioPhoneNumber
     );
-    const response = await SlackApiUtil.sendMessage(blocks[0].text.text, {
+    const response = await this.agentCommunicator.sendMessage(blocks[0].text.text, {
       channel: destinationSlackChannelName,
       blocks: blocks,
     });
@@ -1062,7 +1081,7 @@ export default class ServiceCoordinator {
     TWILIO METHODS
   ************************/
 
-  async processSmsNew(userMessage: string, userInfo: UserInfo, twilioPhoneNumber: string, inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry) {
+  async processSmsNew(userMessage: string, userInfo: UserInfo, twilioPhoneNumber: string, inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry, twilioCallbackURL: string) {
     logger.info('Entering ServiceCoordinator.processSmsNew');
     //T OK TO KEEP THIS MESSAGE LOGIC HERE FOR NOW
     let messageToVoter = MessageConstants.WELCOME_VOTER();
@@ -1086,9 +1105,13 @@ export default class ServiceCoordinator {
       });
     }
 
-    await this.constituentManagementService.sendMessageToConstituent({
+    await this.constituentCommunicator.sendMessage({
       message: messageToVoter,
-      automated: true
+      automated: true,
+      userInfo,
+      twilioPhoneNumber,
+      constituentPhoneNumber: userInfo.userPhoneNumber,
+      twilioCallbackUrl: twilioCallbackURL,
     });
 
     DbApiUtil.updateDbMessageEntryWithUserInfo(userInfo!, inboundDbMessageEntry);
@@ -1118,7 +1141,7 @@ export default class ServiceCoordinator {
     );
   }
 
-  async processSmsPreAutomatedEntry(userInfo: UserInfo, userMessage: string, twilioPhoneNumber: string, inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry) {
+  async processSmsPreAutomatedEntry(userInfo: UserInfo, userMessage: string, twilioPhoneNumber: string, inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry, twilioCallbackURL: string) {
     logger.info('Entering ServiceCoordinator.processSmsPreAutomatedEntry');
     let messageToVoter = MessageConstants.CLARIFY_HELPLINE_REQUEST();
     if (KeywordParser.isVotedKeyword(userMessage)) {
@@ -1138,9 +1161,13 @@ export default class ServiceCoordinator {
       });
     }
 
-    await this.constituentManagementService.sendMessageToConstituent({
+    await this.constituentCommunicator.sendMessage({
       message: messageToVoter,
-      automated: true
+      automated: true,
+      userInfo,
+      twilioPhoneNumber,
+      constituentPhoneNumber: userInfo.userPhoneNumber,
+      twilioCallbackUrl: twilioCallbackURL,
     });
 
     // The rest of this logic is the same as the NEW case. Consider consolidating somehow.
@@ -1169,7 +1196,7 @@ export default class ServiceCoordinator {
     );
   }
 
-  async processSmsEntering(userInfo: UserInfo, twilioPhoneNumber: string, inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry) {
+  async processSmsEntering(userInfo: UserInfo, twilioPhoneNumber: string, inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry, twilioCallbackURL: string) {
     logger.info('Entering ServiceCoordinator.processSmsEntering');
 
     await DbApiUtil.logInitialVoterStatusToDb(
@@ -1253,36 +1280,48 @@ export default class ServiceCoordinator {
       );
 
       try {
-        slackParentMessageResponse = await SlackApiUtil.sendMessage(topLevelThreadSlackBlocks[0].text.text, {
+        slackParentMessageResponse = await this.agentCommunicator.sendMessage(topLevelThreadSlackBlocks[0].text.text, {
           channel: slackChannelName,
           blocks: topLevelThreadSlackBlocks,
         });
       } catch (error) {
-        await this.constituentManagementService.sendMessageToConstituent({
+        await this.constituentCommunicator.sendMessage({
           message: `There was an unexpected error sending your message. Please wait a few minutes and try again.`,
-          automated: true
+          automated: true,
+          userInfo,
+          twilioPhoneNumber,
+          constituentPhoneNumber: userInfo.userPhoneNumber,
+          twilioCallbackUrl: twilioCallbackURL,
         });
         throw new Error(
           `Could not send introduction slack message with voter info for voter ${userInfo.userPhoneNumber} texting ${twilioPhoneNumber}. Error: ${error}`
         );
       }
 
-      // This should never be null because SlackApiUtil.sendMessage always either returns a successful
+      // This should never be null because this.agentCommunicator.sendMessage always either returns a successful
       // response or throws an error, which would be caught above.
       // TODO: We should consolidate this with the error catch above.
       if (!slackParentMessageResponse) {
-        await this.constituentManagementService.sendMessageToConstituent({
+        this.constituentCommunicator.sendMessage({
           message: `There was an unexpected error sending your message. Please wait a few minutes and try again.`,
-          automated: true
+          automated: true,
+          userInfo,
+          twilioPhoneNumber,
+          constituentPhoneNumber: userInfo.userPhoneNumber,
+          twilioCallbackUrl: twilioCallbackURL,
         });
         throw new Error(
           `Could not send introduction slack message with voter info for voter ${userInfo.userPhoneNumber} texting ${twilioPhoneNumber}.`
         );
       }
 
-      await this.constituentManagementService.sendMessageToConstituent({
+      this.constituentCommunicator.sendMessage({
         message: messageToConstituent,
-        automated: true
+        automated: true,
+        userInfo,
+        twilioPhoneNumber,
+        constituentPhoneNumber: userInfo.userPhoneNumber,
+        twilioCallbackUrl: twilioCallbackURL,
       });
 
       logger.debug(`Successfully announced new voter via new thread in ${slackChannelName},
@@ -1368,9 +1407,13 @@ export default class ServiceCoordinator {
         { userPhoneNumber: userInfo.userPhoneNumber, twilioPhoneNumber }
       );
     } else {
-      await this.constituentManagementService.sendMessageToConstituent({
+      this.constituentCommunicator.sendMessage({
         message: messageToConstituent,
-        automated: true
+        automated: true,
+        userInfo,
+        twilioPhoneNumber,
+        constituentPhoneNumber: userInfo.userPhoneNumber,
+        twilioCallbackUrl: twilioCallbackURL,
       });
       userInfo["NONEXISTENT_LOBBY"] = "NONEXISTENT_LOBBY_TS";
       // Set active channel to this first channel, since the voter is new.
@@ -1443,7 +1486,7 @@ export default class ServiceCoordinator {
           userMessage,
           userAttachments
         );
-        await SlackApiUtil.sendMessage(
+        await this.agentCommunicator.sendMessage(
           '',
           {
             parentMessageTs: lobbyParentMessageTs,
@@ -1457,7 +1500,7 @@ export default class ServiceCoordinator {
       } else {
         if (inboundDbMessageEntry) {
           logger.info(
-            `SLACKAPIUTIL.sendMessage: This Slack message send will log to DB (inboundDbMessageEntry is not null).`
+            `this.agentCommunicator.sendMessage: This Slack message send will log to DB (inboundDbMessageEntry is not null).`
           );
           // Copies a few fields from userInfo to inboundDbMessageEntry.
           DbApiUtil.updateDbMessageEntryWithUserInfo(
@@ -1474,7 +1517,7 @@ export default class ServiceCoordinator {
           await DbApiUtil.logMessageToDb(inboundDbMessageEntry);
         } catch (error) {
           logger.info(
-            `SLACKAPIUTIL.sendMessage: failed to log message send success to DB`
+            `this.agentCommunicator.sendMessage: failed to log message send success to DB`
           );
           Sentry.captureException(error);
         }
@@ -1493,13 +1536,17 @@ export default class ServiceCoordinator {
             `ServiceCoordinator.processSmsHasEnteredAutomated: StateParser could not determine U.S. state of voter from message ${userMessage}`
           );
 
-          await this.constituentManagementService.sendMessageToConstituent({
+          this.constituentCommunicator.sendMessage({
             message: MessageConstants.CLARIFY_STATE(),
-            automated: true
+            automated: true,
+            userInfo,
+            twilioPhoneNumber,
+            constituentPhoneNumber: userInfo.userPhoneNumber,
+            twilioCallbackUrl: twilioCallbackURL,
           });
 
           if (!skipLobby && userInfo.activeChannelId != 'NONEXISTENT_LOBBY') {
-            await SlackApiUtil.sendMessage(MessageConstants.CLARIFY_STATE(), {
+            await this.agentCommunicator.sendMessage(MessageConstants.CLARIFY_STATE(), {
               parentMessageTs: lobbyParentMessageTs,
               channel: lobbyChannelId,
               isAutomatedMessage: true,
@@ -1530,12 +1577,16 @@ export default class ServiceCoordinator {
         userInfo.stateName === 'National'
           ? MessageConstants.FINDING_VOLUNTEER()
           : MessageConstants.STATE_CONFIRMATION(stateName);
-      await this.constituentManagementService.sendMessageToConstituent({
+      this.constituentCommunicator.sendMessage({
         message: messageToVoter,
-        automated: true
+        automated: true,
+        userInfo,
+        twilioPhoneNumber,
+        constituentPhoneNumber: userInfo.userPhoneNumber,
+        twilioCallbackUrl: twilioCallbackURL,
       });
       if (!skipLobby && userInfo.activeChannelId != 'NONEXISTENT_LOBBY') {
-        await SlackApiUtil.sendMessage(messageToVoter, {
+        await this.agentCommunicator.sendMessage(messageToVoter, {
           parentMessageTs: lobbyParentMessageTs,
           channel: lobbyChannelId,
           isAutomatedMessage: true,
@@ -1596,7 +1647,7 @@ export default class ServiceCoordinator {
       userOptions.userAttachments
     );
 
-    await SlackApiUtil.sendMessage(
+    await this.agentCommunicator.sendMessage(
       '',
       {
         ...activeChannelMessageParams,
@@ -1634,11 +1685,15 @@ export default class ServiceCoordinator {
         userMessage = MessageConstants.WELCOME_BACK();
       }
 
-      await this.constituentManagementService.sendMessageToConstituent({
+      this.constituentCommunicator.sendMessage({
         message: userMessage,
-        automated: true
+        automated: true,
+        userInfo,
+        twilioPhoneNumber,
+        constituentPhoneNumber: userInfo.userPhoneNumber,
+        twilioCallbackUrl: twilioCallbackURL,
       });
-      await SlackApiUtil.sendMessage(userMessage, {
+      await this.agentCommunicator.sendMessage(userMessage, {
         ...activeChannelMessageParams,
         isAutomatedMessage: true,
       });
@@ -1772,21 +1827,21 @@ export default class ServiceCoordinator {
         NEW
       ********************/
       case ConstituentStatus.NEW: {
-        this.processSmsNew(userMessage, userInfo, twilioPhoneNumber, inboundDbMessageEntry);
+        this.processSmsNew(userMessage, userInfo, twilioPhoneNumber, inboundDbMessageEntry, twilioCallbackURL);
         break;
       }
       /********************
         PRE_ENTERING_AUTOMATED
       ********************/
       case ConstituentStatus.PRE_ENTERING_AUTOMATED: {
-        this.processSmsPreAutomatedEntry(userInfo, userMessage, twilioPhoneNumber, inboundDbMessageEntry);
+        this.processSmsPreAutomatedEntry(userInfo, userMessage, twilioPhoneNumber, inboundDbMessageEntry, twilioCallbackURL);
         break;
       }
       /********************
         ENTERING
       ********************/
       case ConstituentStatus.ENTERING: {
-        this.processSmsEntering(userInfo, twilioPhoneNumber, inboundDbMessageEntry);
+        this.processSmsEntering(userInfo, twilioPhoneNumber, inboundDbMessageEntry, twilioCallbackURL);
         break;
       }
       /********************

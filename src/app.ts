@@ -31,10 +31,13 @@ import { SlackInteractionEventPayload } from './slack_interaction_handler';
 import { TwilioRequestBody } from './twilio_util';
 import * as KeywordParser from './keyword_parser';
 import ConstituentManagementService from './client/default/default_constituent_management_service';
+import ConstituentCommunicator from './constituent_communicator';
+import AgentCommunicator from './agent_communicator';
 import ServiceCoordinator from './client/default/default_service_coordinator';
 import AgentManagementService from './client/default/default_agent_management_service';
 import DbService from './db_service';
 import config from './config';
+import { agent } from 'supertest';
 
 /**************************/
 /* SETUP */
@@ -610,9 +613,11 @@ app.post(
       logger.info('SERVER POST /twilio-pull: Passes Twilio auth.');
       if (config.useRefactoredPath) {
         const constituentManagementService = new ConstituentManagementService();
+        const constituentCommunicator = new ConstituentCommunicator();
+        const agentCommunicator = new AgentCommunicator();
         const agentManagementService = new AgentManagementService();
         const dbService = new DbService();
-        const serviceCoordinator = new ServiceCoordinator(constituentManagementService, agentManagementService, dbService);
+        const serviceCoordinator = new ServiceCoordinator(constituentManagementService, agentManagementService, dbService, constituentCommunicator, agentCommunicator);
         await serviceCoordinator.handleIncomingSmsMessage(req, LoadBalancer.PULL_ENTRY_POINT);
       } else {
         await handleIncomingTwilioMessage(req, LoadBalancer.PULL_ENTRY_POINT);
@@ -683,7 +688,9 @@ app.post(
     const agentManagementService = new AgentManagementService();
     const constituentManagementService = new ConstituentManagementService();
     const dbService = new DbService();
-    const serviceCoordinator = new ServiceCoordinator(constituentManagementService, agentManagementService, dbService);
+    const constituentCommunicator = new ConstituentCommunicator();
+    const agentCommunicator = new AgentCommunicator();
+    const serviceCoordinator = new ServiceCoordinator(constituentManagementService, agentManagementService, dbService, constituentCommunicator, agentCommunicator);
 
     // We do some first-order routing here to make sure this is an event we
     // actually care about -- we want to quickly ignore things like
@@ -759,7 +766,9 @@ app.post(
     const constituentManagementService = new ConstituentManagementService();
     const agentManagementService = new AgentManagementService();
     const dbService = new DbService();
-    const serviceCoordinator = new ServiceCoordinator(constituentManagementService, agentManagementService, dbService);
+    const constituentCommunicator = new ConstituentCommunicator();
+    const agentCommunicator = new AgentCommunicator();
+    const serviceCoordinator = new ServiceCoordinator(constituentManagementService, agentManagementService, dbService, constituentCommunicator, agentCommunicator);
     serviceCoordinator.enqueueBackgroundTask('handleIncomingSlackCommand',req.body.channel_id,
       req.body.channel_name,
       req.body.user_id,
@@ -813,7 +822,9 @@ app.post(
       const constituentManagementService = new ConstituentManagementService();
       const agentManagementService = new AgentManagementService();
       const dbService = new DbService();
-      const serviceCoordinator = new ServiceCoordinator(constituentManagementService, agentManagementService, dbService);
+      const constituentCommunicator = new ConstituentCommunicator();
+      const agentCommunicator = new AgentCommunicator();
+      const serviceCoordinator = new ServiceCoordinator(constituentManagementService, agentManagementService, dbService, constituentCommunicator, agentCommunicator);
       response = await serviceCoordinator.handleIncomingSlackInteractivity(payload);
     } else {
       let shouldEnqueueBackgroundTask = true;

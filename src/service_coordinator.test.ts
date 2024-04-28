@@ -97,11 +97,15 @@ import ServiceCoordinator from './service_coordinator';
 import AgentManagementService from './agent_management_service';
 import ConstituentManagementService from './constituent_management_service';
 import DbService from './db_service';
+import ConstituentCommunicator from './constituent_communicator';
+import AgentCommunicator from './agent_communicator';
 import { ConstituentStatus, Request } from './types';
 
 describe('handleIncomingSmsMessage', () => {
     let serviceCoordinator: ServiceCoordinator;
     let mockConstituentManagementService: ConstituentManagementService;
+    let mockConstituentCommunicator: ConstituentCommunicator;
+    let mockAgentCommunicator: AgentCommunicator;
 
     const mockReq = {
         body: {
@@ -122,8 +126,10 @@ describe('handleIncomingSmsMessage', () => {
         const mockAgentManagementService = new AgentManagementService();
         mockConstituentManagementService = new ConstituentManagementService();
         const mockDbService = new DbService();
+        mockConstituentCommunicator = new ConstituentCommunicator();
+        mockAgentCommunicator = new AgentCommunicator();
 
-        serviceCoordinator = new ServiceCoordinator(mockConstituentManagementService, mockAgentManagementService, mockDbService);
+        serviceCoordinator = new ServiceCoordinator(mockConstituentManagementService, mockAgentManagementService, mockDbService, mockConstituentCommunicator, mockAgentCommunicator);
 
         // Reset mocks
         // TODO: Revisit whether this is necessary.
@@ -133,14 +139,15 @@ describe('handleIncomingSmsMessage', () => {
     describe("When the status is NEW", () => {
         beforeEach(() => {
             mockConstituentManagementService.getConstituentStatus = jest.fn().mockReturnValue(ConstituentStatus.NEW);
-            mockConstituentManagementService.sendMessageToConstituent = jest.fn();
+            mockConstituentCommunicator.sendMessage = jest.fn();
+            mockAgentCommunicator.sendMessage = jest.fn();
         });
 
-        it('Should call constituentManagementService.sendMessageToConstituent', async () => {
+        it('Should call constituentCommunicator.sendMessage with welcome', async () => {
             await serviceCoordinator.handleIncomingSmsMessage(mockReq, 'PULL');
 
-            expect(mockConstituentManagementService.sendMessageToConstituent).toHaveBeenCalledTimes(1);
-            expect(mockConstituentManagementService.sendMessageToConstituent).toHaveBeenCalledWith(
+            expect(mockConstituentCommunicator.sendMessage).toHaveBeenCalledTimes(1);
+            expect(mockConstituentCommunicator.sendMessage).toHaveBeenCalledWith(
                 expect.objectContaining({
                     message: expect.stringMatching(/welcome/i),
                     automated: true

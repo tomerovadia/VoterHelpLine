@@ -33,7 +33,7 @@ export type SlackSendMessageResponse = {
   };
 };
 
-type SlackSendMessageOptions = {
+export type SlackSendMessageOptions = {
   channel: string;
   parentMessageTs?: string;
   parse?: boolean;
