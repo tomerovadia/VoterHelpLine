@@ -143,6 +143,8 @@ describe('handleIncomingSmsMessage', () => {
     describe("When the status is NEW", () => {
         beforeEach(() => {
             mockDefaultConstituentMessageHandler.getConstituentStatus = jest.fn().mockReturnValue(ConstituentStatus.NEW);
+            mockDefaultConstituentMessageHandler.processSmsNew = jest.fn();
+
             mockConstituentCommunicator.sendMessage = jest.fn();
             mockAgentCommunicator.sendMessage = jest.fn();
         });
@@ -150,13 +152,8 @@ describe('handleIncomingSmsMessage', () => {
         it('Should call constituentCommunicator.sendMessage with welcome', async () => {
             await coordinator.handleIncomingSmsMessage(mockReq, 'PULL');
 
-            expect(mockConstituentCommunicator.sendMessage).toHaveBeenCalledTimes(1);
-            expect(mockConstituentCommunicator.sendMessage).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    message: expect.stringMatching(/welcome/i),
-                    automated: true
-                }),
-            );
+            expect(mockDefaultConstituentMessageHandler.processSmsNew).toHaveBeenCalledTimes(1);
+            // TODO: Add expectations about what should have been passed to processSmsNew
         });
 
         // it('Should call Router.prepareUserInfoForNewVoter and Router.welcomePotentialVoter', async () => {
