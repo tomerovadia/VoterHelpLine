@@ -6,16 +6,16 @@ import redisClient, { PromisifiedRedisClient } from './redis_client';
 import * as KeywordParser from './keyword_parser';
 import * as SlackInteractionApiUtil from './slack_interaction_api_util';
 import * as RedisApiUtil from './redis_api_util';
-import * as SlackApiUtil from './slack_api_util';
 import logger from './logger';
 import Constituent from './constituent';
 import config from './config';
 import * as MessageConstants from './message_constants';
 import * as Router from './router';
-import * as TwilioApiUtil from './twilio_api_util';
 import * as LoadBalancer from './load_balancer';
 import * as StateParser from './state_parser';
 import * as SlackBlockUtil from './slack_block_util';
+import ConstituentCommunicator from './constituent_communicator';
+import AgentCommunicator from './agent_communicator';
 
 export default class ConstituentMessageHandler {
   private constituent: Constituent;
@@ -24,8 +24,10 @@ export default class ConstituentMessageHandler {
   private twilioCallbackUrl: string;
   private inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry | undefined;
   private entryPoint: EntryPoint;
+  private constituentCommunicator: ConstituentCommunicator;
+  private agentCommunicator: AgentCommunicator;
 
-  constructor() {
+  constructor(constituentCommunicator: ConstituentCommunicator, agentCommunicator: AgentCommunicator) {
     this.constituent = {
       info: undefined,
       status: ConstituentStatus.UNKNOWN,
@@ -40,6 +42,9 @@ export default class ConstituentMessageHandler {
     this.twilioCallbackUrl = '';
     this.inboundDbMessageEntry = undefined;
     this.entryPoint = 'UNKNOWN';
+
+    this.constituentCommunicator = constituentCommunicator;
+    this.agentCommunicator = agentCommunicator;
   }
 
   public setConstituentId(constituentId: string): void {
@@ -334,7 +339,7 @@ export default class ConstituentMessageHandler {
         return;
       }
       // Log incoming message
-      await SlackApiUtil.sendMessage(
+      await this.agentCommunicator.sendMessage(
         this.constituent.message,
         {
           parentMessageTs: this.constituent.info[this.constituent.info.activeChannelId],
@@ -346,16 +351,15 @@ export default class ConstituentMessageHandler {
       );
       // Reply
       const replyMessage = MessageConstants.HELPLINE_AFTER_STOP_RESPONSE();
-      await TwilioApiUtil.sendMessage(
-        replyMessage,
-        {
-          userPhoneNumber: this.constituent.info.phoneNumber,
-          twilioPhoneNumber: this.twilioPhoneNumber,
-          twilioCallbackURL: this.twilioCallbackUrl,
-        },
-        DbApiUtil.populateAutomatedDbMessageEntry(this.constituent.info)
-      );
-      await SlackApiUtil.sendMessage(replyMessage, {
+      await this.constituentCommunicator.sendMessage({
+        message: replyMessage,
+        automated: true,
+        userInfo: this.constituent.info,
+        twilioPhoneNumber: this.twilioPhoneNumber,
+        constituentPhoneNumber: this.constituent.info.phoneNumber,
+        twilioCallbackUrl: this.twilioCallbackUrl,
+      });
+      await this.agentCommunicator.sendMessage(replyMessage, {
         parentMessageTs: this.constituent.info[this.constituent.info.activeChannelId],
         channel: this.constituent.info.activeChannelId,
         isAutomatedMessage: true,
@@ -496,7 +500,7 @@ export default class ConstituentMessageHandler {
 
     if (this.constituent.info && 'activeChannelId' in this.constituent.info) {
       // This includes a DB write of the message.
-      await SlackApiUtil.sendMessage(
+      await this.agentCommunicator.sendMessage(
         this.constituent.message,
         {
           parentMessageTs: this.constituent.info[this.constituent.info.activeChannelId],
@@ -587,7 +591,7 @@ export default class ConstituentMessageHandler {
 
       if ('activeChannelId' in userInfo) {
         // This includes a DB write of the message.
-        await SlackApiUtil.sendMessage(
+        await this.agentCommunicator.sendMessage(
           userMessage,
           {
             parentMessageTs: userInfo[userInfo.activeChannelId],

@@ -38,6 +38,7 @@ import DefaultAgentFeatureHandler from './client/default/default_agent_feature_h
 import DefaultAgentMessageHandler from './client/default/default_agent_message_handler';
 import DefaultDbService from './client/default/default_db_service';
 import config from './config';
+import { agent } from 'supertest';
 
 /**************************/
 /* SETUP */
@@ -612,9 +613,9 @@ app.post(
     if (TwilioUtil.passesAuth(req)) {
       logger.info('SERVER POST /twilio-pull: Passes Twilio auth.');
       if (config.useRefactoredPath) {
-        const defaultConstituentMessageHandler = new DefaultConstituentMessageHandler();
         const constituentCommunicator = new ConstituentCommunicator();
         const agentCommunicator = new AgentCommunicator();
+        const defaultConstituentMessageHandler = new DefaultConstituentMessageHandler(constituentCommunicator, agentCommunicator);
         const defaultAgentMessageHandler = new DefaultAgentMessageHandler();
         const defaultAgentFeatureHandler = new DefaultAgentFeatureHandler();
         const defaultDbService = new DefaultDbService();
@@ -686,12 +687,12 @@ app.post(
 
     const retryReason = req.header('X-Slack-Retry-Reason');
 
-    const defaultAgentMessageHandler = new DefaultAgentMessageHandler();
-    const defaultAgentFeatureHandler = new DefaultAgentFeatureHandler();
-    const constituentManagementService = new DefaultConstituentMessageHandler();
-    const defaultDbService = new DefaultDbService();
     const constituentCommunicator = new ConstituentCommunicator();
     const agentCommunicator = new AgentCommunicator();
+    const defaultAgentMessageHandler = new DefaultAgentMessageHandler();
+    const defaultAgentFeatureHandler = new DefaultAgentFeatureHandler();
+    const constituentManagementService = new DefaultConstituentMessageHandler(constituentCommunicator, agentCommunicator);
+    const defaultDbService = new DefaultDbService();
     const defaultCoordinator = new DefaultCoordinator(constituentManagementService, defaultAgentMessageHandler, defaultAgentFeatureHandler, defaultDbService, constituentCommunicator, agentCommunicator);
 
     // We do some first-order routing here to make sure this is an event we
@@ -765,12 +766,12 @@ app.post(
     }
     logger.info('SERVER POST /slack-command: PASSES AUTH');
 
-    const defaultConstituentMessageHandler = new DefaultConstituentMessageHandler();
+    const constituentCommunicator = new ConstituentCommunicator();
+    const agentCommunicator = new AgentCommunicator();
+    const defaultConstituentMessageHandler = new DefaultConstituentMessageHandler(constituentCommunicator, agentCommunicator);
     const defaultAgentMessageHandler = new DefaultAgentMessageHandler();
     const defaultAgentFeatureHandler = new DefaultAgentFeatureHandler();
     const defaultDbService = new DefaultDbService();
-    const constituentCommunicator = new ConstituentCommunicator();
-    const agentCommunicator = new AgentCommunicator();
     const defaultCoordinator = new DefaultCoordinator(defaultConstituentMessageHandler, defaultAgentMessageHandler, defaultAgentFeatureHandler, defaultDbService, constituentCommunicator, agentCommunicator);
     defaultCoordinator.enqueueBackgroundTask('handleIncomingSlackCommand',req.body.channel_id,
       req.body.channel_name,
@@ -822,12 +823,12 @@ app.post(
     let response: any;
 
     if (config.useRefactoredPath) {
-      const defaultConstituentMessageHandler = new DefaultConstituentMessageHandler();
+      const constituentCommunicator = new ConstituentCommunicator();
+      const agentCommunicator = new AgentCommunicator();
+      const defaultConstituentMessageHandler = new DefaultConstituentMessageHandler(constituentCommunicator, agentCommunicator);
       const defaultAgentMessageHandler = new DefaultAgentMessageHandler();
       const defaultAgentFeatureHandler = new DefaultAgentFeatureHandler();
       const defaultDbService = new DefaultDbService();
-      const constituentCommunicator = new ConstituentCommunicator();
-      const agentCommunicator = new AgentCommunicator();
       const defaultCoordinator = new DefaultCoordinator(defaultConstituentMessageHandler, defaultAgentMessageHandler, defaultAgentFeatureHandler, defaultDbService, constituentCommunicator, agentCommunicator);
       response = await defaultCoordinator.handleIncomingSlackInteractivity(payload);
     } else {
