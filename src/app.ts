@@ -616,7 +616,7 @@ app.post(
         const constituentCommunicator = new ConstituentCommunicator();
         const agentCommunicator = new AgentCommunicator();
         const defaultConstituentMessageHandler = new DefaultConstituentMessageHandler(constituentCommunicator, agentCommunicator);
-        const defaultAgentMessageHandler = new DefaultAgentMessageHandler();
+        const defaultAgentMessageHandler = new DefaultAgentMessageHandler(agentCommunicator);
         const defaultAgentFeatureHandler = new DefaultAgentFeatureHandler();
         const defaultDbService = new DefaultDbService();
         const defaultCoordinator = new DefaultCoordinator(defaultConstituentMessageHandler, defaultAgentMessageHandler, defaultAgentFeatureHandler, defaultDbService, constituentCommunicator, agentCommunicator);
@@ -689,7 +689,7 @@ app.post(
 
     const constituentCommunicator = new ConstituentCommunicator();
     const agentCommunicator = new AgentCommunicator();
-    const defaultAgentMessageHandler = new DefaultAgentMessageHandler();
+    const defaultAgentMessageHandler = new DefaultAgentMessageHandler(agentCommunicator);
     const defaultAgentFeatureHandler = new DefaultAgentFeatureHandler();
     const constituentManagementService = new DefaultConstituentMessageHandler(constituentCommunicator, agentCommunicator);
     const defaultDbService = new DefaultDbService();
@@ -769,7 +769,7 @@ app.post(
     const constituentCommunicator = new ConstituentCommunicator();
     const agentCommunicator = new AgentCommunicator();
     const defaultConstituentMessageHandler = new DefaultConstituentMessageHandler(constituentCommunicator, agentCommunicator);
-    const defaultAgentMessageHandler = new DefaultAgentMessageHandler();
+    const defaultAgentMessageHandler = new DefaultAgentMessageHandler(agentCommunicator);
     const defaultAgentFeatureHandler = new DefaultAgentFeatureHandler();
     const defaultDbService = new DefaultDbService();
     const defaultCoordinator = new DefaultCoordinator(defaultConstituentMessageHandler, defaultAgentMessageHandler, defaultAgentFeatureHandler, defaultDbService, constituentCommunicator, agentCommunicator);
@@ -826,7 +826,7 @@ app.post(
       const constituentCommunicator = new ConstituentCommunicator();
       const agentCommunicator = new AgentCommunicator();
       const defaultConstituentMessageHandler = new DefaultConstituentMessageHandler(constituentCommunicator, agentCommunicator);
-      const defaultAgentMessageHandler = new DefaultAgentMessageHandler();
+      const defaultAgentMessageHandler = new DefaultAgentMessageHandler(agentCommunicator);
       const defaultAgentFeatureHandler = new DefaultAgentFeatureHandler();
       const defaultDbService = new DefaultDbService();
       const defaultCoordinator = new DefaultCoordinator(defaultConstituentMessageHandler, defaultAgentMessageHandler, defaultAgentFeatureHandler, defaultDbService, constituentCommunicator, agentCommunicator);

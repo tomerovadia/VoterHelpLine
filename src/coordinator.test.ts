@@ -125,7 +125,7 @@ describe('handleIncomingSmsMessage', () => {
     const MD5 = new Hashes.MD5();
 
     beforeEach(() => {
-        const mockAgentMessageHander = new AgentMessageHandler();
+        const mockAgentMessageHander = new AgentMessageHandler(mockAgentCommunicator);
         const mockAgentFeatureHandler = new AgentFeatureHandler();
         mockConstituentMessageHandler = new ConstituentMessageHandler(mockConstituentCommunicator, mockAgentCommunicator);
         const mockDbService = new DbService();
