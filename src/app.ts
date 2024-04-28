@@ -33,9 +33,10 @@ import * as KeywordParser from './keyword_parser';
 import DefaultConstituentMessageHandler from './client/default/default_constituent_message_handler';
 import ConstituentCommunicator from './constituent_communicator';
 import AgentCommunicator from './agent_communicator';
-import ServiceCoordinator from './client/default/default_service_coordinator';
-import AgentManagementService from './client/default/default_agent_management_service';
-import DbService from './db_service';
+import DefaultServiceCoordinator from './client/default/default_service_coordinator';
+import DefaultAgentFeatureHandler from './client/default/default_agent_feature_handler';
+import DefaultAgentMessageHandler from './client/default/default_agent_message_handler';
+import DefaultDbService from './client/default/default_db_service';
 import config from './config';
 
 /**************************/
@@ -614,10 +615,11 @@ app.post(
         const defaultConstituentMessageHandler = new DefaultConstituentMessageHandler();
         const constituentCommunicator = new ConstituentCommunicator();
         const agentCommunicator = new AgentCommunicator();
-        const agentManagementService = new AgentManagementService();
-        const dbService = new DbService();
-        const serviceCoordinator = new ServiceCoordinator(defaultConstituentMessageHandler, agentManagementService, dbService, constituentCommunicator, agentCommunicator);
-        await serviceCoordinator.handleIncomingSmsMessage(req, LoadBalancer.PULL_ENTRY_POINT);
+        const defaultAgentMessageHandler = new DefaultAgentMessageHandler();
+        const defaultAgentFeatureHandler = new DefaultAgentFeatureHandler();
+        const defaultDbService = new DefaultDbService();
+        const defaultServiceCoordinator = new DefaultServiceCoordinator(defaultConstituentMessageHandler, defaultAgentMessageHandler, defaultAgentFeatureHandler, defaultDbService, constituentCommunicator, agentCommunicator);
+        await defaultServiceCoordinator.handleIncomingSmsMessage(req, LoadBalancer.PULL_ENTRY_POINT);
       } else {
         await handleIncomingTwilioMessage(req, LoadBalancer.PULL_ENTRY_POINT);
       }
@@ -684,12 +686,13 @@ app.post(
 
     const retryReason = req.header('X-Slack-Retry-Reason');
 
-    const agentManagementService = new AgentManagementService();
+    const defaultAgentMessageHandler = new DefaultAgentMessageHandler();
+    const defaultAgentFeatureHandler = new DefaultAgentFeatureHandler();
     const constituentManagementService = new DefaultConstituentMessageHandler();
-    const dbService = new DbService();
+    const defaultDbService = new DefaultDbService();
     const constituentCommunicator = new ConstituentCommunicator();
     const agentCommunicator = new AgentCommunicator();
-    const serviceCoordinator = new ServiceCoordinator(constituentManagementService, agentManagementService, dbService, constituentCommunicator, agentCommunicator);
+    const defaultServiceCoordinator = new DefaultServiceCoordinator(constituentManagementService, defaultAgentMessageHandler, defaultAgentFeatureHandler, defaultDbService, constituentCommunicator, agentCommunicator);
 
     // We do some first-order routing here to make sure this is an event we
     // actually care about -- we want to quickly ignore things like
@@ -703,7 +706,7 @@ app.post(
       !reqBody.event.hidden
     ) {
       if (config.useRefactoredPath) {
-        await serviceCoordinator.enqueueBackgroundTask('handleIncomingSlackMessageEvent',
+        await defaultServiceCoordinator.enqueueBackgroundTask('handleIncomingSlackMessageEvent',
           reqBody,
           TwilioUtil.twilioCallbackURL(req),
           {
@@ -729,7 +732,7 @@ app.post(
       !retryReason
     ) {
       if (config.useRefactoredPath) {
-        await serviceCoordinator.enqueueBackgroundTask('handleIncomingSlackAppMentionEvent', reqBody);
+        await defaultServiceCoordinator.enqueueBackgroundTask('handleIncomingSlackAppMentionEvent', reqBody);
       } else {
         await enqueueBackgroundTask('slackAppMentionEventHandler', reqBody);
       }
@@ -763,12 +766,13 @@ app.post(
     logger.info('SERVER POST /slack-command: PASSES AUTH');
 
     const defaultConstituentMessageHandler = new DefaultConstituentMessageHandler();
-    const agentManagementService = new AgentManagementService();
-    const dbService = new DbService();
+    const defaultAgentMessageHandler = new DefaultAgentMessageHandler();
+    const defaultAgentFeatureHandler = new DefaultAgentFeatureHandler();
+    const defaultDbService = new DefaultDbService();
     const constituentCommunicator = new ConstituentCommunicator();
     const agentCommunicator = new AgentCommunicator();
-    const serviceCoordinator = new ServiceCoordinator(defaultConstituentMessageHandler, agentManagementService, dbService, constituentCommunicator, agentCommunicator);
-    serviceCoordinator.enqueueBackgroundTask('handleIncomingSlackCommand',req.body.channel_id,
+    const defaultServiceCoordinator = new DefaultServiceCoordinator(defaultConstituentMessageHandler, defaultAgentMessageHandler, defaultAgentFeatureHandler, defaultDbService, constituentCommunicator, agentCommunicator);
+    defaultServiceCoordinator.enqueueBackgroundTask('handleIncomingSlackCommand',req.body.channel_id,
       req.body.channel_name,
       req.body.user_id,
       req.body.user_name,
@@ -819,12 +823,13 @@ app.post(
 
     if (config.useRefactoredPath) {
       const defaultConstituentMessageHandler = new DefaultConstituentMessageHandler();
-      const agentManagementService = new AgentManagementService();
-      const dbService = new DbService();
+      const defaultAgentMessageHandler = new DefaultAgentMessageHandler();
+      const defaultAgentFeatureHandler = new DefaultAgentFeatureHandler();
+      const defaultDbService = new DefaultDbService();
       const constituentCommunicator = new ConstituentCommunicator();
       const agentCommunicator = new AgentCommunicator();
-      const serviceCoordinator = new ServiceCoordinator(defaultConstituentMessageHandler, agentManagementService, dbService, constituentCommunicator, agentCommunicator);
-      response = await serviceCoordinator.handleIncomingSlackInteractivity(payload);
+      const defaultServiceCoordinator = new DefaultServiceCoordinator(defaultConstituentMessageHandler, defaultAgentMessageHandler, defaultAgentFeatureHandler, defaultDbService, constituentCommunicator, agentCommunicator);
+      response = await defaultServiceCoordinator.handleIncomingSlackInteractivity(payload);
     } else {
       let shouldEnqueueBackgroundTask = true;
       const metadata: InteractivityHandlerMetadata = {};

@@ -7,7 +7,8 @@ import * as TwilioUtil from './twilio_util';
 import * as LoadBalancer from './load_balancer';
 import * as KeywordParser from './keyword_parser';
 import * as SlackApiUtil from './slack_api_util';
-import AgentManagementService from './agent_management_service';
+import AgentMessageHandler from './agent_message_handler';
+import AgentFeatureHandler from './agent_feature_handler';
 import ConstituentMessageHandler from './constituent_message_handler';
 import ConstituentCommunicator from './constituent_communicator';
 import AgentCommunicator from './agent_communicator';
@@ -70,20 +71,23 @@ export default class ServiceCoordinator {
   //   private slackService: any; // Replace 'any' with the actual type of your Slack service
   //   private twilioService: any; // Replace 'any' with the actual type of your Twilio service
   private constituentMessageHandler: ConstituentMessageHandler;
-  private agentManagementService: AgentManagementService;
+  private agentMessageHandler: AgentMessageHandler;
+  private agentFeatureHandler: AgentFeatureHandler;
   private dbService: DbService;
   private constituentCommunicator: ConstituentCommunicator;
   private agentCommunicator: AgentCommunicator;
 
   constructor(
     constituentMessageHandler: ConstituentMessageHandler,
-    agentManagementService: AgentManagementService,
+    agentMessageHandler: AgentMessageHandler,
+    agentFeatureHandler: AgentFeatureHandler,
     dbService: DbService,
     constituentCommunicator: ConstituentCommunicator,
     agentCommunicator: AgentCommunicator
   ) {
     this.constituentMessageHandler = constituentMessageHandler;
-    this.agentManagementService = agentManagementService;
+    this.agentMessageHandler = agentMessageHandler;
+    this.agentFeatureHandler = agentFeatureHandler;
     this.dbService = dbService;
     this.constituentCommunicator = constituentCommunicator;
     this.agentCommunicator = agentCommunicator;
@@ -107,7 +111,7 @@ export default class ServiceCoordinator {
       retryCount,
       retryReason,
     }: { retryCount: number | undefined; retryReason: string | undefined }): Promise<void> {
-    this.agentManagementService.handleSlackMessageEvent(
+    this.agentMessageHandler.handleMessageEvent(
       reqBody,
       twilioCallbackURL,
       {
@@ -119,7 +123,7 @@ export default class ServiceCoordinator {
 
   // Method to handle incoming messages that contain a mention of the Slack app (unofficial Slack commands).
   public async handleIncomingSlackAppMentionEvent(reqBody: SlackEventRequestBody): Promise<void> {
-    await this.agentManagementService.handleSlackAppMentionEvent(
+    await this.agentFeatureHandler.handleSlackAppMentionEvent(
       reqBody
     );
   }
@@ -132,18 +136,18 @@ export default class ServiceCoordinator {
     command: string,
     text: string,
     responseUrl: string): Promise<void> {
-    await this.agentManagementService.handleSlackCommand(
+    await this.agentFeatureHandler.handleSlackCommand(
       channelId, channelName, userId, userName, command, text, responseUrl
     );
   }
 
-  // This wrapper is necessary because agentManagementServiceInstance.handleSlackInteractivity
+  // This wrapper is necessary because agentFeatureHandlerInstance.handleSlackInteractivity
   // can't be listed in BACKGROUND_TASKS directly.
   private async handleSlackInteractivity(
     payload: SlackInteractionEventPayload,
     metadata: InteractivityHandlerMetadata
   ): Promise<void> {
-    await this.agentManagementService.handleSlackInteractivity(payload, metadata);
+    await this.agentFeatureHandler.handleSlackInteractivity(payload, metadata);
   }
 
   // Method to handle incoming slack interactivity.
@@ -1957,8 +1961,8 @@ export default class ServiceCoordinator {
 
 // TODO: Update this to allow constructors to take arguments. See discussion "JS AWS Lambda + Constructor Use."
 // Used by serverless.yml.
-// const agentManagementServiceInstance = new AgentManagementService();
+// const agentFeatureHandlerInstance = new AgentFeatureHandler();
 // const constituentManagementServiceInstance = new ConstituentManagementService();
 // const dbServiceInstance = new DbService();
-// const serviceCoordinatorInstance = new ServiceCoordinator(constituentManagementServiceInstance, agentManagementServiceInstance, dbServiceInstance);
+// const serviceCoordinatorInstance = new ServiceCoordinator(constituentManagementServiceInstance, agentFeatureHandlerInstance, dbServiceInstance);
 // module.exports.backgroundLambdaHandler = serviceCoordinatorInstance.backgroundLambdaHandler.bind(serviceCoordinatorInstance);

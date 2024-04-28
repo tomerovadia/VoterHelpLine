@@ -1,18 +1,20 @@
 import ServiceCoordinator from './../../service_coordinator';
-import DefaultConstituentManagementService from './default_constituent_management_service';
-import DefaultAgentManagementService from './default_agent_management_service';
+import DefaultConstituentMessageHandler from './default_constituent_message_handler';
+import DefaultAgentMessageHandler from './default_agent_message_handler';
+import DefaultAgentFeatureHandler from './default_agent_feature_handler';
 import ConstituentCommunicator from './../../constituent_communicator';
 import agentCommunicator from './../../agent_communicator';
 import DefaultDbService from './default_db_service';
 
 export default class DefaultServiceCoordinator extends ServiceCoordinator {
     constructor(
-        constituentManagementService: DefaultConstituentManagementService,
-        agentManagementService: DefaultAgentManagementService,
-        dbService: DefaultDbService,
+        defaultConstituentManagementService: DefaultConstituentMessageHandler,
+        agentMessageHandler: DefaultAgentMessageHandler,
+        defaultAgentFeatureHandler: DefaultAgentFeatureHandler,
+        defaultDbService: DefaultDbService,
         constituentCommunicator: ConstituentCommunicator,
         agentCommunicator: agentCommunicator
     ) {
-        super(constituentManagementService, agentManagementService, dbService, constituentCommunicator, agentCommunicator);
+        super(defaultConstituentManagementService, agentMessageHandler, defaultAgentFeatureHandler, defaultDbService, constituentCommunicator, agentCommunicator);
     }
 }

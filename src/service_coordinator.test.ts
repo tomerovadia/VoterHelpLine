@@ -5,9 +5,9 @@ const mockTwilioPhoneNumber = 'mockTwilioPhoneNumber';
 const mockConstituentMessage = 'mockConstituentMessage';
 const mockSmsMessageSid = 'mockSmsMessageSid';
 
-jest.mock('./agent_management_service', () => {
+jest.mock('./agent_message_handler', () => {
     return jest.fn().mockImplementation(() => ({
-        isPhoneNumberBlocked: jest.fn().mockReturnValue(false),
+        handleMessageEvent: jest.fn(),
     }));
 });
 
@@ -29,6 +29,7 @@ jest.mock('./constituent_message_handler', () => {
         determineConstituentStatus: jest.fn(),
         handleOptOutLogic: jest.fn().mockReturnValue(true),
         sendMessageToConstituent: jest.fn(),
+        isPhoneNumberBlocked: jest.fn().mockReturnValue(false),
     }));
 });
 
@@ -94,7 +95,8 @@ jest.mock('./keyword_parser', () => ({
 }));
 
 import ServiceCoordinator from './service_coordinator';
-import AgentManagementService from './agent_management_service';
+import AgentMessageHandler from './agent_message_handler';
+import AgentFeatureHandler from './agent_feature_handler';
 import ConstituentMessageHandler from './constituent_message_handler';
 import DbService from './db_service';
 import ConstituentCommunicator from './constituent_communicator';
@@ -123,13 +125,14 @@ describe('handleIncomingSmsMessage', () => {
     const MD5 = new Hashes.MD5();
 
     beforeEach(() => {
-        const mockAgentManagementService = new AgentManagementService();
+        const mockAgentMessageHander = new AgentMessageHandler();
+        const mockAgentFeatureHandler = new AgentFeatureHandler();
         mockConstituentMessageHandler = new ConstituentMessageHandler();
         const mockDbService = new DbService();
         mockConstituentCommunicator = new ConstituentCommunicator();
         mockAgentCommunicator = new AgentCommunicator();
 
-        serviceCoordinator = new ServiceCoordinator(mockConstituentMessageHandler, mockAgentManagementService, mockDbService, mockConstituentCommunicator, mockAgentCommunicator);
+        serviceCoordinator = new ServiceCoordinator(mockConstituentMessageHandler, mockAgentMessageHander, mockAgentFeatureHandler, mockDbService, mockConstituentCommunicator, mockAgentCommunicator);
 
         // Reset mocks
         // TODO: Revisit whether this is necessary.
