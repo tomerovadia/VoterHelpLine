@@ -26,17 +26,6 @@ export default class AgentManagementService {
     // Constructor can be used to initialize the service with predefined data
   }
 
-  // Whether the phone number was blocked by the client/volunteers.
-  public async isPhoneNumberBlocked(userPhoneNumber: string): Promise<boolean> {
-    const redisBlockedUserPhoneNumberValue = await RedisApiUtil.getHashField(
-      redisClient,
-      'twilioBlockedUserPhoneNumbers',
-      userPhoneNumber
-    );
-    
-    return redisBlockedUserPhoneNumberValue == '1';
-  }
-
   public async handleSlackCommand(
     channelId: string,
     channelName: string,

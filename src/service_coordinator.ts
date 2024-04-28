@@ -1765,7 +1765,7 @@ export default class ServiceCoordinator {
     // TODO: Have the logic within this block encapsulated within a method of constituentMessageHandler,
     // so that clients can modify the behavior (e.g. reply with unsubscribe confirmation).
     // Have this be one of the major paths (with constitutent status STOP).
-    if (await this.agentManagementService.isPhoneNumberBlocked(userPhoneNumber)) {
+    if (await this.constituentMessageHandler.isPhoneNumberBlocked(userPhoneNumber)) {
       logger.info(
         `ServiceCoordinator.handleIncomingSmsMessage: Received text from blocked phone number: ${userPhoneNumber}.`
       );

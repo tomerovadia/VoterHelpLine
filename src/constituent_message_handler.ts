@@ -123,6 +123,17 @@ export default class ConstituentManagementService {
     );
   }
 
+  // Whether the phone number was blocked by the client/volunteers.
+  public async isPhoneNumberBlocked(userPhoneNumber: string): Promise<boolean> {
+    const redisBlockedUserPhoneNumberValue = await RedisApiUtil.getHashField(
+      redisClient,
+      'twilioBlockedUserPhoneNumbers',
+      userPhoneNumber
+    );
+    
+    return redisBlockedUserPhoneNumberValue == '1';
+  }
+
   public async fetchAndLoadKnownState(): Promise<string | null> {
     const knownState = await DbApiUtil.getKnownPhoneState(
       this.constituent.phoneNumber
