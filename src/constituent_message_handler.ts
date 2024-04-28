@@ -2,7 +2,7 @@ import * as Sentry from '@sentry/node';
 
 import { ConstituentStatus, UserInfo, EntryPoint } from './types';
 import * as DbApiUtil from './db_api_util';
-import redisClient from './redis_client';
+import redisClient, { PromisifiedRedisClient } from './redis_client';
 import * as KeywordParser from './keyword_parser';
 import * as SlackInteractionApiUtil from './slack_interaction_api_util';
 import * as RedisApiUtil from './redis_api_util';
@@ -12,10 +12,10 @@ import Constituent from './constituent';
 import config from './config';
 import * as MessageConstants from './message_constants';
 import * as Router from './router';
-import * as TwilioApiUtil2 from './twilio_api_util_refactored';
 import * as TwilioApiUtil from './twilio_api_util';
 import * as LoadBalancer from './load_balancer';
 import * as StateParser from './state_parser';
+import * as SlackBlockUtil from './slack_block_util';
 
 export default class ConstituentManagementService {
   private constituent: Constituent;
@@ -84,6 +84,43 @@ export default class ConstituentManagementService {
 
   public isConstituentKnown(): boolean {
     return this.constituent.known ? this.constituent.known : false;
+  }
+
+  public async endVoterSession(  redisClient: PromisifiedRedisClient,
+    userInfo: UserInfo,
+    twilioPhoneNumber: string
+  ): Promise<void> {
+    // end old session thread(s)
+    await DbApiUtil.setSessionEnd(userInfo.userId, twilioPhoneNumber);
+  
+    // clear any assigned volunteer
+    await DbApiUtil.logVolunteerVoterClaimToDb({
+      userId: userInfo.userId,
+      userPhoneNumber: userInfo.userPhoneNumber,
+      twilioPhoneNumber,
+      isDemo: LoadBalancer.phoneNumbersAreDemo(
+        twilioPhoneNumber,
+        userInfo.userPhoneNumber
+      ),
+      volunteerSlackUserName: null,
+      volunteerSlackUserId: null,
+      originatingSlackUserName: null,
+      originatingSlackUserId: null,
+      slackChannelName: null,
+      slackChannelId: null,
+      slackParentMessageTs: null,
+      actionTs: null,
+    });
+  
+    // delete userInfo
+    const redisHashKey = `${userInfo.userId}:${twilioPhoneNumber}`;
+    await RedisApiUtil.deleteKeys(redisClient, [redisHashKey]);
+  
+    // update old session thread's panel async; do not await
+    void SlackBlockUtil.closeVoterPanel(
+      userInfo,
+      'This voter helpline session is closed'
+    );
   }
 
   public async fetchAndLoadKnownState(): Promise<string | null> {
