@@ -5,9 +5,15 @@ import * as Sentry from '@sentry/node';
 import logger from './logger';
 
 export default class ConstituentCommunicator {
-    // private twilioPhoneNumber: string;
-    // private constituentPhoneNumber: string;
-    // private twilioCallbackUrl: string;
+    private twilioPhoneNumber: string;
+    private constituentPhoneNumber: string;
+    private twilioCallbackUrl: string;
+
+    constructor(twilioPhoneNumber: string, constituentPhoneNumber: string, twilioCallbackUrl: string) {
+        this.twilioPhoneNumber = twilioPhoneNumber;
+        this.constituentPhoneNumber = constituentPhoneNumber;
+        this.twilioCallbackUrl = twilioCallbackUrl;
+    }
 
     public async sendMessage({
         message,
@@ -15,18 +21,12 @@ export default class ConstituentCommunicator {
         deduplicationId,
         automated,
         userInfo,
-        twilioPhoneNumber,
-        constituentPhoneNumber,
-        twilioCallbackUrl,
     }: {
         message: string;
         media?: string[];
         deduplicationId?: string;
         automated: boolean;
         userInfo: UserInfo;
-        twilioPhoneNumber: string;
-        constituentPhoneNumber: string;
-        twilioCallbackUrl: string;
     }
     ): Promise<void> {
         logger.info(`ENTERING ConstituentCommunicator.sendMessageToConstituent`);
@@ -40,8 +40,8 @@ export default class ConstituentCommunicator {
         }
 
         databaseMessageEntry.message = message;
-        databaseMessageEntry.fromPhoneNumber = twilioPhoneNumber;
-        databaseMessageEntry.toPhoneNumber = constituentPhoneNumber;
+        databaseMessageEntry.fromPhoneNumber = this.twilioPhoneNumber;
+        databaseMessageEntry.toPhoneNumber = this.constituentPhoneNumber;
         databaseMessageEntry.twilioSendTimestamp = new Date();
 
         logger.info(
@@ -51,9 +51,9 @@ export default class ConstituentCommunicator {
         );
         const twilioSendMessageResponse = await TwilioApiUtil2.sendMessage(message, media, {
             deduplicationId,
-            twilioPhoneNumber: twilioPhoneNumber,
-            userPhoneNumber: constituentPhoneNumber,
-            twilioCallbackURL: twilioCallbackUrl,
+            twilioPhoneNumber: this.twilioPhoneNumber,
+            userPhoneNumber: this.constituentPhoneNumber,
+            twilioCallbackURL: this.twilioCallbackUrl,
         });
 
         if (twilioSendMessageResponse && twilioSendMessageResponse.success) {
@@ -75,7 +75,7 @@ export default class ConstituentCommunicator {
                 logger.warn(
                     'ConstituentCommunicator.sendMessageToConstituent: Not sending duplicate Twilio message ' +
                     `triggered by Slack message ${databaseMessageEntry.slackMessageTs} in ` +
-                    `channel ${databaseMessageEntry.slackChannel} to ${constituentPhoneNumber}: ${message}`
+                    `channel ${databaseMessageEntry.slackChannel} to ${this.constituentPhoneNumber}: ${message}`
                 );
             }
             databaseMessageEntry.twilioError = twilioErrorMessage ? twilioErrorMessage : twilioSendMessageResponse.errorMessage;

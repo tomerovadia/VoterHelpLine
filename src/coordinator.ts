@@ -323,9 +323,6 @@ export default class Coordinator {
           message: messageToVoter,
           automated: true,
           userInfo,
-          twilioPhoneNumber,
-          constituentPhoneNumber: userInfo.userPhoneNumber,
-          twilioCallbackUrl: twilioCallbackURL,
         });
       }
     } else {
@@ -333,9 +330,6 @@ export default class Coordinator {
         message: `There was an unexpected error sending your message. Please wait a few minutes and try again.`,
         automated: true,
         userInfo,
-        twilioPhoneNumber,
-        constituentPhoneNumber: userInfo.userPhoneNumber,
-        twilioCallbackUrl: twilioCallbackURL,
       });
       throw new Error(
         `Could not send introduction slack message with voter info for voter ${userInfo.userPhoneNumber} texting ${twilioPhoneNumber}`
@@ -665,9 +659,6 @@ export default class Coordinator {
       message: replyMessage,
       automated: true,
       userInfo,
-      twilioPhoneNumber,
-      constituentPhoneNumber: userInfo.userPhoneNumber,
-      twilioCallbackUrl: twilioCallbackURL,
     });
     await this.agentCommunicator.sendMessage(replyMessage, {
       parentMessageTs: userInfo[userInfo.activeChannelId],
@@ -1113,9 +1104,6 @@ export default class Coordinator {
       message: messageToVoter,
       automated: true,
       userInfo,
-      twilioPhoneNumber,
-      constituentPhoneNumber: userInfo.userPhoneNumber,
-      twilioCallbackUrl: twilioCallbackURL,
     });
 
     DbApiUtil.updateDbMessageEntryWithUserInfo(userInfo!, inboundDbMessageEntry);
@@ -1169,9 +1157,6 @@ export default class Coordinator {
       message: messageToVoter,
       automated: true,
       userInfo,
-      twilioPhoneNumber,
-      constituentPhoneNumber: userInfo.userPhoneNumber,
-      twilioCallbackUrl: twilioCallbackURL,
     });
 
     // The rest of this logic is the same as the NEW case. Consider consolidating somehow.
@@ -1293,9 +1278,6 @@ export default class Coordinator {
           message: `There was an unexpected error sending your message. Please wait a few minutes and try again.`,
           automated: true,
           userInfo,
-          twilioPhoneNumber,
-          constituentPhoneNumber: userInfo.userPhoneNumber,
-          twilioCallbackUrl: twilioCallbackURL,
         });
         throw new Error(
           `Could not send introduction slack message with voter info for voter ${userInfo.userPhoneNumber} texting ${twilioPhoneNumber}. Error: ${error}`
@@ -1310,9 +1292,6 @@ export default class Coordinator {
           message: `There was an unexpected error sending your message. Please wait a few minutes and try again.`,
           automated: true,
           userInfo,
-          twilioPhoneNumber,
-          constituentPhoneNumber: userInfo.userPhoneNumber,
-          twilioCallbackUrl: twilioCallbackURL,
         });
         throw new Error(
           `Could not send introduction slack message with voter info for voter ${userInfo.userPhoneNumber} texting ${twilioPhoneNumber}.`
@@ -1323,9 +1302,6 @@ export default class Coordinator {
         message: messageToConstituent,
         automated: true,
         userInfo,
-        twilioPhoneNumber,
-        constituentPhoneNumber: userInfo.userPhoneNumber,
-        twilioCallbackUrl: twilioCallbackURL,
       });
 
       logger.debug(`Successfully announced new voter via new thread in ${slackChannelName},
@@ -1415,9 +1391,6 @@ export default class Coordinator {
         message: messageToConstituent,
         automated: true,
         userInfo,
-        twilioPhoneNumber,
-        constituentPhoneNumber: userInfo.userPhoneNumber,
-        twilioCallbackUrl: twilioCallbackURL,
       });
       userInfo["NONEXISTENT_LOBBY"] = "NONEXISTENT_LOBBY_TS";
       // Set active channel to this first channel, since the voter is new.
@@ -1544,9 +1517,6 @@ export default class Coordinator {
             message: MessageConstants.CLARIFY_STATE(),
             automated: true,
             userInfo,
-            twilioPhoneNumber,
-            constituentPhoneNumber: userInfo.userPhoneNumber,
-            twilioCallbackUrl: twilioCallbackURL,
           });
 
           if (!skipLobby && userInfo.activeChannelId != 'NONEXISTENT_LOBBY') {
@@ -1585,9 +1555,6 @@ export default class Coordinator {
         message: messageToVoter,
         automated: true,
         userInfo,
-        twilioPhoneNumber,
-        constituentPhoneNumber: userInfo.userPhoneNumber,
-        twilioCallbackUrl: twilioCallbackURL,
       });
       if (!skipLobby && userInfo.activeChannelId != 'NONEXISTENT_LOBBY') {
         await this.agentCommunicator.sendMessage(messageToVoter, {
@@ -1693,9 +1660,6 @@ export default class Coordinator {
         message: userMessage,
         automated: true,
         userInfo,
-        twilioPhoneNumber,
-        constituentPhoneNumber: userInfo.userPhoneNumber,
-        twilioCallbackUrl: twilioCallbackURL,
       });
       await this.agentCommunicator.sendMessage(userMessage, {
         ...activeChannelMessageParams,

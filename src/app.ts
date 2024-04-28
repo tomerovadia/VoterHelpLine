@@ -613,7 +613,9 @@ app.post(
     if (TwilioUtil.passesAuth(req)) {
       logger.info('SERVER POST /twilio-pull: Passes Twilio auth.');
       if (config.useRefactoredPath) {
-        const constituentCommunicator = new ConstituentCommunicator();
+        const reqBody = req.body as TwilioRequestBody;
+        const twilioCallbackURL = TwilioUtil.twilioCallbackURL(req);
+        const constituentCommunicator = new ConstituentCommunicator(reqBody.To, reqBody.From, twilioCallbackURL);
         const agentCommunicator = new AgentCommunicator();
         const defaultConstituentMessageHandler = new DefaultConstituentMessageHandler(constituentCommunicator, agentCommunicator);
         const defaultAgentMessageHandler = new DefaultAgentMessageHandler(agentCommunicator);
@@ -687,7 +689,8 @@ app.post(
 
     const retryReason = req.header('X-Slack-Retry-Reason');
 
-    const constituentCommunicator = new ConstituentCommunicator();
+    const twilioCallbackURL = TwilioUtil.twilioCallbackURL(req);
+    const constituentCommunicator = new ConstituentCommunicator(reqBody.To, reqBody.From, twilioCallbackURL);
     const agentCommunicator = new AgentCommunicator();
     const defaultAgentMessageHandler = new DefaultAgentMessageHandler(agentCommunicator);
     const defaultAgentFeatureHandler = new DefaultAgentFeatureHandler();
@@ -766,7 +769,9 @@ app.post(
     }
     logger.info('SERVER POST /slack-command: PASSES AUTH');
 
-    const constituentCommunicator = new ConstituentCommunicator();
+    const reqBody = req.body as TwilioRequestBody;
+    const twilioCallbackURL = TwilioUtil.twilioCallbackURL(req);
+    const constituentCommunicator = new ConstituentCommunicator(reqBody.To, reqBody.From, twilioCallbackURL);
     const agentCommunicator = new AgentCommunicator();
     const defaultConstituentMessageHandler = new DefaultConstituentMessageHandler(constituentCommunicator, agentCommunicator);
     const defaultAgentMessageHandler = new DefaultAgentMessageHandler(agentCommunicator);
@@ -823,7 +828,9 @@ app.post(
     let response: any;
 
     if (config.useRefactoredPath) {
-      const constituentCommunicator = new ConstituentCommunicator();
+      const reqBody = req.body as TwilioRequestBody;
+      const twilioCallbackURL = TwilioUtil.twilioCallbackURL(req);
+      const constituentCommunicator = new ConstituentCommunicator(reqBody.To, reqBody.From, twilioCallbackURL);
       const agentCommunicator = new AgentCommunicator();
       const defaultConstituentMessageHandler = new DefaultConstituentMessageHandler(constituentCommunicator, agentCommunicator);
       const defaultAgentMessageHandler = new DefaultAgentMessageHandler(agentCommunicator);

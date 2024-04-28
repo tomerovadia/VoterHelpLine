@@ -355,9 +355,6 @@ export default class ConstituentMessageHandler {
         message: replyMessage,
         automated: true,
         userInfo: this.constituent.info,
-        twilioPhoneNumber: this.twilioPhoneNumber,
-        constituentPhoneNumber: this.constituent.info.phoneNumber,
-        twilioCallbackUrl: this.twilioCallbackUrl,
       });
       await this.agentCommunicator.sendMessage(replyMessage, {
         parentMessageTs: this.constituent.info[this.constituent.info.activeChannelId],

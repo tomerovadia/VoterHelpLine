@@ -4,6 +4,7 @@ const mockConstituentPhoneNumber = 'mockConstituentPhoneNumber';
 const mockTwilioPhoneNumber = 'mockTwilioPhoneNumber';
 const mockConstituentMessage = 'mockConstituentMessage';
 const mockSmsMessageSid = 'mockSmsMessageSid';
+const mockTwilioCallbackUrl = 'mockTwilioCallbackUrl';
 
 jest.mock('./agent_message_handler', () => {
     return jest.fn().mockImplementation(() => ({
@@ -129,7 +130,7 @@ describe('handleIncomingSmsMessage', () => {
         const mockAgentFeatureHandler = new AgentFeatureHandler();
         mockConstituentMessageHandler = new ConstituentMessageHandler(mockConstituentCommunicator, mockAgentCommunicator);
         const mockDbService = new DbService();
-        mockConstituentCommunicator = new ConstituentCommunicator();
+        mockConstituentCommunicator = new ConstituentCommunicator(mockTwilioPhoneNumber, mockConstituentPhoneNumber, mockTwilioCallbackUrl);
         mockAgentCommunicator = new AgentCommunicator();
 
         coordinator = new Coordinator(mockConstituentMessageHandler, mockAgentMessageHander, mockAgentFeatureHandler, mockDbService, mockConstituentCommunicator, mockAgentCommunicator);
