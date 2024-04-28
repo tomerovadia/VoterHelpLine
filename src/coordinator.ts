@@ -1753,7 +1753,6 @@ export default class Coordinator {
     this.constituentMessageHandler.setUserAttachments(userAttachments);
     this.constituentMessageHandler.setTwilioPhoneNumber(twilioPhoneNumber);
     this.constituentMessageHandler.setEntryPoint(entryPoint);
-    this.constituentMessageHandler.setTwilioCallbackURL(twilioCallbackURL);
     logger.info(`Coordinator.handleIncomingSmsMessage: Receiving Twilio message from ${entryPoint} entry point voter,
                           userPhoneNumber: ${userPhoneNumber},
                           twilioPhoneNumber: ${twilioPhoneNumber},

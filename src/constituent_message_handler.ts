@@ -21,7 +21,6 @@ export default class ConstituentMessageHandler {
   private constituent: Constituent;
   private userAttachments: string[];
   private twilioPhoneNumber: string;
-  private twilioCallbackUrl: string;
   private inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry | undefined;
   private entryPoint: EntryPoint;
   private constituentCommunicator: ConstituentCommunicator;
@@ -39,7 +38,6 @@ export default class ConstituentMessageHandler {
     };
     this.userAttachments = [];
     this.twilioPhoneNumber = '';
-    this.twilioCallbackUrl = '';
     this.inboundDbMessageEntry = undefined;
     this.entryPoint = 'UNKNOWN';
 
@@ -65,10 +63,6 @@ export default class ConstituentMessageHandler {
 
   public setTwilioPhoneNumber(twilioPhoneNumber: string): void {
     this.twilioPhoneNumber = twilioPhoneNumber;
-  }
-
-  public setTwilioCallbackURL(twilioCallbackUrl: string): void {
-    this.twilioCallbackUrl = twilioCallbackUrl;
   }
 
   public setInboundDbMessageEntry(inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry): void {
