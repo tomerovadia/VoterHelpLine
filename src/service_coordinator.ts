@@ -1724,7 +1724,7 @@ export default class ServiceCoordinator {
       await this.recordVotedStatus(userInfo!, twilioPhoneNumber);
     }
     // Treat this as a new session
-    this.constituentMessageHandler.endVoterSession(redisClient, userInfo, twilioPhoneNumber);
+    this.constituentMessageHandler.endConstituentSession(redisClient, userInfo, twilioPhoneNumber);
     // TODO: Reconcile this with the userOptions defined above in a separate switch branch.
     const userOptions = {
       userPhoneNumber,
@@ -1814,7 +1814,7 @@ export default class ServiceCoordinator {
     await this.constituentMessageHandler.fetchAndLoadOptOutStatus();
     this.constituentMessageHandler.determineConstituentStatus();
     if (config.enableMultiCycleFeature && this.constituentMessageHandler.getConstituentStatus() == ConstituentStatus.RETURNING) {
-      await this.constituentMessageHandler.endVoterSession(redisClient, userInfo, twilioPhoneNumber);
+      await this.constituentMessageHandler.endConstituentSession(redisClient, userInfo, twilioPhoneNumber);
     }
 
     logger.info("ServiceCoordinator.handleIncomingSmsMessage ConstituentStatus: ", this.constituentMessageHandler.getConstituentStatus());

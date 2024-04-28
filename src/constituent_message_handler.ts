@@ -86,7 +86,7 @@ export default class ConstituentManagementService {
     return this.constituent.known ? this.constituent.known : false;
   }
 
-  public async endVoterSession(  redisClient: PromisifiedRedisClient,
+  public async endConstituentSession(  redisClient: PromisifiedRedisClient,
     userInfo: UserInfo,
     twilioPhoneNumber: string
   ): Promise<void> {
