@@ -66,7 +66,7 @@ export type AdminCommandParams = {
 };
 
 
-export default class ServiceCoordinator {
+export default class Coordinator {
   // Example of storing references to service instances
   //   private slackService: any; // Replace 'any' with the actual type of your Slack service
   //   private twilioService: any; // Replace 'any' with the actual type of your Twilio service
@@ -151,7 +151,7 @@ export default class ServiceCoordinator {
   }
 
   // Method to handle incoming slack interactivity.
-  // This is the only public Slack method of ServiceCoordinator that isn't itself meant to be
+  // This is the only public Slack method of Coordinator that isn't itself meant to be
   // called enqueued as a background task. Instead, it itself enqueues background tasks
   // conditionally based on the type of interactivity.
   public async handleIncomingSlackInteractivity(payload: SlackInteractionEventPayload): Promise<any> {
@@ -245,13 +245,13 @@ export default class ServiceCoordinator {
     includeWelcome?: boolean,
     noWelcome?: boolean
   ): Promise<string> {
-    logger.debug('ENTERING ServiceCoordinator.introduceNewVoterToSlackChannel');
+    logger.debug('ENTERING Coordinator.introduceNewVoterToSlackChannel');
     logger.debug(
-      `ServiceCoordinator.introduceNewVoterToSlackChannel: Updating lastVoterMessageSecsFromEpoch to ${userInfo.lastVoterMessageSecsFromEpoch}`
+      `Coordinator.introduceNewVoterToSlackChannel: Updating lastVoterMessageSecsFromEpoch to ${userInfo.lastVoterMessageSecsFromEpoch}`
     );
 
     logger.debug(
-      `ServiceCoordinator.introduceNewVoterToSlackChannel: Announcing new voter via new thread in ${slackChannelName}.`
+      `Coordinator.introduceNewVoterToSlackChannel: Announcing new voter via new thread in ${slackChannelName}.`
     );
 
     // If the voter has previously communicated that they already voted, we have them
@@ -316,7 +316,7 @@ export default class ServiceCoordinator {
     if (response) {
       if (!noWelcome && entryPoint === LoadBalancer.PULL_ENTRY_POINT) {
         logger.debug(
-          `ServiceCoordinator.introduceNewVoterToSlackChannel: Entry point is PULL, so sending automated welcome to voter.`
+          `Coordinator.introduceNewVoterToSlackChannel: Entry point is PULL, so sending automated welcome to voter.`
         );
         // Welcome the voter
         await this.constituentCommunicator.sendMessage({
@@ -342,7 +342,7 @@ export default class ServiceCoordinator {
       );
     }
 
-    logger.debug(`ServiceCoordinator.introduceNewVoterToSlackChannel: Successfully announced new voter via new thread in ${slackChannelName},
+    logger.debug(`Coordinator.introduceNewVoterToSlackChannel: Successfully announced new voter via new thread in ${slackChannelName},
                     response.data.channel: ${response.data.channel},
                     response.data.ts: ${response.data.ts}`);
 
@@ -378,12 +378,12 @@ export default class ServiceCoordinator {
       process.env.CLIENT_ORGANIZATION === 'VOTE_AMERICA'
     ) {
       logger.debug(
-        `ServiceCoordinator.introduceNewVoterToSlackChannel: Retrieving and passing message history to Slack, slackChannelName: ${slackChannelName}, parentMessageTs: ${response.data.channel}.`
+        `Coordinator.introduceNewVoterToSlackChannel: Retrieving and passing message history to Slack, slackChannelName: ${slackChannelName}, parentMessageTs: ${response.data.channel}.`
       );
 
       if (!inboundDbMessageEntry) {
         logger.debug(
-          `ServiceCoordinator.introduceNewVoterToSlackChannel: reopen empty session thread, slackChannelName: ${slackChannelName}, parentMessageTs: ${response.data.channel}.`
+          `Coordinator.introduceNewVoterToSlackChannel: reopen empty session thread, slackChannelName: ${slackChannelName}, parentMessageTs: ${response.data.channel}.`
         );
       } else {
         DbApiUtil.updateDbMessageEntryWithUserInfo(
@@ -399,7 +399,7 @@ export default class ServiceCoordinator {
           await DbApiUtil.logMessageToDb(inboundDbMessageEntry);
         } catch (error) {
           logger.info(
-            `ServiceCoordinator.introduceNewVoterToSlackChannel: failed to log incoming voter message to DB`
+            `Coordinator.introduceNewVoterToSlackChannel: failed to log incoming voter message to DB`
           );
           Sentry.captureException(error);
         }
@@ -421,7 +421,7 @@ export default class ServiceCoordinator {
       // and show in the Slack thread the welcome message the voter received
       // in response.
       logger.debug(
-        `ServiceCoordinator.introduceNewVoterToSlackChannel: Passing voter message to Slack, slackChannelName: ${slackChannelName}, parentMessageTs: ${response.data.ts}.`
+        `Coordinator.introduceNewVoterToSlackChannel: Passing voter message to Slack, slackChannelName: ${slackChannelName}, parentMessageTs: ${response.data.ts}.`
       );
       if (inboundDbMessageEntry) {
         const blocks = SlackBlockUtil.formatMessageWithAttachmentLinks(
@@ -442,7 +442,7 @@ export default class ServiceCoordinator {
       }
 
       logger.debug(
-        `ServiceCoordinator.introduceNewVoterToSlackChannel: Passing automated welcome message to Slack, slackChannelName: ${slackChannelName}, parentMessageTs: ${response.data.channel}.`
+        `Coordinator.introduceNewVoterToSlackChannel: Passing automated welcome message to Slack, slackChannelName: ${slackChannelName}, parentMessageTs: ${response.data.channel}.`
       );
       await this.agentCommunicator.sendMessage(messageToVoter, {
         parentMessageTs: response.data.ts,
@@ -454,7 +454,7 @@ export default class ServiceCoordinator {
     // Add key/value such that given a user phone number we can get the
     // Slack channel thread associated with that user.
     logger.debug(
-      `ServiceCoordinator.introduceNewVoterToSlackChannel: Writing updated userInfo to Redis.`
+      `Coordinator.introduceNewVoterToSlackChannel: Writing updated userInfo to Redis.`
     );
     await RedisApiUtil.setHash(
       redisClient,
@@ -465,7 +465,7 @@ export default class ServiceCoordinator {
     // Add key/value such that given Slack thread data we can get a
     // user phone number.
     logger.debug(
-      `ServiceCoordinator.introduceNewVoterToSlackChannel: Writing updated Slack-to-Twilio redisData to Redis.`
+      `Coordinator.introduceNewVoterToSlackChannel: Writing updated Slack-to-Twilio redisData to Redis.`
     );
     await RedisApiUtil.setHash(
       redisClient,
@@ -485,7 +485,7 @@ export default class ServiceCoordinator {
     twilioCallbackURL: string,
     includeWelcome?: boolean
   ): Promise<void> {
-    logger.debug('ENTERING ServiceCoordinator.handleNewVoter');
+    logger.debug('ENTERING Coordinator.handleNewVoter');
     const userMessage = userOptions.userMessage;
 
     await DbApiUtil.logInitialVoterStatusToDb(
@@ -518,7 +518,7 @@ export default class ServiceCoordinator {
           userInfo.panelmessage = 'known phone number';
         } else {
           logger.warning(
-            `ServiceCoordinator.handleNewVoter (${userInfo.userId}): unable to parse known state '${knownState}`
+            `Coordinator.handleNewVoter (${userInfo.userId}): unable to parse known state '${knownState}`
           );
         }
       }
@@ -535,13 +535,13 @@ export default class ServiceCoordinator {
       if (slackChannelName) {
         // We can route them too
         logger.info(
-          `ServiceCoordinator.handleNewVoter (${userInfo.userId}): New voter is in known state ${userInfo.stateName}, selected Slack channel ${slackChannelName}`
+          `Coordinator.handleNewVoter (${userInfo.userId}): New voter is in known state ${userInfo.stateName}, selected Slack channel ${slackChannelName}`
         );
       } else {
         // That state doesn't route for some reason; go to national
         slackChannelName = userInfo.isDemo ? 'demo-national' : 'national';
         logger.info(
-          `ServiceCoordinator.handleNewVoter (${userInfo.userId}): New voter is in known state ${userInfo.stateName}, but no channel match`
+          `Coordinator.handleNewVoter (${userInfo.userId}): New voter is in known state ${userInfo.stateName}, but no channel match`
         );
       }
     }
@@ -550,13 +550,13 @@ export default class ServiceCoordinator {
       slackChannelName = userInfo.isDemo ? 'demo-lobby' : 'lobby';
       if (entryPoint === LoadBalancer.PULL_ENTRY_POINT) {
         logger.debug(
-          `ServiceCoordinator.handleNewVoter (${userInfo.userId}): New voter will enter Slack channel: ${slackChannelName}`
+          `Coordinator.handleNewVoter (${userInfo.userId}): New voter will enter Slack channel: ${slackChannelName}`
         );
       } else if (entryPoint === LoadBalancer.PUSH_ENTRY_POINT) {
         userInfo.stateName =
           LoadBalancer.getPushPhoneNumberState(twilioPhoneNumber);
         logger.debug(
-          `ServiceCoordinator.handleNewVoter (${userInfo.userId}): Determined that twilioPhoneNumber ${twilioPhoneNumber} corresponds to U.S. state ${userInfo.stateName} based on hard coding in LoadBalancer.`
+          `Coordinator.handleNewVoter (${userInfo.userId}): Determined that twilioPhoneNumber ${twilioPhoneNumber} corresponds to U.S. state ${userInfo.stateName} based on hard coding in LoadBalancer.`
         );
         const selectedChannelName = await LoadBalancer.selectSlackChannel(
           redisClient,
@@ -565,7 +565,7 @@ export default class ServiceCoordinator {
         );
 
         logger.debug(
-          `ServiceCoordinator.handleNewVoter (${userInfo.userId}): LoadBalancer returned Slack channel ${selectedChannelName} for new PUSH voter.`
+          `Coordinator.handleNewVoter (${userInfo.userId}): LoadBalancer returned Slack channel ${selectedChannelName} for new PUSH voter.`
         );
         if (selectedChannelName) {
           slackChannelName = selectedChannelName;
@@ -573,7 +573,7 @@ export default class ServiceCoordinator {
           // If LoadBalancer didn't find a Slack channel, then select #national or #demo-national as fallback.
           slackChannelName = userInfo.isDemo ? 'demo-national' : 'national';
           logger.error(
-            `ServiceCoordinator.handleNewVoter (${userInfo.userId}): ERROR LoadBalancer did not find a Slack channel for new PUSH voter. Using ${slackChannelName} as fallback.`
+            `Coordinator.handleNewVoter (${userInfo.userId}): ERROR LoadBalancer did not find a Slack channel for new PUSH voter. Using ${slackChannelName} as fallback.`
           );
         }
       }
@@ -615,7 +615,7 @@ export default class ServiceCoordinator {
         userOptions.userPhoneNumber
       );
       logger.debug(
-        `ServiceCoordinator.prepareUserInfoForNewVoter (${userOptions.userId}): Evaluating isDemo based on userPhoneNumber/twilioPhoneNumber: ${isDemo}`
+        `Coordinator.prepareUserInfoForNewVoter (${userOptions.userId}): Evaluating isDemo based on userPhoneNumber/twilioPhoneNumber: ${isDemo}`
       );
       confirmedDisclaimer = false;
       volunteerEngaged = false;
@@ -729,7 +729,7 @@ export default class ServiceCoordinator {
       destinationSlackChannelId: string;
     }
   ): Promise<string | null> {
-    logger.debug('ENTERING ServiceCoordinator.postUserMessageHistoryToSlack');
+    logger.debug('ENTERING Coordinator.postUserMessageHistoryToSlack');
 
     // past sessions
     const sessionHistory = await DbApiUtil.getPastSessionThreads(
@@ -808,7 +808,7 @@ export default class ServiceCoordinator {
     // Just in case.
     if (!messageHistory) {
       logger.debug(
-        'ServiceCoordinator.postUserMessageHistoryToSlack: No message history found.'
+        'Coordinator.postUserMessageHistoryToSlack: No message history found.'
       );
       return null;
     }
@@ -820,7 +820,7 @@ export default class ServiceCoordinator {
     }
 
     logger.debug(
-      'ServiceCoordinator.postUserMessageHistoryToSlack: Message history found, formatting it by calling SlackMessageFormatter.'
+      'Coordinator.postUserMessageHistoryToSlack: Message history found, formatting it by calling SlackMessageFormatter.'
     );
     const formattedMessageHistory = SlackMessageFormatter.formatMessageHistory(
       messageHistory,
@@ -863,7 +863,7 @@ export default class ServiceCoordinator {
     const skipLobby =
       (await RedisApiUtil.getKey(redisClient, 'skipLobby')) === 'true';
 
-    logger.debug('ENTERING ServiceCoordinator.routeVoterToSlackChannel');
+    logger.debug('ENTERING Coordinator.routeVoterToSlackChannel');
     const userPhoneNumber = userInfo.userPhoneNumber;
 
     // TODO: Consider doing this fetch within handleSlackAdminCommand, especially
@@ -876,14 +876,14 @@ export default class ServiceCoordinator {
       ? slackChannelIds[destinationSlackChannelName]
       : null;
     logger.debug(
-      `ServiceCoordinator.routeVoterToSlackChannel: Determined destination Slack channel ID: ${destinationSlackChannelId}`
+      `Coordinator.routeVoterToSlackChannel: Determined destination Slack channel ID: ${destinationSlackChannelId}`
     );
 
     // If a destinationSlackChannelId was not fetched from Redis, refresh Redis's slackPodChannelIds cache
     // data via a call to Slack's conversation.list API and try again.
     if (!destinationSlackChannelId) {
       logger.debug(
-        `ServiceCoordinator.routeVoterToSlackChannel: destinationSlackChannelId (${destinationSlackChannelId}) not found in Redis, refreshing slackPodChannelIds key using Slack conversations.list call.`
+        `Coordinator.routeVoterToSlackChannel: destinationSlackChannelId (${destinationSlackChannelId}) not found in Redis, refreshing slackPodChannelIds key using Slack conversations.list call.`
       );
       await SlackApiUtil.updateSlackChannelNamesAndIdsInRedis(redisClient);
       slackChannelIds = await RedisApiUtil.getHash(
@@ -892,7 +892,7 @@ export default class ServiceCoordinator {
       );
       destinationSlackChannelId = slackChannelIds[destinationSlackChannelName];
       logger.debug(
-        `ServiceCoordinator.routeVoterToSlackChannel: Resulting Slack channel ID using Slack channel name (${destinationSlackChannelName}) after Slack conversations.list call: ${destinationSlackChannelId}`
+        `Coordinator.routeVoterToSlackChannel: Resulting Slack channel ID using Slack channel name (${destinationSlackChannelName}) after Slack conversations.list call: ${destinationSlackChannelId}`
       );
     }
 
@@ -901,7 +901,7 @@ export default class ServiceCoordinator {
       // Error catching for admin command: destination channel not found.
       if (!destinationSlackChannelId) {
         logger.debug(
-          'ServiceCoordinator.routeVoterToSlackChannel: destinationSlackChannelId not found. Did you forget to add it to slackPodChannelIds in Redis? Or if this is an admin action, did the admin type it wrong?'
+          'Coordinator.routeVoterToSlackChannel: destinationSlackChannelId not found. Did you forget to add it to slackPodChannelIds in Redis? Or if this is an admin action, did the admin type it wrong?'
         );
         // Only respond to the admin command if it's a admin control room command (not Route to Journey shortcut).
         if (
@@ -927,7 +927,7 @@ export default class ServiceCoordinator {
 
       // TODO: This should probably be a lot later in the routing of the voter.
       logger.debug(
-        'ServiceCoordinator.routeVoterToSlackChannel: Routing of voter should succeed from here on out. Letting the admin (if applicable) know.'
+        'Coordinator.routeVoterToSlackChannel: Routing of voter should succeed from here on out. Letting the admin (if applicable) know.'
       );
       await this.agentCommunicator.sendMessage(
         `*Operator:* Voter is being routed to ${SlackApiUtil.linkToSlackChannel(
@@ -982,12 +982,12 @@ export default class ServiceCoordinator {
     }
 
     logger.debug(
-      'ServiceCoordinator.routeVoterToSlackChannel: Successfully updated old thread parent message during channel move'
+      'Coordinator.routeVoterToSlackChannel: Successfully updated old thread parent message during channel move'
     );
 
     // Create new thread in the channel.
     logger.debug(
-      `ServiceCoordinator.routeVoterToSlackChannel: Creating a new thread in this channel (${destinationSlackChannelId}), since voter hasn't been here.`
+      `Coordinator.routeVoterToSlackChannel: Creating a new thread in this channel (${destinationSlackChannelId}), since voter hasn't been here.`
     );
 
     if (adminCommandParams) {
@@ -1030,13 +1030,13 @@ export default class ServiceCoordinator {
       sessionStartEpoch: userInfo.sessionStartEpoch || null,
     });
 
-    logger.debug(`ServiceCoordinator.routeVoterToSlackChannel: Voter is being routed to,
+    logger.debug(`Coordinator.routeVoterToSlackChannel: Voter is being routed to,
     destinationSlackChannelId: ${destinationSlackChannelId},
     destinationSlackParentMessageTs: ${response.data.ts},
     destinationSlackChannelName: ${destinationSlackChannelName}`);
 
     logger.debug(
-      "ServiceCoordinator.routeVoterToSlackChannel: Changing voter's active channel."
+      "Coordinator.routeVoterToSlackChannel: Changing voter's active channel."
     );
     // Reassign the active channel so that the next voter messages go to the
     // new active channel.
@@ -1045,7 +1045,7 @@ export default class ServiceCoordinator {
 
     // Update userInfo in Redis (remember state channel thread identifying info and new activeChannel).
     logger.debug(
-      `ServiceCoordinator.routeVoterToSlackChannel: Writing updated userInfo to Redis.`
+      `Coordinator.routeVoterToSlackChannel: Writing updated userInfo to Redis.`
     );
     await RedisApiUtil.setHash(
       redisClient,
@@ -1086,7 +1086,7 @@ export default class ServiceCoordinator {
   ************************/
 
   async processSmsNew(userMessage: string, userInfo: UserInfo, twilioPhoneNumber: string, inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry, twilioCallbackURL: string) {
-    logger.info('Entering ServiceCoordinator.processSmsNew');
+    logger.info('Entering Coordinator.processSmsNew');
     //T OK TO KEEP THIS MESSAGE LOGIC HERE FOR NOW
     let messageToVoter = MessageConstants.WELCOME_VOTER();
     if (KeywordParser.isVotedKeyword(userMessage)) {
@@ -1127,7 +1127,7 @@ export default class ServiceCoordinator {
       await DbApiUtil.logMessageToDb(inboundDbMessageEntry);
     } catch (error) {
       logger.info(
-        `ServiceCoordinator.processSmsNew: failed to log incoming voter message to DB`
+        `Coordinator.processSmsNew: failed to log incoming voter message to DB`
       );
       Sentry.captureException(error);
     }
@@ -1136,7 +1136,7 @@ export default class ServiceCoordinator {
     // that the voter has been encountered before, even if there is not
     // yet any Slack channel/thread info for this voter.
     logger.debug(
-      `ServiceCoordinator.processSmsNew: Writing new voter userInfo to Redis.`
+      `Coordinator.processSmsNew: Writing new voter userInfo to Redis.`
     );
     await RedisApiUtil.setHash(
       redisClient,
@@ -1146,7 +1146,7 @@ export default class ServiceCoordinator {
   }
 
   async processSmsPreAutomatedEntry(userInfo: UserInfo, userMessage: string, twilioPhoneNumber: string, inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry, twilioCallbackURL: string) {
-    logger.info('Entering ServiceCoordinator.processSmsPreAutomatedEntry');
+    logger.info('Entering Coordinator.processSmsPreAutomatedEntry');
     let messageToVoter = MessageConstants.CLARIFY_HELPLINE_REQUEST();
     if (KeywordParser.isVotedKeyword(userMessage)) {
       messageToVoter = MessageConstants.VOTED_WELCOME_RESPONSE();
@@ -1201,7 +1201,7 @@ export default class ServiceCoordinator {
   }
 
   async processSmsEntering(userInfo: UserInfo, twilioPhoneNumber: string, inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry, twilioCallbackURL: string) {
-    logger.info('Entering ServiceCoordinator.processSmsEntering');
+    logger.info('Entering Coordinator.processSmsEntering');
 
     await DbApiUtil.logInitialVoterStatusToDb(
       userInfo.userId,
@@ -1466,14 +1466,14 @@ export default class ServiceCoordinator {
       );
     } else {
       logger.info(
-        `ServiceCoordinator.processSmsHasEnteredAutomated (${userId}): U.S. state for voter is not known. Automated system will attempt to determine.`
+        `Coordinator.processSmsHasEnteredAutomated (${userId}): U.S. state for voter is not known. Automated system will attempt to determine.`
       );
 
       userInfo.numStateSelectionAttempts++;
 
       userInfo.lastVoterMessageSecsFromEpoch = Math.round(Date.now() / 1000);
       logger.debug(
-        `ServiceCoordinator.processSmsHasEnteredAutomated: Updating lastVoterMessageSecsFromEpoch to ${userInfo.lastVoterMessageSecsFromEpoch}`
+        `Coordinator.processSmsHasEnteredAutomated: Updating lastVoterMessageSecsFromEpoch to ${userInfo.lastVoterMessageSecsFromEpoch}`
       );
 
       const skipLobby =
@@ -1484,7 +1484,7 @@ export default class ServiceCoordinator {
 
       if (!skipLobby && userInfo.activeChannelId != 'NONEXISTENT_LOBBY') {
         logger.debug(
-          `ServiceCoordinator.processSmsHasEnteredAutomated: Passing voter message to Slack, slackChannelName: ${lobbyChannelId}, parentMessageTs: ${lobbyParentMessageTs}.`
+          `Coordinator.processSmsHasEnteredAutomated: Passing voter message to Slack, slackChannelName: ${lobbyChannelId}, parentMessageTs: ${lobbyParentMessageTs}.`
         );
         const blocks = SlackBlockUtil.formatMessageWithAttachmentLinks(
           userMessage,
@@ -1537,7 +1537,7 @@ export default class ServiceCoordinator {
           // Otherwise, try to determine their U.S. state one more time.
         } else {
           logger.debug(
-            `ServiceCoordinator.processSmsHasEnteredAutomated: StateParser could not determine U.S. state of voter from message ${userMessage}`
+            `Coordinator.processSmsHasEnteredAutomated: StateParser could not determine U.S. state of voter from message ${userMessage}`
           );
 
           this.constituentCommunicator.sendMessage({
@@ -1558,7 +1558,7 @@ export default class ServiceCoordinator {
           }
 
           logger.debug(
-            `ServiceCoordinator.processSmsHasEnteredAutomated: Writing updated userInfo to Redis.`
+            `Coordinator.processSmsHasEnteredAutomated: Writing updated userInfo to Redis.`
           );
           await RedisApiUtil.setHash(
             redisClient,
@@ -1574,7 +1574,7 @@ export default class ServiceCoordinator {
       // U.S. state has been determined.
       userInfo.stateName = stateName;
       logger.debug(
-        `ServiceCoordinator.processSmsHasEnteredAutomated: StateParser reviewed ${userMessage} and determined U.S. state: ${stateName}`
+        `Coordinator.processSmsHasEnteredAutomated: StateParser reviewed ${userMessage} and determined U.S. state: ${stateName}`
       );
 
       const messageToVoter =
@@ -1631,7 +1631,7 @@ export default class ServiceCoordinator {
       await this.recordVotedStatus(userInfo!, twilioPhoneNumber);
     }
     logger.info(
-      `ServiceCoordinator.processSmsHasEnteredConversation (${userId}): Known U.S. state for voter (${userInfo!.stateName}) or volunteer has engaged (${userInfo!.volunteerEngaged}). Automated system no longer active.`
+      `Coordinator.processSmsHasEnteredConversation (${userId}): Known U.S. state for voter (${userInfo!.stateName}) or volunteer has engaged (${userInfo!.volunteerEngaged}). Automated system no longer active.`
     );
     const userOptions = { userInfo: userInfo!, userPhoneNumber, userMessage, userAttachments };
 
@@ -1670,7 +1670,7 @@ export default class ServiceCoordinator {
     );
 
     logger.debug(
-      `ServiceCoordinator.handleClearedVoter: Seconds since last message from voter: ${nowSecondsEpoch - lastVoterMessageSecsFromEpoch
+      `Coordinator.handleClearedVoter: Seconds since last message from voter: ${nowSecondsEpoch - lastVoterMessageSecsFromEpoch
       }`
     );
 
@@ -1679,7 +1679,7 @@ export default class ServiceCoordinator {
       MINS_BEFORE_WELCOME_BACK_MESSAGE * 60
     ) {
       logger.debug(
-        `ServiceCoordinator.handleClearedVoter: Seconds since last message from voter > MINS_BEFORE_WELCOME_BACK_MESSAGE (${nowSecondsEpoch - lastVoterMessageSecsFromEpoch
+        `Coordinator.handleClearedVoter: Seconds since last message from voter > MINS_BEFORE_WELCOME_BACK_MESSAGE (${nowSecondsEpoch - lastVoterMessageSecsFromEpoch
         } > : ${MINS_BEFORE_WELCOME_BACK_MESSAGE}), sending welcome back message.`
       );
       let userMessage = null as string | null;
@@ -1713,7 +1713,7 @@ export default class ServiceCoordinator {
       }
     }
 
-    logger.debug(`ServiceCoordinator.handleClearedVoter: Writing updated userInfo to Redis.`);
+    logger.debug(`Coordinator.handleClearedVoter: Writing updated userInfo to Redis.`);
     await RedisApiUtil.setHash(
       redisClient,
       `${userId}:${twilioPhoneNumber}`,
@@ -1761,7 +1761,7 @@ export default class ServiceCoordinator {
     // TODO: Return a status of some kind, instead of void.
     entryPoint: EntryPoint
   ): Promise<void> {
-    logger.info('Entering ServiceCoordinator.handleIncomingSmsMessage');
+    logger.info('Entering Coordinator.handleIncomingSmsMessage');
 
     const reqBody = req.body as TwilioRequestBody;
     const userPhoneNumber = reqBody.From;
@@ -1771,7 +1771,7 @@ export default class ServiceCoordinator {
     // Have this be one of the major paths (with constitutent status STOP).
     if (await this.constituentMessageHandler.isPhoneNumberBlocked(userPhoneNumber)) {
       logger.info(
-        `ServiceCoordinator.handleIncomingSmsMessage: Received text from blocked phone number: ${userPhoneNumber}.`
+        `Coordinator.handleIncomingSmsMessage: Received text from blocked phone number: ${userPhoneNumber}.`
       );
       return;
     }
@@ -1790,7 +1790,7 @@ export default class ServiceCoordinator {
     this.constituentMessageHandler.setTwilioPhoneNumber(twilioPhoneNumber);
     this.constituentMessageHandler.setEntryPoint(entryPoint);
     this.constituentMessageHandler.setTwilioCallbackURL(twilioCallbackURL);
-    logger.info(`ServiceCoordinator.handleIncomingSmsMessage: Receiving Twilio message from ${entryPoint} entry point voter,
+    logger.info(`Coordinator.handleIncomingSmsMessage: Receiving Twilio message from ${entryPoint} entry point voter,
                           userPhoneNumber: ${userPhoneNumber},
                           twilioPhoneNumber: ${twilioPhoneNumber},
                           userMessage: ${userMessage},
@@ -1821,7 +1821,7 @@ export default class ServiceCoordinator {
       await this.constituentMessageHandler.endConstituentSession(redisClient, userInfo, twilioPhoneNumber);
     }
 
-    logger.info("ServiceCoordinator.handleIncomingSmsMessage ConstituentStatus: ", this.constituentMessageHandler.getConstituentStatus());
+    logger.info("Coordinator.handleIncomingSmsMessage ConstituentStatus: ", this.constituentMessageHandler.getConstituentStatus());
     const constituentIsAllowedToContinue = await this.constituentMessageHandler.handleOptOutLogic(twilioPhoneNumber, inboundDbMessageEntry);
     if (!constituentIsAllowedToContinue) return;
 
@@ -1964,5 +1964,5 @@ export default class ServiceCoordinator {
 // const agentFeatureHandlerInstance = new AgentFeatureHandler();
 // const constituentManagementServiceInstance = new ConstituentManagementService();
 // const dbServiceInstance = new DbService();
-// const serviceCoordinatorInstance = new ServiceCoordinator(constituentManagementServiceInstance, agentFeatureHandlerInstance, dbServiceInstance);
-// module.exports.backgroundLambdaHandler = serviceCoordinatorInstance.backgroundLambdaHandler.bind(serviceCoordinatorInstance);
+// const CoordinatorInstance = new Coordinator(constituentManagementServiceInstance, agentFeatureHandlerInstance, dbServiceInstance);
+// module.exports.backgroundLambdaHandler = CoordinatorInstance.backgroundLambdaHandler.bind(CoordinatorInstance);
