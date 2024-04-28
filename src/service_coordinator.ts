@@ -8,7 +8,7 @@ import * as LoadBalancer from './load_balancer';
 import * as KeywordParser from './keyword_parser';
 import * as SlackApiUtil from './slack_api_util';
 import AgentManagementService from './agent_management_service';
-import ConstituentManagementService from './constituent_management_service';
+import ConstituentMessageHandler from './constituent_message_handler';
 import ConstituentCommunicator from './constituent_communicator';
 import AgentCommunicator from './agent_communicator';
 import logger from './logger';
@@ -69,20 +69,20 @@ export default class ServiceCoordinator {
   // Example of storing references to service instances
   //   private slackService: any; // Replace 'any' with the actual type of your Slack service
   //   private twilioService: any; // Replace 'any' with the actual type of your Twilio service
-  private constituentManagementService: ConstituentManagementService;
+  private constituentMessageHandler: ConstituentMessageHandler;
   private agentManagementService: AgentManagementService;
   private dbService: DbService;
   private constituentCommunicator: ConstituentCommunicator;
   private agentCommunicator: AgentCommunicator;
 
   constructor(
-    constituentManagementService: ConstituentManagementService,
+    constituentMessageHandler: ConstituentMessageHandler,
     agentManagementService: AgentManagementService,
     dbService: DbService,
     constituentCommunicator: ConstituentCommunicator,
     agentCommunicator: AgentCommunicator
   ) {
-    this.constituentManagementService = constituentManagementService;
+    this.constituentMessageHandler = constituentMessageHandler;
     this.agentManagementService = agentManagementService;
     this.dbService = dbService;
     this.constituentCommunicator = constituentCommunicator;
@@ -1215,11 +1215,11 @@ export default class ServiceCoordinator {
     let stateName;
 
     // Can we infer the voter's state from their phone number?
-    // TODO: Handle this in the determineConstituentStatus function in ConstituentManagementService.
+    // TODO: Handle this in the determineConstituentStatus function in ConstituentMessageHandler.
     if (
       config.enableKnownStateFromPhoneNumber
     ) {
-      stateName = this.constituentManagementService.fetchAndLoadKnownState();
+      stateName = this.constituentMessageHandler.fetchAndLoadKnownState();
       if (stateName) {
         const stateChannel = await LoadBalancer.selectSlackChannel(
           redisClient,
@@ -1250,7 +1250,7 @@ export default class ServiceCoordinator {
     );
 
     let messageToConstituent;
-    if (!this.constituentManagementService.isConstituentKnown()) {
+    if (!this.constituentMessageHandler.isConstituentKnown()) {
       // Voter initiated conversation with "HELPLINE".
       if (userInfo.stateName) {
         messageToConstituent = MessageConstants.WELCOME_FINDING_VOLUNTEER(
@@ -1762,7 +1762,7 @@ export default class ServiceCoordinator {
     const reqBody = req.body as TwilioRequestBody;
     const userPhoneNumber = reqBody.From;
 
-    // TODO: Have the logic within this block encapsulated within a method of constituentManagementService,
+    // TODO: Have the logic within this block encapsulated within a method of constituentMessageHandler,
     // so that clients can modify the behavior (e.g. reply with unsubscribe confirmation).
     // Have this be one of the major paths (with constitutent status STOP).
     if (await this.agentManagementService.isPhoneNumberBlocked(userPhoneNumber)) {
@@ -1779,13 +1779,13 @@ export default class ServiceCoordinator {
     const userId = MD5.hex(userPhoneNumber);
     const twilioCallbackURL = TwilioUtil.twilioCallbackURL(req);
     // TODO: Set these in the constructor instead.
-    this.constituentManagementService.setConstituentId(userId);
-    this.constituentManagementService.setConstituentPhoneNumber(userPhoneNumber);
-    this.constituentManagementService.setConstituentMessage(userMessage);
-    this.constituentManagementService.setUserAttachments(userAttachments);
-    this.constituentManagementService.setTwilioPhoneNumber(twilioPhoneNumber);
-    this.constituentManagementService.setEntryPoint(entryPoint);
-    this.constituentManagementService.setTwilioCallbackURL(twilioCallbackURL);
+    this.constituentMessageHandler.setConstituentId(userId);
+    this.constituentMessageHandler.setConstituentPhoneNumber(userPhoneNumber);
+    this.constituentMessageHandler.setConstituentMessage(userMessage);
+    this.constituentMessageHandler.setUserAttachments(userAttachments);
+    this.constituentMessageHandler.setTwilioPhoneNumber(twilioPhoneNumber);
+    this.constituentMessageHandler.setEntryPoint(entryPoint);
+    this.constituentMessageHandler.setTwilioCallbackURL(twilioCallbackURL);
     logger.info(`ServiceCoordinator.handleIncomingSmsMessage: Receiving Twilio message from ${entryPoint} entry point voter,
                           userPhoneNumber: ${userPhoneNumber},
                           twilioPhoneNumber: ${twilioPhoneNumber},
@@ -1800,29 +1800,29 @@ export default class ServiceCoordinator {
       twilioAttachments: userAttachments,
       entryPoint: LoadBalancer.PUSH_ENTRY_POINT,
     });
-    this.constituentManagementService.setInboundDbMessageEntry(inboundDbMessageEntry);
+    this.constituentMessageHandler.setInboundDbMessageEntry(inboundDbMessageEntry);
     let returningVoter = false;
-    let userInfo = await this.constituentManagementService.fetchAndLoadConstituentInfo(twilioPhoneNumber);
+    let userInfo = await this.constituentMessageHandler.fetchAndLoadConstituentInfo(twilioPhoneNumber);
     if (!userInfo) {
-      userInfo = this.constituentManagementService.loadInfoForNewConstituent({
+      userInfo = this.constituentMessageHandler.loadInfoForNewConstituent({
         userPhoneNumber,
         constituentId: userId,
         twilioPhoneNumber,
         entryPoint,
       });
     }
-    await this.constituentManagementService.fetchAndLoadOptOutStatus();
-    this.constituentManagementService.determineConstituentStatus();
-    if (config.enableMultiCycleFeature && this.constituentManagementService.getConstituentStatus() == ConstituentStatus.RETURNING) {
+    await this.constituentMessageHandler.fetchAndLoadOptOutStatus();
+    this.constituentMessageHandler.determineConstituentStatus();
+    if (config.enableMultiCycleFeature && this.constituentMessageHandler.getConstituentStatus() == ConstituentStatus.RETURNING) {
       await this.agentManagementService.endVoterSession(redisClient, userInfo, twilioPhoneNumber);
     }
 
-    logger.info("ServiceCoordinator.handleIncomingSmsMessage ConstituentStatus: ", this.constituentManagementService.getConstituentStatus());
-    const constituentIsAllowedToContinue = await this.constituentManagementService.handleOptOutLogic(twilioPhoneNumber, inboundDbMessageEntry);
+    logger.info("ServiceCoordinator.handleIncomingSmsMessage ConstituentStatus: ", this.constituentMessageHandler.getConstituentStatus());
+    const constituentIsAllowedToContinue = await this.constituentMessageHandler.handleOptOutLogic(twilioPhoneNumber, inboundDbMessageEntry);
     if (!constituentIsAllowedToContinue) return;
 
     let userOptions;
-    switch (this.constituentManagementService.getConstituentStatus()) {
+    switch (this.constituentMessageHandler.getConstituentStatus()) {
       /********************
         NEW
       ********************/

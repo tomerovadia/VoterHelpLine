@@ -11,7 +11,7 @@ jest.mock('./agent_management_service', () => {
     }));
 });
 
-jest.mock('./constituent_management_service', () => {
+jest.mock('./constituent_message_handler', () => {
     return jest.fn().mockImplementation(() => ({
         getConstituentStatus: jest.fn(),
         setConstituentId: jest.fn(),
@@ -95,7 +95,7 @@ jest.mock('./keyword_parser', () => ({
 
 import ServiceCoordinator from './service_coordinator';
 import AgentManagementService from './agent_management_service';
-import ConstituentManagementService from './constituent_management_service';
+import ConstituentMessageHandler from './constituent_message_handler';
 import DbService from './db_service';
 import ConstituentCommunicator from './constituent_communicator';
 import AgentCommunicator from './agent_communicator';
@@ -103,7 +103,7 @@ import { ConstituentStatus, Request } from './types';
 
 describe('handleIncomingSmsMessage', () => {
     let serviceCoordinator: ServiceCoordinator;
-    let mockConstituentManagementService: ConstituentManagementService;
+    let mockConstituentMessageHandler: ConstituentMessageHandler;
     let mockConstituentCommunicator: ConstituentCommunicator;
     let mockAgentCommunicator: AgentCommunicator;
 
@@ -124,12 +124,12 @@ describe('handleIncomingSmsMessage', () => {
 
     beforeEach(() => {
         const mockAgentManagementService = new AgentManagementService();
-        mockConstituentManagementService = new ConstituentManagementService();
+        mockConstituentMessageHandler = new ConstituentMessageHandler();
         const mockDbService = new DbService();
         mockConstituentCommunicator = new ConstituentCommunicator();
         mockAgentCommunicator = new AgentCommunicator();
 
-        serviceCoordinator = new ServiceCoordinator(mockConstituentManagementService, mockAgentManagementService, mockDbService, mockConstituentCommunicator, mockAgentCommunicator);
+        serviceCoordinator = new ServiceCoordinator(mockConstituentMessageHandler, mockAgentManagementService, mockDbService, mockConstituentCommunicator, mockAgentCommunicator);
 
         // Reset mocks
         // TODO: Revisit whether this is necessary.
@@ -138,7 +138,7 @@ describe('handleIncomingSmsMessage', () => {
 
     describe("When the status is NEW", () => {
         beforeEach(() => {
-            mockConstituentManagementService.getConstituentStatus = jest.fn().mockReturnValue(ConstituentStatus.NEW);
+            mockConstituentMessageHandler.getConstituentStatus = jest.fn().mockReturnValue(ConstituentStatus.NEW);
             mockConstituentCommunicator.sendMessage = jest.fn();
             mockAgentCommunicator.sendMessage = jest.fn();
         });
