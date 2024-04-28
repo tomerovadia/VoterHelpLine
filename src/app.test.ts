@@ -34,7 +34,6 @@ jest.mock('./db_api_util', () => ({
   logMessageToDb: jest.fn(),
 }));
 
-// import * as TwilioApiUtil2 from './twilio_api_util_refactored';
 import * as TwilioUtil from './twilio_util';
 import * as RedisApiUtil from './redis_api_util';
 
@@ -60,7 +59,7 @@ describe('POST /twilio-pull', () => {
   });
 
   it('should authenticate Twilio', async () => {
-    const response = await request(app)
+    await request(app)
       .post('/twilio-pull')
       .send({
         From: mockConstituentPhoneNumber,
@@ -68,8 +67,8 @@ describe('POST /twilio-pull', () => {
         Body: mockConstituentMessage,
         SmsMessageSid: mockSmsMessageSid
       })
-    .expect(200)
-    .expect('Content-Type', "text/xml");
+      .expect(200)
+      .expect('Content-Type', "text/xml");
 
     expect(TwilioUtil.passesAuth).toHaveBeenCalled();
   });
@@ -83,7 +82,7 @@ describe('POST /twilio-pull', () => {
     });
 
     it('should reply', async () => {
-      const response = await request(app)
+      await request(app)
         .post('/twilio-pull')
         .send({
           From: mockConstituentPhoneNumber,
@@ -98,7 +97,7 @@ describe('POST /twilio-pull', () => {
     });
 
     it('should add constituent to Redis', async () => {
-      const response = await request(app)
+      await request(app)
         .post('/twilio-pull')
         .send({
           From: mockConstituentPhoneNumber,

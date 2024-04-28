@@ -17,10 +17,11 @@ import * as SlackBlockUtil from './slack_block_util';
 import ConstituentCommunicator from './constituent_communicator';
 import AgentCommunicator from './agent_communicator';
 
-export default class ConstituentMessageHandler {
-  private constituent: Constituent;
+export default abstract class ConstituentMessageHandler {
+  protected constituent: Constituent;
+  protected twilioPhoneNumber: string;
+
   private userAttachments: string[];
-  private twilioPhoneNumber: string;
   private inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry | undefined;
   private entryPoint: EntryPoint;
   private constituentCommunicator: ConstituentCommunicator;
@@ -255,7 +256,7 @@ export default class ConstituentMessageHandler {
 
   // Method defining the logic for determining if a user is a returning constituent.
   // Clients should define their own logic here, if using this feature.
-  private isConstituentReturningFromPreviousCycle(): boolean {
+  protected isConstituentReturningFromPreviousCycle(): boolean {
     // This is a reference, necessary to avoid typescript errors.
     let constituentInfo = this.constituent.info;
     if (!constituentInfo) {
@@ -361,44 +362,7 @@ export default class ConstituentMessageHandler {
 
   // Method containing high-level logic for the general approach to be used
   // for an incoming constituent message.
-  public determineConstituentStatus(): void {
-    const constituentId = this.constituent.id;
-    if (this.constituent.known) {
-        if ('activeChannelId' in this.constituent.info!) {
-          if (config.enableMultiCycleFeature && this.isConstituentReturningFromPreviousCycle()) {
-            // TODO: Add helper function to make these logs briefer, e.g. by prepending the location.
-            logger.info(
-              `ConstituentMessageHandler.determineConstituentStatus (${constituentId}): determined that voter is returning from a previous cycle, starting with fresh userInfo`
-            );
-            this.constituent.info.returningVoter = true;
-            this.constituent.status = ConstituentStatus.RETURNING;
-          } else if (this.constituent.known && 'activeChannelId' in this.constituent.info) {
-            if (this.constituent.info.stateName ||
-              this.constituent.info.volunteerEngaged ||
-              this.constituent.info.numStateSelectionAttempts >=
-              config.numStateSelectionAttemptsLimit) {
-                this.constituent.status = ConstituentStatus.HAS_ENTERED_CONVERSATION;
-              } else {
-                this.constituent.status = ConstituentStatus.HAS_ENTERED_AUTOMATED;
-              }
-          }
-        } else if (this.constituent.message && KeywordParser.isHelplineKeyword(this.constituent.message)) {
-          this.constituent.status = ConstituentStatus.ENTERING;
-        } else {
-          this.constituent.status = ConstituentStatus.PRE_ENTERING_AUTOMATED;
-        }
-    } else {
-      logger.info(
-        `ConstituentMessageHandler.determineConstituentStatus (${constituentId}): No existing userInfo for user after Redis retrieval with redisHashKey ${`${constituentId}:${this.twilioPhoneNumber}`}`);
-        if (this.constituent.message && KeywordParser.isHelplineKeyword(this.constituent.message)) {
-          // TODO: We might need a special message for constituents who are messaging for the very first
-          // time and their message is HELPLINE. Rather than "ok..." we should have a bit of a welcome.
-          this.constituent.status = ConstituentStatus.ENTERING;
-        } else {
-          this.constituent.status = ConstituentStatus.NEW;
-        }
-    }
-  }
+  public abstract determineConstituentStatus(): void;
 
   // Method to handle opted out constituent logic, whether they have opted
   // out in the past or are opting out now, or are now opting back in.
