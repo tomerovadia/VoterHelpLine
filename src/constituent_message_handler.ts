@@ -8,7 +8,6 @@ import * as SlackInteractionApiUtil from './slack_interaction_api_util';
 import * as RedisApiUtil from './redis_api_util';
 import logger from './logger';
 import Constituent from './constituent';
-import config from './config';
 import * as MessageConstants from './message_constants';
 import * as Router from './router';
 import * as LoadBalancer from './load_balancer';
