@@ -33,7 +33,7 @@ import * as KeywordParser from './keyword_parser';
 import DefaultConstituentMessageHandler from './client/default/default_constituent_message_handler';
 import ConstituentCommunicator from './constituent_communicator';
 import AgentCommunicator from './agent_communicator';
-import DefaultServiceCoordinator from './client/default/default_service_coordinator';
+import DefaultCoordinator from './client/default/default_coordinator';
 import DefaultAgentFeatureHandler from './client/default/default_agent_feature_handler';
 import DefaultAgentMessageHandler from './client/default/default_agent_message_handler';
 import DefaultDbService from './client/default/default_db_service';
@@ -618,8 +618,8 @@ app.post(
         const defaultAgentMessageHandler = new DefaultAgentMessageHandler();
         const defaultAgentFeatureHandler = new DefaultAgentFeatureHandler();
         const defaultDbService = new DefaultDbService();
-        const defaultServiceCoordinator = new DefaultServiceCoordinator(defaultConstituentMessageHandler, defaultAgentMessageHandler, defaultAgentFeatureHandler, defaultDbService, constituentCommunicator, agentCommunicator);
-        await defaultServiceCoordinator.handleIncomingSmsMessage(req, LoadBalancer.PULL_ENTRY_POINT);
+        const defaultCoordinator = new DefaultCoordinator(defaultConstituentMessageHandler, defaultAgentMessageHandler, defaultAgentFeatureHandler, defaultDbService, constituentCommunicator, agentCommunicator);
+        await defaultCoordinator.handleIncomingSmsMessage(req, LoadBalancer.PULL_ENTRY_POINT);
       } else {
         await handleIncomingTwilioMessage(req, LoadBalancer.PULL_ENTRY_POINT);
       }
@@ -692,7 +692,7 @@ app.post(
     const defaultDbService = new DefaultDbService();
     const constituentCommunicator = new ConstituentCommunicator();
     const agentCommunicator = new AgentCommunicator();
-    const defaultServiceCoordinator = new DefaultServiceCoordinator(constituentManagementService, defaultAgentMessageHandler, defaultAgentFeatureHandler, defaultDbService, constituentCommunicator, agentCommunicator);
+    const defaultCoordinator = new DefaultCoordinator(constituentManagementService, defaultAgentMessageHandler, defaultAgentFeatureHandler, defaultDbService, constituentCommunicator, agentCommunicator);
 
     // We do some first-order routing here to make sure this is an event we
     // actually care about -- we want to quickly ignore things like
@@ -706,7 +706,7 @@ app.post(
       !reqBody.event.hidden
     ) {
       if (config.useRefactoredPath) {
-        await defaultServiceCoordinator.enqueueBackgroundTask('handleIncomingSlackMessageEvent',
+        await defaultCoordinator.enqueueBackgroundTask('handleIncomingSlackMessageEvent',
           reqBody,
           TwilioUtil.twilioCallbackURL(req),
           {
@@ -732,7 +732,7 @@ app.post(
       !retryReason
     ) {
       if (config.useRefactoredPath) {
-        await defaultServiceCoordinator.enqueueBackgroundTask('handleIncomingSlackAppMentionEvent', reqBody);
+        await defaultCoordinator.enqueueBackgroundTask('handleIncomingSlackAppMentionEvent', reqBody);
       } else {
         await enqueueBackgroundTask('slackAppMentionEventHandler', reqBody);
       }
@@ -771,8 +771,8 @@ app.post(
     const defaultDbService = new DefaultDbService();
     const constituentCommunicator = new ConstituentCommunicator();
     const agentCommunicator = new AgentCommunicator();
-    const defaultServiceCoordinator = new DefaultServiceCoordinator(defaultConstituentMessageHandler, defaultAgentMessageHandler, defaultAgentFeatureHandler, defaultDbService, constituentCommunicator, agentCommunicator);
-    defaultServiceCoordinator.enqueueBackgroundTask('handleIncomingSlackCommand',req.body.channel_id,
+    const defaultCoordinator = new DefaultCoordinator(defaultConstituentMessageHandler, defaultAgentMessageHandler, defaultAgentFeatureHandler, defaultDbService, constituentCommunicator, agentCommunicator);
+    defaultCoordinator.enqueueBackgroundTask('handleIncomingSlackCommand',req.body.channel_id,
       req.body.channel_name,
       req.body.user_id,
       req.body.user_name,
@@ -828,8 +828,8 @@ app.post(
       const defaultDbService = new DefaultDbService();
       const constituentCommunicator = new ConstituentCommunicator();
       const agentCommunicator = new AgentCommunicator();
-      const defaultServiceCoordinator = new DefaultServiceCoordinator(defaultConstituentMessageHandler, defaultAgentMessageHandler, defaultAgentFeatureHandler, defaultDbService, constituentCommunicator, agentCommunicator);
-      response = await defaultServiceCoordinator.handleIncomingSlackInteractivity(payload);
+      const defaultCoordinator = new DefaultCoordinator(defaultConstituentMessageHandler, defaultAgentMessageHandler, defaultAgentFeatureHandler, defaultDbService, constituentCommunicator, agentCommunicator);
+      response = await defaultCoordinator.handleIncomingSlackInteractivity(payload);
     } else {
       let shouldEnqueueBackgroundTask = true;
       const metadata: InteractivityHandlerMetadata = {};

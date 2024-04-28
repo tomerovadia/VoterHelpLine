@@ -94,7 +94,7 @@ jest.mock('./keyword_parser', () => ({
     isVotedKeyword: jest.fn().mockReturnValue(false),
 }));
 
-import ServiceCoordinator from './service_coordinator';
+import Coordinator from './coordinator';
 import AgentMessageHandler from './agent_message_handler';
 import AgentFeatureHandler from './agent_feature_handler';
 import ConstituentMessageHandler from './constituent_message_handler';
@@ -104,7 +104,7 @@ import AgentCommunicator from './agent_communicator';
 import { ConstituentStatus, Request } from './types';
 
 describe('handleIncomingSmsMessage', () => {
-    let serviceCoordinator: ServiceCoordinator;
+    let coordinator: Coordinator;
     let mockConstituentMessageHandler: ConstituentMessageHandler;
     let mockConstituentCommunicator: ConstituentCommunicator;
     let mockAgentCommunicator: AgentCommunicator;
@@ -132,7 +132,7 @@ describe('handleIncomingSmsMessage', () => {
         mockConstituentCommunicator = new ConstituentCommunicator();
         mockAgentCommunicator = new AgentCommunicator();
 
-        serviceCoordinator = new ServiceCoordinator(mockConstituentMessageHandler, mockAgentMessageHander, mockAgentFeatureHandler, mockDbService, mockConstituentCommunicator, mockAgentCommunicator);
+        coordinator = new Coordinator(mockConstituentMessageHandler, mockAgentMessageHander, mockAgentFeatureHandler, mockDbService, mockConstituentCommunicator, mockAgentCommunicator);
 
         // Reset mocks
         // TODO: Revisit whether this is necessary.
@@ -147,7 +147,7 @@ describe('handleIncomingSmsMessage', () => {
         });
 
         it('Should call constituentCommunicator.sendMessage with welcome', async () => {
-            await serviceCoordinator.handleIncomingSmsMessage(mockReq, 'PULL');
+            await coordinator.handleIncomingSmsMessage(mockReq, 'PULL');
 
             expect(mockConstituentCommunicator.sendMessage).toHaveBeenCalledTimes(1);
             expect(mockConstituentCommunicator.sendMessage).toHaveBeenCalledWith(
@@ -159,14 +159,14 @@ describe('handleIncomingSmsMessage', () => {
         });
 
         // it('Should call Router.prepareUserInfoForNewVoter and Router.welcomePotentialVoter', async () => {
-        //     await serviceCoordinator.handleIncomingSmsMessage(mockReq, 'PULL');
+        //     await coordinator.handleIncomingSmsMessage(mockReq, 'PULL');
 
         //     expect(Router.prepareUserInfoForNewVoter).toHaveBeenCalledTimes(1);
         //     expect(Router.welcomePotentialVoter).toHaveBeenCalledTimes(1);
         // });
 
         // it('Should correctly pass constituent info to Router.prepareUserInfoForNewVoter', async () => {    
-        //     await serviceCoordinator.handleIncomingSmsMessage(mockReq, 'PULL');
+        //     await coordinator.handleIncomingSmsMessage(mockReq, 'PULL');
 
         //     expect(Router.prepareUserInfoForNewVoter).toHaveBeenCalledWith(expect.objectContaining({
         //         userOptions: expect.objectContaining({
@@ -187,7 +187,7 @@ describe('handleIncomingSmsMessage', () => {
     //         mockConstituentManagementService.getConstituentStatus = jest.fn().mockReturnValue(ConstituentStatus.PRE_ENTERING_AUTOMATED);
     //     });
     //     it('Should call Router.clarifyHelplineRequest', async () => {
-    //         await serviceCoordinator.handleIncomingSmsMessage(mockReq, 'PULL');
+    //         await coordinator.handleIncomingSmsMessage(mockReq, 'PULL');
     //         expect(Router.clarifyHelplineRequest).toHaveBeenCalledTimes(1);
     //     });
     // });
@@ -198,7 +198,7 @@ describe('handleIncomingSmsMessage', () => {
     //     });
 
     //     it('Should call Router.prepareUserInfoForNewVoter', async () => {
-    //         await serviceCoordinator.handleIncomingSmsMessage(mockReq, 'PULL');
+    //         await coordinator.handleIncomingSmsMessage(mockReq, 'PULL');
 
     //         expect(Router.determineVoterState).toHaveBeenCalledTimes(1);
     //     });
@@ -210,7 +210,7 @@ describe('handleIncomingSmsMessage', () => {
     //         });
 
     //         it('Should call Router.recordVotedStatus and Router.replyToVoted', async () => {
-    //             await serviceCoordinator.handleIncomingSmsMessage(mockReq, 'PULL');
+    //             await coordinator.handleIncomingSmsMessage(mockReq, 'PULL');
 
     //             expect(Router.recordVotedStatus).toHaveBeenCalledTimes(1);
     //             expect(Router.replyToVoted).toHaveBeenCalledTimes(1);
@@ -224,7 +224,7 @@ describe('handleIncomingSmsMessage', () => {
     //     });
 
     //     it('Should call Router.handleClearedVoter', async () => {
-    //         await serviceCoordinator.handleIncomingSmsMessage(mockReq, 'PULL');
+    //         await coordinator.handleIncomingSmsMessage(mockReq, 'PULL');
 
     //         expect(Router.handleClearedVoter).toHaveBeenCalledTimes(1);
     //     });
@@ -236,7 +236,7 @@ describe('handleIncomingSmsMessage', () => {
     //         });
 
     //         it('Should call Router.recordVotedStatus and Router.replyToVoted', async () => {
-    //             await serviceCoordinator.handleIncomingSmsMessage(mockReq, 'PULL');
+    //             await coordinator.handleIncomingSmsMessage(mockReq, 'PULL');
 
     //             expect(Router.recordVotedStatus).toHaveBeenCalledTimes(1);
     //             expect(Router.handleClearedVoter).toHaveBeenCalledTimes(1);
@@ -250,7 +250,7 @@ describe('handleIncomingSmsMessage', () => {
     //     });
 
     //     it('Should call Router.prepareUserInfoForNewVoter and Router.handleNewVoter', async () => {
-    //         await serviceCoordinator.handleIncomingSmsMessage(mockReq, 'PULL');
+    //         await coordinator.handleIncomingSmsMessage(mockReq, 'PULL');
 
     //         expect(Router.endVoterSession).toHaveBeenCalledTimes(1);
     //         expect(Router.prepareUserInfoForNewVoter).toHaveBeenCalledTimes(1);
@@ -264,7 +264,7 @@ describe('handleIncomingSmsMessage', () => {
     //         });
 
     //         it('Should call Router.recordVotedStatus', async () => {
-    //             await serviceCoordinator.handleIncomingSmsMessage(mockReq, 'PULL');
+    //             await coordinator.handleIncomingSmsMessage(mockReq, 'PULL');
 
     //             expect(Router.recordVotedStatus).toHaveBeenCalledTimes(1);
     //             expect(Router.endVoterSession).toHaveBeenCalledTimes(1);
