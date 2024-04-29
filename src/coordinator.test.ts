@@ -15,13 +15,8 @@ jest.mock('./agent_message_handler', () => {
 jest.mock('./constituent_message_handler', () => {
     return jest.fn().mockImplementation(() => ({
         getConstituentStatus: jest.fn(),
-        setConstituentId: jest.fn(),
         setConstituentPhoneNumber: jest.fn(),
-        setConstituentMessage: jest.fn(),
-        setUserAttachments: jest.fn(),
         setTwilioPhoneNumber: jest.fn(),
-        setEntryPoint: jest.fn(),
-        setTwilioCallbackURL: jest.fn(),
         setInboundDbMessageEntry: jest.fn(),
         fetchAndLoadConstituentInfo: jest.fn().mockReturnValue({
             stateName: 'testStateName',
@@ -29,8 +24,8 @@ jest.mock('./constituent_message_handler', () => {
         fetchAndLoadOptOutStatus: jest.fn(),
         determineConstituentStatus: jest.fn(),
         handleOptOutLogic: jest.fn().mockReturnValue(true),
-        sendMessageToConstituent: jest.fn(),
         isPhoneNumberBlocked: jest.fn().mockReturnValue(false),
+        handleMessage: jest.fn(),
     }));
 });
 
@@ -152,7 +147,7 @@ describe('handleIncomingSmsMessage', () => {
         it('Should call constituentCommunicator.sendMessage with welcome', async () => {
             await coordinator.handleIncomingSmsMessage(mockReq, 'PULL');
 
-            expect(mockDefaultConstituentMessageHandler.processSmsNew).toHaveBeenCalledTimes(1);
+            expect(mockDefaultConstituentMessageHandler.handleMessage).toHaveBeenCalledTimes(1);
             // TODO: Add expectations about what should have been passed to processSmsNew
         });
 

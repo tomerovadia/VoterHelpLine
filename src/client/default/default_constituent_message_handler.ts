@@ -63,7 +63,7 @@ export default class DefaultConstituentMessageHandler extends ConstituentMessage
     }
   }
 
-  public async processSmsNew(userMessage: string, userInfo: UserInfo, twilioPhoneNumber: string, inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry, twilioCallbackURL: string) {
+  public async processSmsNew(userMessage: string, userInfo: UserInfo, twilioPhoneNumber: string, inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry) {
     logger.info('Entering DefaultConstituentMessageHandler.processSmsNew');
     //T OK TO KEEP THIS MESSAGE LOGIC HERE FOR NOW
     let messageToVoter = MessageConstants.WELCOME_VOTER();
@@ -120,7 +120,7 @@ export default class DefaultConstituentMessageHandler extends ConstituentMessage
     );
   }
 
-  public async processSmsPreAutomatedEntry(userInfo: UserInfo, userMessage: string, twilioPhoneNumber: string, inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry, twilioCallbackURL: string) {
+  public async processSmsPreAutomatedEntry(userInfo: UserInfo, userMessage: string, twilioPhoneNumber: string, inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry) {
     logger.info('Entering DefaultConstituentMessageHandler.processSmsPreAutomatedEntry');
     let messageToVoter = MessageConstants.CLARIFY_HELPLINE_REQUEST();
     if (KeywordParser.isVotedKeyword(userMessage)) {
@@ -172,7 +172,7 @@ export default class DefaultConstituentMessageHandler extends ConstituentMessage
     );
   }
 
-  public async processSmsEntering(userInfo: UserInfo, twilioPhoneNumber: string, inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry, twilioCallbackURL: string) {
+  public async processSmsEntering(userInfo: UserInfo, twilioPhoneNumber: string, inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry) {
     logger.info('Entering DefaultConstituentMessageHandler.processSmsEntering');
 
     await DbApiUtil.logInitialVoterStatusToDb(
@@ -414,13 +414,12 @@ export default class DefaultConstituentMessageHandler extends ConstituentMessage
   }
 
   public async processSmsHasEnteredAutomated(userInfo: UserInfo, userMessage: string, twilioPhoneNumber: string, inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry,
-    twilioCallbackURL: string, userId: string, userAttachments: any[]) {
+    userId: string, userAttachments: any[]) {
     if (KeywordParser.isVotedKeyword(userMessage)) {
       await super.recordVotedStatus(userInfo!, twilioPhoneNumber);
       await super.replyToVoted(
         userInfo!,
         twilioPhoneNumber,
-        twilioCallbackURL,
         userMessage,
         inboundDbMessageEntry
       );
@@ -579,7 +578,7 @@ export default class DefaultConstituentMessageHandler extends ConstituentMessage
   }
 
   public async processSmsHasEnteredConversation(userInfo: UserInfo, userMessage: string, twilioPhoneNumber: string, inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry, userPhoneNumber: string,
-    userAttachments: any[], twilioCallbackURL: string, userId: string) {
+    userAttachments: any[], userId: string) {
     if (KeywordParser.isVotedKeyword(userMessage)
     ) {
       await super.recordVotedStatus(userInfo!, twilioPhoneNumber);
@@ -673,7 +672,7 @@ export default class DefaultConstituentMessageHandler extends ConstituentMessage
   }
 
   public async processSmsReturning(userInfo: UserInfo, userMessage: string, twilioPhoneNumber: string, inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry,
-    userPhoneNumber: string, twilioCallbackURL: string, userId: string, entryPoint: EntryPoint, returningVoter: boolean, userAttachments: any[]) {
+    userPhoneNumber: string, userId: string, entryPoint: EntryPoint, returningVoter: boolean, userAttachments: any[]) {
     if (KeywordParser.isVotedKeyword(userMessage)
     ) {
       await super.recordVotedStatus(userInfo!, twilioPhoneNumber);
@@ -701,7 +700,6 @@ export default class DefaultConstituentMessageHandler extends ConstituentMessage
       twilioPhoneNumber,
       inboundDbMessageEntry,
       entryPoint,
-      twilioCallbackURL,
       true /* includeWelcome */
     );
   }
