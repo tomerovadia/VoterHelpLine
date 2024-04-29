@@ -1464,14 +1464,6 @@ export default abstract class ConstituentMessageHandler {
                           userMessage: ${userMessage},
                           userId: ${userId}`);
 
-    // const inboundDbMessageEntry = this.dbService.populateInitialIncomingConstituentMessageDbEntry({
-    //   userMessage,
-    //   userPhoneNumber,
-    //   twilioPhoneNumber,
-    //   twilioMessageSid: reqBody.SmsMessageSid,
-    //   twilioAttachments: userAttachments,
-    //   entryPoint: LoadBalancer.PUSH_ENTRY_POINT,
-    // });
     this.setInboundDbMessageEntry(inboundDbMessageEntry);
     let returningVoter = false;
     let userInfo = await this.fetchAndLoadConstituentInfo(twilioPhoneNumber);
