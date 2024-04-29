@@ -94,10 +94,6 @@ export default abstract class ConstituentMessageHandler {
     return this.constituent.status;
   }
 
-  public getConstituentStateName(): string | null {
-    return this.constituent.info ? this.constituent.info.stateName : null;
-  }
-
   public async endConstituentSession(  redisClient: PromisifiedRedisClient,
     userInfo: UserInfo,
     twilioPhoneNumber: string
