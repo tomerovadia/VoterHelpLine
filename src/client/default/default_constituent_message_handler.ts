@@ -637,7 +637,7 @@ export default class DefaultConstituentMessageHandler extends ConstituentMessage
         } > : ${MINS_BEFORE_WELCOME_BACK_MESSAGE}), sending welcome back message.`
       );
       let messageToVoter = null as string | null;
-      if (KeywordParser.isVotedKeyword(userOptions.messageToVoter)) {
+      if (KeywordParser.isVotedKeyword(userOptions.userMessage)) {
         messageToVoter = MessageConstants.VOTED_RESPONSE();
       } else {
         messageToVoter = MessageConstants.WELCOME_BACK();
