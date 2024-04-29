@@ -226,7 +226,7 @@ export default class DefaultConstituentMessageHandler extends ConstituentMessage
     );
 
     let messageToConstituent;
-    if (!super.isConstituentKnown()) {
+    if (!this.constituent.known) {
       // Voter initiated conversation with "HELPLINE".
       if (userInfo.stateName) {
         messageToConstituent = MessageConstants.WELCOME_FINDING_VOLUNTEER(
