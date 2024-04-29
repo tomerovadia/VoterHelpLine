@@ -64,7 +64,7 @@ export default class DefaultConstituentMessageHandler extends ConstituentMessage
   }
 
   public async processSmsNew(userMessage: string, userInfo: UserInfo, twilioPhoneNumber: string, inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry, twilioCallbackURL: string) {
-    logger.info('Entering Coordinator.processSmsNew');
+    logger.info('Entering DefaultConstituentMessageHandler.processSmsNew');
     //T OK TO KEEP THIS MESSAGE LOGIC HERE FOR NOW
     let messageToVoter = MessageConstants.WELCOME_VOTER();
     if (KeywordParser.isVotedKeyword(userMessage)) {
@@ -102,7 +102,7 @@ export default class DefaultConstituentMessageHandler extends ConstituentMessage
       await DbApiUtil.logMessageToDb(inboundDbMessageEntry);
     } catch (error) {
       logger.info(
-        `Coordinator.processSmsNew: failed to log incoming voter message to DB`
+        `DefaultConstituentMessageHandler.processSmsNew: failed to log incoming voter message to DB`
       );
       Sentry.captureException(error);
     }
@@ -111,7 +111,7 @@ export default class DefaultConstituentMessageHandler extends ConstituentMessage
     // that the voter has been encountered before, even if there is not
     // yet any Slack channel/thread info for this voter.
     logger.debug(
-      `Coordinator.processSmsNew: Writing new voter userInfo to Redis.`
+      `DefaultConstituentMessageHandler.processSmsNew: Writing new voter userInfo to Redis.`
     );
     await RedisApiUtil.setHash(
       redisClient,
@@ -121,7 +121,7 @@ export default class DefaultConstituentMessageHandler extends ConstituentMessage
   }
 
   public async processSmsPreAutomatedEntry(userInfo: UserInfo, userMessage: string, twilioPhoneNumber: string, inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry, twilioCallbackURL: string) {
-    logger.info('Entering Coordinator.processSmsPreAutomatedEntry');
+    logger.info('Entering DefaultConstituentMessageHandler.processSmsPreAutomatedEntry');
     let messageToVoter = MessageConstants.CLARIFY_HELPLINE_REQUEST();
     if (KeywordParser.isVotedKeyword(userMessage)) {
       messageToVoter = MessageConstants.VOTED_WELCOME_RESPONSE();
@@ -173,7 +173,7 @@ export default class DefaultConstituentMessageHandler extends ConstituentMessage
   }
 
   public async processSmsEntering(userInfo: UserInfo, twilioPhoneNumber: string, inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry, twilioCallbackURL: string) {
-    logger.info('Entering Coordinator.processSmsEntering');
+    logger.info('Entering DefaultConstituentMessageHandler.processSmsEntering');
 
     await DbApiUtil.logInitialVoterStatusToDb(
       userInfo.userId,
@@ -426,14 +426,14 @@ export default class DefaultConstituentMessageHandler extends ConstituentMessage
       );
     } else {
       logger.info(
-        `Coordinator.processSmsHasEnteredAutomated (${userId}): U.S. state for voter is not known. Automated system will attempt to determine.`
+        `DefaultConstituentMessageHandler.processSmsHasEnteredAutomated (${userId}): U.S. state for voter is not known. Automated system will attempt to determine.`
       );
 
       userInfo.numStateSelectionAttempts++;
 
       userInfo.lastVoterMessageSecsFromEpoch = Math.round(Date.now() / 1000);
       logger.debug(
-        `Coordinator.processSmsHasEnteredAutomated: Updating lastVoterMessageSecsFromEpoch to ${userInfo.lastVoterMessageSecsFromEpoch}`
+        `DefaultConstituentMessageHandler.processSmsHasEnteredAutomated: Updating lastVoterMessageSecsFromEpoch to ${userInfo.lastVoterMessageSecsFromEpoch}`
       );
 
       const skipLobby =
@@ -444,7 +444,7 @@ export default class DefaultConstituentMessageHandler extends ConstituentMessage
 
       if (!skipLobby && userInfo.activeChannelId != 'NONEXISTENT_LOBBY') {
         logger.debug(
-          `Coordinator.processSmsHasEnteredAutomated: Passing voter message to Slack, slackChannelName: ${lobbyChannelId}, parentMessageTs: ${lobbyParentMessageTs}.`
+          `DefaultConstituentMessageHandler.processSmsHasEnteredAutomated: Passing voter message to Slack, slackChannelName: ${lobbyChannelId}, parentMessageTs: ${lobbyParentMessageTs}.`
         );
         const blocks = SlackBlockUtil.formatMessageWithAttachmentLinks(
           userMessage,
@@ -497,7 +497,7 @@ export default class DefaultConstituentMessageHandler extends ConstituentMessage
           // Otherwise, try to determine their U.S. state one more time.
         } else {
           logger.debug(
-            `Coordinator.processSmsHasEnteredAutomated: StateParser could not determine U.S. state of voter from message ${userMessage}`
+            `DefaultConstituentMessageHandler.processSmsHasEnteredAutomated: StateParser could not determine U.S. state of voter from message ${userMessage}`
           );
 
           this.constituentCommunicator.sendMessage({
@@ -515,7 +515,7 @@ export default class DefaultConstituentMessageHandler extends ConstituentMessage
           }
 
           logger.debug(
-            `Coordinator.processSmsHasEnteredAutomated: Writing updated userInfo to Redis.`
+            `DefaultConstituentMessageHandler.processSmsHasEnteredAutomated: Writing updated userInfo to Redis.`
           );
           await RedisApiUtil.setHash(
             redisClient,
@@ -531,7 +531,7 @@ export default class DefaultConstituentMessageHandler extends ConstituentMessage
       // U.S. state has been determined.
       userInfo.stateName = stateName;
       logger.debug(
-        `Coordinator.processSmsHasEnteredAutomated: StateParser reviewed ${userMessage} and determined U.S. state: ${stateName}`
+        `DefaultConstituentMessageHandler.processSmsHasEnteredAutomated: StateParser reviewed ${userMessage} and determined U.S. state: ${stateName}`
       );
 
       const messageToVoter =
@@ -585,7 +585,7 @@ export default class DefaultConstituentMessageHandler extends ConstituentMessage
       await super.recordVotedStatus(userInfo!, twilioPhoneNumber);
     }
     logger.info(
-      `Coordinator.processSmsHasEnteredConversation (${userId}): Known U.S. state for voter (${userInfo!.stateName}) or volunteer has engaged (${userInfo!.volunteerEngaged}). Automated system no longer active.`
+      `DefaultConstituentMessageHandler.processSmsHasEnteredConversation (${userId}): Known U.S. state for voter (${userInfo!.stateName}) or volunteer has engaged (${userInfo!.volunteerEngaged}). Automated system no longer active.`
     );
     const userOptions = { userInfo: userInfo!, userPhoneNumber, userMessage, userAttachments };
 
@@ -624,7 +624,7 @@ export default class DefaultConstituentMessageHandler extends ConstituentMessage
     );
 
     logger.debug(
-      `Coordinator.handleClearedVoter: Seconds since last message from voter: ${nowSecondsEpoch - lastVoterMessageSecsFromEpoch
+      `DefaultConstituentMessageHandler.handleClearedVoter: Seconds since last message from voter: ${nowSecondsEpoch - lastVoterMessageSecsFromEpoch
       }`
     );
 
@@ -633,7 +633,7 @@ export default class DefaultConstituentMessageHandler extends ConstituentMessage
       MINS_BEFORE_WELCOME_BACK_MESSAGE * 60
     ) {
       logger.debug(
-        `Coordinator.handleClearedVoter: Seconds since last message from voter > MINS_BEFORE_WELCOME_BACK_MESSAGE (${nowSecondsEpoch - lastVoterMessageSecsFromEpoch
+        `DefaultConstituentMessageHandler.handleClearedVoter: Seconds since last message from voter > MINS_BEFORE_WELCOME_BACK_MESSAGE (${nowSecondsEpoch - lastVoterMessageSecsFromEpoch
         } > : ${MINS_BEFORE_WELCOME_BACK_MESSAGE}), sending welcome back message.`
       );
       let userMessage = null as string | null;
@@ -664,7 +664,7 @@ export default class DefaultConstituentMessageHandler extends ConstituentMessage
       }
     }
 
-    logger.debug(`Coordinator.handleClearedVoter: Writing updated userInfo to Redis.`);
+    logger.debug(`DefaultConstituentMessageHandler.handleClearedVoter: Writing updated userInfo to Redis.`);
     await RedisApiUtil.setHash(
       redisClient,
       `${userId}:${twilioPhoneNumber}`,
