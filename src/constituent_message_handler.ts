@@ -54,7 +54,7 @@ export default abstract class ConstituentMessageHandler {
       id: '',
       phoneNumber: '',
       onOptOutList: false,
-      message: undefined,
+      message: '',
       known: undefined,
     };
     this.userAttachments = [];
@@ -1405,19 +1405,19 @@ export default abstract class ConstituentMessageHandler {
   // for an incoming constituent message.
   protected abstract determineConstituentStatus(): void;
 
-  protected abstract processSmsNew(userMessage: string, userInfo: UserInfo, twilioPhoneNumber: string, inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry): Promise<void>;
+  protected abstract processSmsNew(userInfo: UserInfo, twilioPhoneNumber: string, inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry): Promise<void>;
 
-  protected abstract processSmsPreAutomatedEntry(userInfo: UserInfo, userMessage: string, twilioPhoneNumber: string, inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry): Promise<void>;
+  protected abstract processSmsPreAutomatedEntry(userInfo: UserInfo, twilioPhoneNumber: string, inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry): Promise<void>;
 
   protected abstract processSmsEntering(userInfo: UserInfo, twilioPhoneNumber: string, inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry): Promise<void>;
 
-  protected abstract processSmsHasEnteredAutomated(userInfo: UserInfo, userMessage: string, twilioPhoneNumber: string, inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry,
+  protected abstract processSmsHasEnteredAutomated(userInfo: UserInfo, twilioPhoneNumber: string, inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry,
     userAttachments: any[]): Promise<void>;
 
-  protected abstract processSmsHasEnteredConversation(userInfo: UserInfo, userMessage: string, twilioPhoneNumber: string, inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry,
+  protected abstract processSmsHasEnteredConversation(userInfo: UserInfo, twilioPhoneNumber: string, inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry,
     userAttachments: any[]): Promise<void>;
 
-  protected abstract processSmsReturning(userInfo: UserInfo, userMessage: string, twilioPhoneNumber: string, inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry,
+  protected abstract processSmsReturning(userInfo: UserInfo, twilioPhoneNumber: string, inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry,
     entryPoint: EntryPoint, returningVoter: boolean, userAttachments: any[]): Promise<void>;
 
   // Method to handle incoming SMS messages.
@@ -1486,14 +1486,14 @@ export default abstract class ConstituentMessageHandler {
         NEW
       ********************/
       case ConstituentStatus.NEW: {
-        this.processSmsNew(userMessage, userInfo, twilioPhoneNumber, inboundDbMessageEntry);
+        this.processSmsNew(userInfo, twilioPhoneNumber, inboundDbMessageEntry);
         break;
       }
       /********************
         PRE_ENTERING_AUTOMATED
       ********************/
       case ConstituentStatus.PRE_ENTERING_AUTOMATED: {
-        this.processSmsPreAutomatedEntry(userInfo, userMessage, twilioPhoneNumber, inboundDbMessageEntry);
+        this.processSmsPreAutomatedEntry(userInfo, twilioPhoneNumber, inboundDbMessageEntry);
         break;
       }
       /********************
@@ -1507,21 +1507,21 @@ export default abstract class ConstituentMessageHandler {
         HAS_ENTERED_AUTOMATED
       ********************/
       case ConstituentStatus.HAS_ENTERED_AUTOMATED: {
-        this.processSmsHasEnteredAutomated(userInfo, userMessage, twilioPhoneNumber, inboundDbMessageEntry, userAttachments);
+        this.processSmsHasEnteredAutomated(userInfo, twilioPhoneNumber, inboundDbMessageEntry, userAttachments);
         break;
       }
       /********************
         HAS_ENTERED_CONVERSATION
       ********************/
       case ConstituentStatus.HAS_ENTERED_CONVERSATION: {
-        this.processSmsHasEnteredConversation(userInfo, userMessage, twilioPhoneNumber, inboundDbMessageEntry, userAttachments);
+        this.processSmsHasEnteredConversation(userInfo, twilioPhoneNumber, inboundDbMessageEntry, userAttachments);
         break;
       }
       /********************
         RETURNING
       ********************/
       case ConstituentStatus.RETURNING: {
-        this.processSmsReturning(userInfo, userMessage, twilioPhoneNumber, inboundDbMessageEntry, entryPoint, returningVoter, userAttachments);
+        this.processSmsReturning(userInfo, twilioPhoneNumber, inboundDbMessageEntry, entryPoint, returningVoter, userAttachments);
         break;
       }
       /********************

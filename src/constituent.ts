@@ -9,7 +9,8 @@ export default interface Constituent {
     phoneNumber: string;
     // Whether the constituent is on the opt out list.
     onOptOutList: boolean;
-    message: string | undefined;
+    // The message from the constituent in the current request.
+    message: string;
     // Whether this is the first time we're seeing this user.
     known: boolean | undefined;
 }

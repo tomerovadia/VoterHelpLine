@@ -63,11 +63,11 @@ export default class DefaultConstituentMessageHandler extends ConstituentMessage
     }
   }
 
-  public async processSmsNew(userMessage: string, userInfo: UserInfo, twilioPhoneNumber: string, inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry) {
+  public async processSmsNew(userInfo: UserInfo, twilioPhoneNumber: string, inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry) {
     logger.info('Entering DefaultConstituentMessageHandler.processSmsNew');
     //T OK TO KEEP THIS MESSAGE LOGIC HERE FOR NOW
     let messageToVoter = MessageConstants.WELCOME_VOTER();
-    if (KeywordParser.isVotedKeyword(userMessage)) {
+    if (KeywordParser.isVotedKeyword(this.constituent.message)) {
       messageToVoter = MessageConstants.VOTED_WELCOME_RESPONSE();
 
       //T Should this pull from userinfo or User somewhere else?
@@ -120,10 +120,10 @@ export default class DefaultConstituentMessageHandler extends ConstituentMessage
     );
   }
 
-  public async processSmsPreAutomatedEntry(userInfo: UserInfo, userMessage: string, twilioPhoneNumber: string, inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry) {
+  public async processSmsPreAutomatedEntry(userInfo: UserInfo, twilioPhoneNumber: string, inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry) {
     logger.info('Entering DefaultConstituentMessageHandler.processSmsPreAutomatedEntry');
     let messageToVoter = MessageConstants.CLARIFY_HELPLINE_REQUEST();
-    if (KeywordParser.isVotedKeyword(userMessage)) {
+    if (KeywordParser.isVotedKeyword(this.constituent.message)) {
       messageToVoter = MessageConstants.VOTED_WELCOME_RESPONSE();
       await DbApiUtil.logVoterStatusToDb({
         userId: userInfo.userId,
@@ -413,14 +413,14 @@ export default class DefaultConstituentMessageHandler extends ConstituentMessage
     );
   }
 
-  public async processSmsHasEnteredAutomated(userInfo: UserInfo, userMessage: string, twilioPhoneNumber: string, inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry,
+  public async processSmsHasEnteredAutomated(userInfo: UserInfo, twilioPhoneNumber: string, inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry,
     userAttachments: any[]) {
-    if (KeywordParser.isVotedKeyword(userMessage)) {
+    if (KeywordParser.isVotedKeyword(this.constituent.message)) {
       await super.recordVotedStatus(userInfo!, twilioPhoneNumber);
       await super.replyToVoted(
         userInfo!,
         twilioPhoneNumber,
-        userMessage,
+        this.constituent.message,
         inboundDbMessageEntry
       );
     } else {
@@ -446,7 +446,7 @@ export default class DefaultConstituentMessageHandler extends ConstituentMessage
           `DefaultConstituentMessageHandler.processSmsHasEnteredAutomated: Passing voter message to Slack, slackChannelName: ${lobbyChannelId}, parentMessageTs: ${lobbyParentMessageTs}.`
         );
         const blocks = SlackBlockUtil.formatMessageWithAttachmentLinks(
-          userMessage,
+            this.constituent.message,
           userAttachments
         );
         await this.agentCommunicator.sendMessage(
@@ -486,7 +486,7 @@ export default class DefaultConstituentMessageHandler extends ConstituentMessage
         }
       }
 
-      let stateName = StateParser.determineState(userMessage);
+      let stateName = StateParser.determineState(this.constituent.message);
 
       if (stateName == null) {
         // If we've tried to determine their U.S. state enough times, choose the National channel
@@ -496,7 +496,7 @@ export default class DefaultConstituentMessageHandler extends ConstituentMessage
           // Otherwise, try to determine their U.S. state one more time.
         } else {
           logger.debug(
-            `DefaultConstituentMessageHandler.processSmsHasEnteredAutomated: StateParser could not determine U.S. state of voter from message ${userMessage}`
+            `DefaultConstituentMessageHandler.processSmsHasEnteredAutomated: StateParser could not determine U.S. state of voter from message ${this.constituent.message}`
           );
 
           this.constituentCommunicator.sendMessage({
@@ -530,7 +530,7 @@ export default class DefaultConstituentMessageHandler extends ConstituentMessage
       // U.S. state has been determined.
       userInfo.stateName = stateName;
       logger.debug(
-        `DefaultConstituentMessageHandler.processSmsHasEnteredAutomated: StateParser reviewed ${userMessage} and determined U.S. state: ${stateName}`
+        `DefaultConstituentMessageHandler.processSmsHasEnteredAutomated: StateParser reviewed ${this.constituent.message} and determined U.S. state: ${stateName}`
       );
 
       const messageToVoter =
@@ -577,16 +577,16 @@ export default class DefaultConstituentMessageHandler extends ConstituentMessage
     }
   }
 
-  public async processSmsHasEnteredConversation(userInfo: UserInfo, userMessage: string, twilioPhoneNumber: string, inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry,
+  public async processSmsHasEnteredConversation(userInfo: UserInfo, twilioPhoneNumber: string, inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry,
     userAttachments: any[]) {
-    if (KeywordParser.isVotedKeyword(userMessage)
+    if (KeywordParser.isVotedKeyword(this.constituent.message)
     ) {
       await super.recordVotedStatus(userInfo!, twilioPhoneNumber);
     }
     logger.info(
       `DefaultConstituentMessageHandler.processSmsHasEnteredConversation (${this.constituent.id}): Known U.S. state for voter (${userInfo!.stateName}) or volunteer has engaged (${userInfo!.volunteerEngaged}). Automated system no longer active.`
     );
-    const userOptions = { userInfo: userInfo!, userPhoneNumber: this.constituent.phoneNumber, userMessage, userAttachments };
+    const userOptions = { userInfo: userInfo!, userPhoneNumber: this.constituent.phoneNumber, userMessage: this.constituent.message, userAttachments };
 
     const activeChannelMessageParams = {
       parentMessageTs: userInfo[userInfo.activeChannelId],
@@ -671,9 +671,9 @@ export default class DefaultConstituentMessageHandler extends ConstituentMessage
     );
   }
 
-  public async processSmsReturning(userInfo: UserInfo, userMessage: string, twilioPhoneNumber: string, inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry,
+  public async processSmsReturning(userInfo: UserInfo, twilioPhoneNumber: string, inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry,
     entryPoint: EntryPoint, returningVoter: boolean, userAttachments: any[]) {
-    if (KeywordParser.isVotedKeyword(userMessage)
+    if (KeywordParser.isVotedKeyword(this.constituent.message)
     ) {
       await super.recordVotedStatus(userInfo!, twilioPhoneNumber);
     }
@@ -682,7 +682,7 @@ export default class DefaultConstituentMessageHandler extends ConstituentMessage
     // TODO: Reconcile this with the userOptions defined above in a separate switch branch.
     const userOptions = {
       userPhoneNumber: this.constituent.phoneNumber,
-      userMessage,
+      userMessage: this.constituent.message,
       userAttachments,
       userId: this.constituent.id,
     };
