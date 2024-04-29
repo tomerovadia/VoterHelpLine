@@ -414,7 +414,7 @@ export default class DefaultConstituentMessageHandler extends ConstituentMessage
   }
 
   public async processSmsHasEnteredAutomated(userInfo: UserInfo, userMessage: string, twilioPhoneNumber: string, inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry,
-    userId: string, userAttachments: any[]) {
+    userAttachments: any[]) {
     if (KeywordParser.isVotedKeyword(userMessage)) {
       await super.recordVotedStatus(userInfo!, twilioPhoneNumber);
       await super.replyToVoted(
@@ -425,7 +425,7 @@ export default class DefaultConstituentMessageHandler extends ConstituentMessage
       );
     } else {
       logger.info(
-        `DefaultConstituentMessageHandler.processSmsHasEnteredAutomated (${userId}): U.S. state for voter is not known. Automated system will attempt to determine.`
+        `DefaultConstituentMessageHandler.processSmsHasEnteredAutomated (${this.constituent.id}): U.S. state for voter is not known. Automated system will attempt to determine.`
       );
 
       userInfo.numStateSelectionAttempts++;
@@ -518,7 +518,7 @@ export default class DefaultConstituentMessageHandler extends ConstituentMessage
           );
           await RedisApiUtil.setHash(
             redisClient,
-            `${userId}:${twilioPhoneNumber}`,
+            `${this.constituent.id}:${twilioPhoneNumber}`,
             userInfo
           );
 
@@ -578,13 +578,13 @@ export default class DefaultConstituentMessageHandler extends ConstituentMessage
   }
 
   public async processSmsHasEnteredConversation(userInfo: UserInfo, userMessage: string, twilioPhoneNumber: string, inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry, userPhoneNumber: string,
-    userAttachments: any[], userId: string) {
+    userAttachments: any[]) {
     if (KeywordParser.isVotedKeyword(userMessage)
     ) {
       await super.recordVotedStatus(userInfo!, twilioPhoneNumber);
     }
     logger.info(
-      `DefaultConstituentMessageHandler.processSmsHasEnteredConversation (${userId}): Known U.S. state for voter (${userInfo!.stateName}) or volunteer has engaged (${userInfo!.volunteerEngaged}). Automated system no longer active.`
+      `DefaultConstituentMessageHandler.processSmsHasEnteredConversation (${this.constituent.id}): Known U.S. state for voter (${userInfo!.stateName}) or volunteer has engaged (${userInfo!.volunteerEngaged}). Automated system no longer active.`
     );
     const userOptions = { userInfo: userInfo!, userPhoneNumber, userMessage, userAttachments };
 
@@ -666,13 +666,13 @@ export default class DefaultConstituentMessageHandler extends ConstituentMessage
     logger.debug(`DefaultConstituentMessageHandler.handleClearedVoter: Writing updated userInfo to Redis.`);
     await RedisApiUtil.setHash(
       redisClient,
-      `${userId}:${twilioPhoneNumber}`,
+      `${this.constituent.id}:${twilioPhoneNumber}`,
       userInfo
     );
   }
 
   public async processSmsReturning(userInfo: UserInfo, userMessage: string, twilioPhoneNumber: string, inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry,
-    userPhoneNumber: string, userId: string, entryPoint: EntryPoint, returningVoter: boolean, userAttachments: any[]) {
+    userPhoneNumber: string, entryPoint: EntryPoint, returningVoter: boolean, userAttachments: any[]) {
     if (KeywordParser.isVotedKeyword(userMessage)
     ) {
       await super.recordVotedStatus(userInfo!, twilioPhoneNumber);
@@ -684,7 +684,7 @@ export default class DefaultConstituentMessageHandler extends ConstituentMessage
       userPhoneNumber,
       userMessage,
       userAttachments,
-      userId,
+      userId: this.constituent.id,
     };
     userInfo = super.prepareUserInfoForNewVoter({
       userOptions,
