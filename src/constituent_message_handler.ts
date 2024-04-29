@@ -160,7 +160,7 @@ export default abstract class ConstituentMessageHandler {
     });
   }
 
-  public async postUserMessageHistoryToSlack(
+  protected async postUserMessageHistoryToSlack(
     redisClient: PromisifiedRedisClient,
     userInfo: UserInfo,
     twilioPhoneNumber: string,
@@ -717,7 +717,7 @@ export default abstract class ConstituentMessageHandler {
     );
   }
 
-  async introduceNewVoterToSlackChannel(
+  private async introduceNewVoterToSlackChannel(
     {
       userInfo,
       userMessage,
@@ -957,7 +957,7 @@ export default abstract class ConstituentMessageHandler {
   }
 
   // Whether the phone number was blocked by the client/volunteers.
-  public async isPhoneNumberBlocked(userPhoneNumber: string): Promise<boolean> {
+  private async isPhoneNumberBlocked(userPhoneNumber: string): Promise<boolean> {
     const redisBlockedUserPhoneNumberValue = await RedisApiUtil.getHashField(
       redisClient,
       'twilioBlockedUserPhoneNumbers',
@@ -1001,11 +1001,11 @@ export default abstract class ConstituentMessageHandler {
     return null;
   }
 
-  public getOnOptOutList(): boolean {
+  private getOnOptOutList(): boolean {
     return this.constituent.onOptOutList;
   }
 
-  public async fetchAndLoadConstituentInfo(
+  private async fetchAndLoadConstituentInfo(
     twilioPhoneNumber: string
   ): Promise<UserInfo | null> {
     const redisHashKey = `${this.constituent.id}:${twilioPhoneNumber}`;
@@ -1195,7 +1195,7 @@ export default abstract class ConstituentMessageHandler {
 
   // Method to handle opted out constituent logic, whether they have opted
   // out in the past or are opting out now, or are now opting back in.
-  public async handleOptOutLogic(twilioPhoneNumber: string, inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry): Promise<boolean> {
+  private async handleOptOutLogic(twilioPhoneNumber: string, inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry): Promise<boolean> {
     if (!this.constituent.message) {
       // Add an error message here.
       return false;
@@ -1311,7 +1311,7 @@ export default abstract class ConstituentMessageHandler {
   }
 
   // Previous logic.
-  public async handleKnownVoterBlockLogic(
+  private async handleKnownVoterBlockLogic(
     userInfo: UserInfo,
     userMessage: string,
     userPhoneNumber: string,
@@ -1403,21 +1403,21 @@ export default abstract class ConstituentMessageHandler {
 
   // Method containing high-level logic for the general approach to be used
   // for an incoming constituent message.
-  public abstract determineConstituentStatus(): void;
+  protected abstract determineConstituentStatus(): void;
 
-  public abstract processSmsNew(userMessage: string, userInfo: UserInfo, twilioPhoneNumber: string, inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry): Promise<void>;
+  protected abstract processSmsNew(userMessage: string, userInfo: UserInfo, twilioPhoneNumber: string, inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry): Promise<void>;
 
-  public abstract processSmsPreAutomatedEntry(userInfo: UserInfo, userMessage: string, twilioPhoneNumber: string, inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry): Promise<void>;
+  protected abstract processSmsPreAutomatedEntry(userInfo: UserInfo, userMessage: string, twilioPhoneNumber: string, inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry): Promise<void>;
 
-  public abstract processSmsEntering(userInfo: UserInfo, twilioPhoneNumber: string, inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry): Promise<void>;
+  protected abstract processSmsEntering(userInfo: UserInfo, twilioPhoneNumber: string, inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry): Promise<void>;
 
-  public abstract processSmsHasEnteredAutomated(userInfo: UserInfo, userMessage: string, twilioPhoneNumber: string, inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry,
+  protected abstract processSmsHasEnteredAutomated(userInfo: UserInfo, userMessage: string, twilioPhoneNumber: string, inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry,
     userAttachments: any[]): Promise<void>;
 
-  public abstract processSmsHasEnteredConversation(userInfo: UserInfo, userMessage: string, twilioPhoneNumber: string, inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry,
+  protected abstract processSmsHasEnteredConversation(userInfo: UserInfo, userMessage: string, twilioPhoneNumber: string, inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry,
     userAttachments: any[]): Promise<void>;
 
-  public abstract processSmsReturning(userInfo: UserInfo, userMessage: string, twilioPhoneNumber: string, inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry,
+  protected abstract processSmsReturning(userInfo: UserInfo, userMessage: string, twilioPhoneNumber: string, inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry,
     entryPoint: EntryPoint, returningVoter: boolean, userAttachments: any[]): Promise<void>;
 
   // Method to handle incoming SMS messages.
