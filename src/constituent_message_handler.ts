@@ -1448,7 +1448,7 @@ export default abstract class ConstituentMessageHandler {
     const userId = MD5.hex(userPhoneNumber);
     this.constituent.id = userId;
     this.constituent.phoneNumber = userPhoneNumber;
-    this.constituent.message = this.constituent.message;
+    this.constituent.message = reqBody.Body;
     this.userAttachments = userAttachments;
     this.twilioPhoneNumber = twilioPhoneNumber;
     this.entryPoint = entryPoint;
