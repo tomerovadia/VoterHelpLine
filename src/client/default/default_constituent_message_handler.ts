@@ -413,8 +413,7 @@ export default class DefaultConstituentMessageHandler extends ConstituentMessage
     );
   }
 
-  public async processSmsHasEnteredAutomated(userInfo: UserInfo, twilioPhoneNumber: string, inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry,
-    userAttachments: any[]) {
+  public async processSmsHasEnteredAutomated(userInfo: UserInfo, twilioPhoneNumber: string, inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry) {
     if (KeywordParser.isVotedKeyword(this.constituent.message)) {
       await super.recordVotedStatus(userInfo!, twilioPhoneNumber);
       await super.replyToVoted(
@@ -447,7 +446,7 @@ export default class DefaultConstituentMessageHandler extends ConstituentMessage
         );
         const blocks = SlackBlockUtil.formatMessageWithAttachmentLinks(
             this.constituent.message,
-          userAttachments
+            this.userAttachments
         );
         await this.agentCommunicator.sendMessage(
           '',
@@ -577,8 +576,7 @@ export default class DefaultConstituentMessageHandler extends ConstituentMessage
     }
   }
 
-  public async processSmsHasEnteredConversation(userInfo: UserInfo, twilioPhoneNumber: string, inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry,
-    userAttachments: any[]) {
+  public async processSmsHasEnteredConversation(userInfo: UserInfo, twilioPhoneNumber: string, inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry) {
     if (KeywordParser.isVotedKeyword(this.constituent.message)
     ) {
       await super.recordVotedStatus(userInfo!, twilioPhoneNumber);
@@ -586,7 +584,7 @@ export default class DefaultConstituentMessageHandler extends ConstituentMessage
     logger.info(
       `DefaultConstituentMessageHandler.processSmsHasEnteredConversation (${this.constituent.id}): Known U.S. state for voter (${userInfo!.stateName}) or volunteer has engaged (${userInfo!.volunteerEngaged}). Automated system no longer active.`
     );
-    const userOptions = { userInfo: userInfo!, userPhoneNumber: this.constituent.phoneNumber, userMessage: this.constituent.message, userAttachments };
+    const userOptions = { userInfo: userInfo!, userPhoneNumber: this.constituent.phoneNumber, userMessage: this.constituent.message, userAttachments: this.userAttachments };
 
     const activeChannelMessageParams = {
       parentMessageTs: userInfo[userInfo.activeChannelId],
@@ -672,7 +670,7 @@ export default class DefaultConstituentMessageHandler extends ConstituentMessage
   }
 
   public async processSmsReturning(userInfo: UserInfo, twilioPhoneNumber: string, inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry,
-    entryPoint: EntryPoint, returningVoter: boolean, userAttachments: any[]) {
+    entryPoint: EntryPoint, returningVoter: boolean) {
     if (KeywordParser.isVotedKeyword(this.constituent.message)
     ) {
       await super.recordVotedStatus(userInfo!, twilioPhoneNumber);
@@ -683,7 +681,7 @@ export default class DefaultConstituentMessageHandler extends ConstituentMessage
     const userOptions = {
       userPhoneNumber: this.constituent.phoneNumber,
       userMessage: this.constituent.message,
-      userAttachments,
+      userAttachments: this.userAttachments,
       userId: this.constituent.id,
     };
     userInfo = super.prepareUserInfoForNewVoter({
