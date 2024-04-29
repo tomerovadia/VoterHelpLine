@@ -1414,11 +1414,11 @@ export default abstract class ConstituentMessageHandler {
   public abstract processSmsHasEnteredAutomated(userInfo: UserInfo, userMessage: string, twilioPhoneNumber: string, inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry,
     userAttachments: any[]): Promise<void>;
 
-  public abstract processSmsHasEnteredConversation(userInfo: UserInfo, userMessage: string, twilioPhoneNumber: string, inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry, userPhoneNumber: string,
+  public abstract processSmsHasEnteredConversation(userInfo: UserInfo, userMessage: string, twilioPhoneNumber: string, inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry,
     userAttachments: any[]): Promise<void>;
 
   public abstract processSmsReturning(userInfo: UserInfo, userMessage: string, twilioPhoneNumber: string, inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry,
-    userPhoneNumber: string, entryPoint: EntryPoint, returningVoter: boolean, userAttachments: any[]): Promise<void>;
+    entryPoint: EntryPoint, returningVoter: boolean, userAttachments: any[]): Promise<void>;
 
   // Method to handle incoming SMS messages.
   public async handleMessage(
@@ -1514,14 +1514,14 @@ export default abstract class ConstituentMessageHandler {
         HAS_ENTERED_CONVERSATION
       ********************/
       case ConstituentStatus.HAS_ENTERED_CONVERSATION: {
-        this.processSmsHasEnteredConversation(userInfo, userMessage, twilioPhoneNumber, inboundDbMessageEntry, userPhoneNumber, userAttachments);
+        this.processSmsHasEnteredConversation(userInfo, userMessage, twilioPhoneNumber, inboundDbMessageEntry, userAttachments);
         break;
       }
       /********************
         RETURNING
       ********************/
       case ConstituentStatus.RETURNING: {
-        this.processSmsReturning(userInfo, userMessage, twilioPhoneNumber, inboundDbMessageEntry, userPhoneNumber, entryPoint, returningVoter, userAttachments);
+        this.processSmsReturning(userInfo, userMessage, twilioPhoneNumber, inboundDbMessageEntry, entryPoint, returningVoter, userAttachments);
         break;
       }
       /********************

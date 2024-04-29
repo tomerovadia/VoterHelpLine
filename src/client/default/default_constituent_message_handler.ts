@@ -577,7 +577,7 @@ export default class DefaultConstituentMessageHandler extends ConstituentMessage
     }
   }
 
-  public async processSmsHasEnteredConversation(userInfo: UserInfo, userMessage: string, twilioPhoneNumber: string, inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry, userPhoneNumber: string,
+  public async processSmsHasEnteredConversation(userInfo: UserInfo, userMessage: string, twilioPhoneNumber: string, inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry,
     userAttachments: any[]) {
     if (KeywordParser.isVotedKeyword(userMessage)
     ) {
@@ -586,7 +586,7 @@ export default class DefaultConstituentMessageHandler extends ConstituentMessage
     logger.info(
       `DefaultConstituentMessageHandler.processSmsHasEnteredConversation (${this.constituent.id}): Known U.S. state for voter (${userInfo!.stateName}) or volunteer has engaged (${userInfo!.volunteerEngaged}). Automated system no longer active.`
     );
-    const userOptions = { userInfo: userInfo!, userPhoneNumber, userMessage, userAttachments };
+    const userOptions = { userInfo: userInfo!, userPhoneNumber: this.constituent.phoneNumber, userMessage, userAttachments };
 
     const activeChannelMessageParams = {
       parentMessageTs: userInfo[userInfo.activeChannelId],
@@ -672,7 +672,7 @@ export default class DefaultConstituentMessageHandler extends ConstituentMessage
   }
 
   public async processSmsReturning(userInfo: UserInfo, userMessage: string, twilioPhoneNumber: string, inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry,
-    userPhoneNumber: string, entryPoint: EntryPoint, returningVoter: boolean, userAttachments: any[]) {
+    entryPoint: EntryPoint, returningVoter: boolean, userAttachments: any[]) {
     if (KeywordParser.isVotedKeyword(userMessage)
     ) {
       await super.recordVotedStatus(userInfo!, twilioPhoneNumber);
@@ -681,7 +681,7 @@ export default class DefaultConstituentMessageHandler extends ConstituentMessage
     super.endConstituentSession(redisClient, userInfo, twilioPhoneNumber);
     // TODO: Reconcile this with the userOptions defined above in a separate switch branch.
     const userOptions = {
-      userPhoneNumber,
+      userPhoneNumber: this.constituent.phoneNumber,
       userMessage,
       userAttachments,
       userId: this.constituent.id,
