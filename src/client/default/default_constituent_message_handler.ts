@@ -636,19 +636,19 @@ export default class DefaultConstituentMessageHandler extends ConstituentMessage
         `DefaultConstituentMessageHandler.handleClearedVoter: Seconds since last message from voter > MINS_BEFORE_WELCOME_BACK_MESSAGE (${nowSecondsEpoch - lastVoterMessageSecsFromEpoch
         } > : ${MINS_BEFORE_WELCOME_BACK_MESSAGE}), sending welcome back message.`
       );
-      let userMessage = null as string | null;
-      if (KeywordParser.isVotedKeyword(userOptions.userMessage)) {
-        userMessage = MessageConstants.VOTED_RESPONSE();
+      let messageToVoter = null as string | null;
+      if (KeywordParser.isVotedKeyword(userOptions.messageToVoter)) {
+        messageToVoter = MessageConstants.VOTED_RESPONSE();
       } else {
-        userMessage = MessageConstants.WELCOME_BACK();
+        messageToVoter = MessageConstants.WELCOME_BACK();
       }
 
       this.constituentCommunicator.sendMessage({
-        message: userMessage,
+        message: messageToVoter,
         automated: true,
         userInfo,
       });
-      await this.agentCommunicator.sendMessage(userMessage, {
+      await this.agentCommunicator.sendMessage(messageToVoter, {
         ...activeChannelMessageParams,
         isAutomatedMessage: true,
       });
