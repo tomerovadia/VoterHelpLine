@@ -63,7 +63,7 @@ export default class DefaultConstituentMessageHandler extends ConstituentMessage
     }
   }
 
-  public async processSmsNew(userInfo: UserInfo, twilioPhoneNumber: string, inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry) {
+  public async processSmsNew(userInfo: UserInfo, inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry) {
     logger.info('Entering DefaultConstituentMessageHandler.processSmsNew');
     //T OK TO KEEP THIS MESSAGE LOGIC HERE FOR NOW
     let messageToVoter = MessageConstants.WELCOME_VOTER();
@@ -75,7 +75,7 @@ export default class DefaultConstituentMessageHandler extends ConstituentMessage
       await DbApiUtil.logVoterStatusToDb({
         userId: userInfo.userId,
         userPhoneNumber: userInfo.userPhoneNumber,
-        twilioPhoneNumber: twilioPhoneNumber,
+        twilioPhoneNumber: this.twilioPhoneNumber,
         isDemo: userInfo.isDemo,
         voterStatus: 'VOTED',
         originatingSlackUserName: null,
@@ -115,12 +115,12 @@ export default class DefaultConstituentMessageHandler extends ConstituentMessage
     );
     await RedisApiUtil.setHash(
       redisClient,
-      `${userInfo.userId}:${twilioPhoneNumber}`,
+      `${userInfo.userId}:${this.twilioPhoneNumber}`,
       userInfo
     );
   }
 
-  public async processSmsPreAutomatedEntry(userInfo: UserInfo, twilioPhoneNumber: string, inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry) {
+  public async processSmsPreAutomatedEntry(userInfo: UserInfo, inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry) {
     logger.info('Entering DefaultConstituentMessageHandler.processSmsPreAutomatedEntry');
     let messageToVoter = MessageConstants.CLARIFY_HELPLINE_REQUEST();
     if (KeywordParser.isVotedKeyword(this.constituent.message)) {
@@ -128,7 +128,7 @@ export default class DefaultConstituentMessageHandler extends ConstituentMessage
       await DbApiUtil.logVoterStatusToDb({
         userId: userInfo.userId,
         userPhoneNumber: userInfo.userPhoneNumber,
-        twilioPhoneNumber: twilioPhoneNumber,
+        twilioPhoneNumber: this.twilioPhoneNumber,
         isDemo: userInfo.isDemo,
         voterStatus: 'VOTED',
         originatingSlackUserName: null,
@@ -167,18 +167,18 @@ export default class DefaultConstituentMessageHandler extends ConstituentMessage
     );
     await RedisApiUtil.setHash(
       redisClient,
-      `${userInfo.userId}:${twilioPhoneNumber}`,
+      `${userInfo.userId}:${this.twilioPhoneNumber}`,
       userInfo
     );
   }
 
-  public async processSmsEntering(userInfo: UserInfo, twilioPhoneNumber: string, inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry) {
+  public async processSmsEntering(userInfo: UserInfo, inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry) {
     logger.info('Entering DefaultConstituentMessageHandler.processSmsEntering');
 
     await DbApiUtil.logInitialVoterStatusToDb(
       userInfo.userId,
       userInfo.userPhoneNumber,
-      twilioPhoneNumber,
+      this.twilioPhoneNumber,
       userInfo.isDemo
     );
 
@@ -222,7 +222,7 @@ export default class DefaultConstituentMessageHandler extends ConstituentMessage
     // enter the helpline with "Voted" prepopulated as their status.
     const status = await DbApiUtil.getLatestVoterStatus(
       userInfo.userId,
-      twilioPhoneNumber
+      this.twilioPhoneNumber
     );
 
     let messageToConstituent;
@@ -250,7 +250,7 @@ export default class DefaultConstituentMessageHandler extends ConstituentMessage
     if (slackChannelName) {
       const topLevelThreadSlackBlocks = await SlackBlockUtil.getVoterPanel(
         userInfo,
-        twilioPhoneNumber,
+        this.twilioPhoneNumber,
         undefined,
         status || 'UNKNOWN'
       );
@@ -267,7 +267,7 @@ export default class DefaultConstituentMessageHandler extends ConstituentMessage
           userInfo,
         });
         throw new Error(
-          `Could not send introduction slack message with voter info for voter ${userInfo.userPhoneNumber} texting ${twilioPhoneNumber}. Error: ${error}`
+          `Could not send introduction slack message with voter info for voter ${userInfo.userPhoneNumber} texting ${this.twilioPhoneNumber}. Error: ${error}`
         );
       }
 
@@ -281,7 +281,7 @@ export default class DefaultConstituentMessageHandler extends ConstituentMessage
           userInfo,
         });
         throw new Error(
-          `Could not send introduction slack message with voter info for voter ${userInfo.userPhoneNumber} texting ${twilioPhoneNumber}.`
+          `Could not send introduction slack message with voter info for voter ${userInfo.userPhoneNumber} texting ${this.twilioPhoneNumber}.`
         );
       }
 
@@ -300,7 +300,7 @@ export default class DefaultConstituentMessageHandler extends ConstituentMessage
         channelId: slackParentMessageResponse.data.channel,
         userId: userInfo.userId,
         userPhoneNumber: userInfo.userPhoneNumber,
-        twilioPhoneNumber: twilioPhoneNumber,
+        twilioPhoneNumber: this.twilioPhoneNumber,
         needsAttention: true,
         isDemo: userInfo.isDemo,
         sessionStartEpoch: userInfo.sessionStartEpoch || null,
@@ -336,7 +336,7 @@ export default class DefaultConstituentMessageHandler extends ConstituentMessage
       await super.postUserMessageHistoryToSlack(
         redisClient,
         userInfo,
-        twilioPhoneNumber,
+        this.twilioPhoneNumber,
         {
           destinationSlackParentMessageTs: slackParentMessageResponse.data.ts,
           destinationSlackChannelId: slackParentMessageResponse.data.channel,
@@ -349,7 +349,7 @@ export default class DefaultConstituentMessageHandler extends ConstituentMessage
       );
       await RedisApiUtil.setHash(
         redisClient,
-        `${userInfo.userId}:${twilioPhoneNumber}`,
+        `${userInfo.userId}:${this.twilioPhoneNumber}`,
         userInfo
       );
 
@@ -361,7 +361,7 @@ export default class DefaultConstituentMessageHandler extends ConstituentMessage
       await RedisApiUtil.setHash(
         redisClient,
         `${slackParentMessageResponse.data.channel}:${slackParentMessageResponse.data.ts}`,
-        { userPhoneNumber: userInfo.userPhoneNumber, twilioPhoneNumber }
+        { userPhoneNumber: userInfo.userPhoneNumber, twilioPhoneNumber: this.twilioPhoneNumber }
       );
       // Add key/value such that given Slack thread data we can get a
       // user phone number.
@@ -371,7 +371,7 @@ export default class DefaultConstituentMessageHandler extends ConstituentMessage
       await RedisApiUtil.setHash(
         redisClient,
         `${slackParentMessageResponse.data.channel}:${slackParentMessageResponse.data.ts}`,
-        { userPhoneNumber: userInfo.userPhoneNumber, twilioPhoneNumber }
+        { userPhoneNumber: userInfo.userPhoneNumber, twilioPhoneNumber: this.twilioPhoneNumber }
       );
     } else {
       this.constituentCommunicator.sendMessage({
@@ -408,17 +408,17 @@ export default class DefaultConstituentMessageHandler extends ConstituentMessage
     );
     await RedisApiUtil.setHash(
       redisClient,
-      `${userInfo.userId}:${twilioPhoneNumber}`,
+      `${userInfo.userId}:${this.twilioPhoneNumber}`,
       userInfo
     );
   }
 
-  public async processSmsHasEnteredAutomated(userInfo: UserInfo, twilioPhoneNumber: string, inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry) {
+  public async processSmsHasEnteredAutomated(userInfo: UserInfo, inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry) {
     if (KeywordParser.isVotedKeyword(this.constituent.message)) {
-      await super.recordVotedStatus(userInfo!, twilioPhoneNumber);
+      await super.recordVotedStatus(userInfo!, this.twilioPhoneNumber);
       await super.replyToVoted(
         userInfo!,
-        twilioPhoneNumber,
+        this.twilioPhoneNumber,
         this.constituent.message,
         inboundDbMessageEntry
       );
@@ -517,7 +517,7 @@ export default class DefaultConstituentMessageHandler extends ConstituentMessage
           );
           await RedisApiUtil.setHash(
             redisClient,
-            `${this.constituent.id}:${twilioPhoneNumber}`,
+            `${this.constituent.id}:${this.twilioPhoneNumber}`,
             userInfo
           );
 
@@ -570,16 +570,16 @@ export default class DefaultConstituentMessageHandler extends ConstituentMessage
       }
 
       await super.routeVoterToSlackChannel(userInfo, redisClient, {
-        twilioPhoneNumber,
+        twilioPhoneNumber: this.twilioPhoneNumber,
         destinationSlackChannelName: selectedStateChannelName,
       });
     }
   }
 
-  public async processSmsHasEnteredConversation(userInfo: UserInfo, twilioPhoneNumber: string, inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry) {
+  public async processSmsHasEnteredConversation(userInfo: UserInfo, inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry) {
     if (KeywordParser.isVotedKeyword(this.constituent.message)
     ) {
-      await super.recordVotedStatus(userInfo!, twilioPhoneNumber);
+      await super.recordVotedStatus(userInfo!, this.twilioPhoneNumber);
     }
     logger.info(
       `DefaultConstituentMessageHandler.processSmsHasEnteredConversation (${this.constituent.id}): Known U.S. state for voter (${userInfo!.stateName}) or volunteer has engaged (${userInfo!.volunteerEngaged}). Automated system no longer active.`
@@ -655,7 +655,7 @@ export default class DefaultConstituentMessageHandler extends ConstituentMessage
         // than continuing to use the existing thread. We do this by "routing"
         // the voter back to the same channel
         await super.routeVoterToSlackChannel(userInfo, redisClient, {
-          twilioPhoneNumber,
+          twilioPhoneNumber: this.twilioPhoneNumber,
           destinationSlackChannelName: userInfo.activeChannelName,
         });
       }
@@ -664,19 +664,19 @@ export default class DefaultConstituentMessageHandler extends ConstituentMessage
     logger.debug(`DefaultConstituentMessageHandler.handleClearedVoter: Writing updated userInfo to Redis.`);
     await RedisApiUtil.setHash(
       redisClient,
-      `${this.constituent.id}:${twilioPhoneNumber}`,
+      `${this.constituent.id}:${this.twilioPhoneNumber}`,
       userInfo
     );
   }
 
-  public async processSmsReturning(userInfo: UserInfo, twilioPhoneNumber: string, inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry,
+  public async processSmsReturning(userInfo: UserInfo, inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry,
     entryPoint: EntryPoint, returningVoter: boolean) {
     if (KeywordParser.isVotedKeyword(this.constituent.message)
     ) {
-      await super.recordVotedStatus(userInfo!, twilioPhoneNumber);
+      await super.recordVotedStatus(userInfo!, this.twilioPhoneNumber);
     }
     // Treat this as a new session
-    super.endConstituentSession(redisClient, userInfo, twilioPhoneNumber);
+    super.endConstituentSession(redisClient, userInfo, this.twilioPhoneNumber);
     // TODO: Reconcile this with the userOptions defined above in a separate switch branch.
     const userOptions = {
       userPhoneNumber: this.constituent.phoneNumber,
@@ -686,7 +686,7 @@ export default class DefaultConstituentMessageHandler extends ConstituentMessage
     };
     userInfo = super.prepareUserInfoForNewVoter({
       userOptions,
-      twilioPhoneNumber,
+      twilioPhoneNumber: this.twilioPhoneNumber,
       entryPoint,
       returningVoter,
     });
@@ -695,7 +695,7 @@ export default class DefaultConstituentMessageHandler extends ConstituentMessage
       userInfo,
       userOptions,
       redisClient,
-      twilioPhoneNumber,
+      this.twilioPhoneNumber,
       inboundDbMessageEntry,
       entryPoint,
       true /* includeWelcome */
