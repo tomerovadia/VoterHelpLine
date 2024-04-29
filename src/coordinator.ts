@@ -211,120 +211,16 @@ export default class Coordinator {
     entryPoint: EntryPoint
   ): Promise<void> {
     logger.info('Entering Coordinator.handleIncomingSmsMessage');
-
     const reqBody = req.body as TwilioRequestBody;
-    const userPhoneNumber = reqBody.From;
-
-    // TODO: Have the logic within this block encapsulated within a method of constituentMessageHandler,
-    // so that clients can modify the behavior (e.g. reply with unsubscribe confirmation).
-    // Have this be one of the major paths (with constitutent status STOP).
-    if (await this.constituentMessageHandler.isPhoneNumberBlocked(userPhoneNumber)) {
-      logger.info(
-        `Coordinator.handleIncomingSmsMessage: Received text from blocked phone number: ${userPhoneNumber}.`
-      );
-      return;
-    }
-
-    const twilioPhoneNumber = reqBody.To;
-    const userMessage = reqBody.Body;
-    const userAttachments = TwilioUtil.getAttachments(reqBody);
-    const MD5 = new Hashes.MD5();
-    const userId = MD5.hex(userPhoneNumber);
-    const twilioCallbackURL = TwilioUtil.twilioCallbackURL(req);
-    // TODO: Set these in the constructor instead.
-    this.constituentMessageHandler.setConstituentId(userId);
-    this.constituentMessageHandler.setConstituentPhoneNumber(userPhoneNumber);
-    this.constituentMessageHandler.setConstituentMessage(userMessage);
-    this.constituentMessageHandler.setUserAttachments(userAttachments);
-    this.constituentMessageHandler.setTwilioPhoneNumber(twilioPhoneNumber);
-    this.constituentMessageHandler.setEntryPoint(entryPoint);
-    logger.info(`Coordinator.handleIncomingSmsMessage: Receiving Twilio message from ${entryPoint} entry point voter,
-                          userPhoneNumber: ${userPhoneNumber},
-                          twilioPhoneNumber: ${twilioPhoneNumber},
-                          userMessage: ${userMessage},
-                          userId: ${userId}`);
-
     const inboundDbMessageEntry = this.dbService.populateInitialIncomingConstituentMessageDbEntry({
-      userMessage,
-      userPhoneNumber,
-      twilioPhoneNumber,
+      userMessage: reqBody.Body,
+      userPhoneNumber: reqBody.From,
+      twilioPhoneNumber: reqBody.To,
       twilioMessageSid: reqBody.SmsMessageSid,
-      twilioAttachments: userAttachments,
+      twilioAttachments: TwilioUtil.getAttachments(reqBody),
       entryPoint: LoadBalancer.PUSH_ENTRY_POINT,
     });
-    this.constituentMessageHandler.setInboundDbMessageEntry(inboundDbMessageEntry);
-    let returningVoter = false;
-    let userInfo = await this.constituentMessageHandler.fetchAndLoadConstituentInfo(twilioPhoneNumber);
-    if (!userInfo) {
-      userInfo = this.constituentMessageHandler.loadInfoForNewConstituent({
-        userPhoneNumber,
-        constituentId: userId,
-        twilioPhoneNumber,
-        entryPoint,
-      });
-    }
-    await this.constituentMessageHandler.fetchAndLoadOptOutStatus();
-    this.constituentMessageHandler.determineConstituentStatus();
-    if (config.enableMultiCycleFeature && this.constituentMessageHandler.getConstituentStatus() == ConstituentStatus.RETURNING) {
-      await this.constituentMessageHandler.endConstituentSession(redisClient, userInfo, twilioPhoneNumber);
-    }
-
-    logger.info("Coordinator.handleIncomingSmsMessage ConstituentStatus: ", this.constituentMessageHandler.getConstituentStatus());
-    const constituentIsAllowedToContinue = await this.constituentMessageHandler.handleOptOutLogic(twilioPhoneNumber, inboundDbMessageEntry);
-    if (!constituentIsAllowedToContinue) return;
-
-    let userOptions;
-    switch (this.constituentMessageHandler.getConstituentStatus()) {
-      /********************
-        NEW
-      ********************/
-      case ConstituentStatus.NEW: {
-        this.constituentMessageHandler.processSmsNew(userMessage, userInfo, twilioPhoneNumber, inboundDbMessageEntry, twilioCallbackURL);
-        break;
-      }
-      /********************
-        PRE_ENTERING_AUTOMATED
-      ********************/
-      case ConstituentStatus.PRE_ENTERING_AUTOMATED: {
-        this.constituentMessageHandler.processSmsPreAutomatedEntry(userInfo, userMessage, twilioPhoneNumber, inboundDbMessageEntry, twilioCallbackURL);
-        break;
-      }
-      /********************
-        ENTERING
-      ********************/
-      case ConstituentStatus.ENTERING: {
-        this.constituentMessageHandler.processSmsEntering(userInfo, twilioPhoneNumber, inboundDbMessageEntry, twilioCallbackURL);
-        break;
-      }
-      /********************
-        HAS_ENTERED_AUTOMATED
-      ********************/
-      case ConstituentStatus.HAS_ENTERED_AUTOMATED: {
-        this.constituentMessageHandler.processSmsHasEnteredAutomated(userInfo, userMessage, twilioPhoneNumber, inboundDbMessageEntry, twilioCallbackURL, userId, userAttachments);
-        break;
-      }
-      /********************
-        HAS_ENTERED_CONVERSATION
-      ********************/
-      case ConstituentStatus.HAS_ENTERED_CONVERSATION: {
-        this.constituentMessageHandler.processSmsHasEnteredConversation(userInfo, userMessage, twilioPhoneNumber, inboundDbMessageEntry, userPhoneNumber, userAttachments, twilioCallbackURL, userId);
-        break;
-      }
-      /********************
-        RETURNING
-      ********************/
-      case ConstituentStatus.RETURNING: {
-        this.constituentMessageHandler.processSmsReturning(userInfo, userMessage, twilioPhoneNumber, inboundDbMessageEntry, userPhoneNumber, twilioCallbackURL, userId, entryPoint, returningVoter, userAttachments);
-        break;
-      }
-      /********************
-        UNKNOWN
-      ********************/
-      case ConstituentStatus.UNKNOWN: {
-        // TODO: Throw some kind of error here.
-        return;
-      }
-    }
+    this.constituentMessageHandler.handleMessage(req, entryPoint, inboundDbMessageEntry);
   }
 
   /***********************
