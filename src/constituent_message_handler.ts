@@ -1443,20 +1443,19 @@ export default abstract class ConstituentMessageHandler {
     }
 
     const twilioPhoneNumber = reqBody.To;
-    const userMessage = reqBody.Body;
     const userAttachments = TwilioUtil.getAttachments(reqBody);
     const MD5 = new Hashes.MD5();
     const userId = MD5.hex(userPhoneNumber);
     this.constituent.id = userId;
     this.constituent.phoneNumber = userPhoneNumber;
-    this.constituent.message = userMessage;
+    this.constituent.message = this.constituent.message;
     this.userAttachments = userAttachments;
     this.twilioPhoneNumber = twilioPhoneNumber;
     this.entryPoint = entryPoint;
     logger.info(`ConstituentMessageHandler.handleIncomingSmsMessage: Receiving Twilio message from ${entryPoint} entry point voter,
                           userPhoneNumber: ${userPhoneNumber},
                           twilioPhoneNumber: ${twilioPhoneNumber},
-                          userMessage: ${userMessage},
+                          userMessage: ${this.constituent.message},
                           userId: ${userId}`);
 
     this.setInboundDbMessageEntry(inboundDbMessageEntry);
