@@ -125,54 +125,54 @@ describe('POST /twilio-pull', () => {
       }));
     });
 
-  it('should log constituent message to persistent database', async () => {
-    await request(app)
-      .post('/twilio-pull')
-      .send({
-        From: mockConstituentPhoneNumber,
-        To: mockTwilioPhoneNumber,
-        Body: mockConstituentMessage,
-        SmsMessageSid: mockInboundSmsMessageSid
-      })
-      .expect(200)
-      .expect('Content-Type', "text/xml");
-
-
-    expect(DbApiUtil.logMessageToDb).toHaveBeenCalledWith(expect.objectContaining({
-      "archived": false, "automated": null, "confirmedDisclaimer": false, "direction": "INBOUND", "entryPoint": "PULL",
-      "fromPhoneNumber": "mockConstituentPhoneNumber", "isDemo": false, "lastVoterMessageSecsFromEpoch": expect.any(Number),
-      "message": "mockConstituentMessage", "originatingSlackUserId": null, "originatingSlackUserName": null,
-      "slackChannel": null, "slackError": null, "slackMessageTs": null, "slackParentMessageTs": null,
-      "slackReceiveTimestamp": null, "slackRetryNum": null, "slackRetryReason": null, "slackSendTimestamp": null,
-      "stateName": undefined, "successfullySent": null, "toPhoneNumber": "mockTwilioPhoneNumber", "twilioAttachments": [],
-      "twilioError": null, "twilioMessageSid": mockInboundSmsMessageSid, "twilioReceiveTimestamp": expect.anything(),
-      "twilioSendTimestamp": null, "unprocessedMessage": null, "userId": "8e11012e2804a933a23197043b99a2b3"
-    }));
+    it('should log constituent message to persistent database', async () => {
+      await request(app)
+        .post('/twilio-pull')
+        .send({
+          From: mockConstituentPhoneNumber,
+          To: mockTwilioPhoneNumber,
+          Body: mockConstituentMessage,
+          SmsMessageSid: mockInboundSmsMessageSid
+        })
+        .expect(200)
+        .expect('Content-Type', "text/xml");
+  
+  
+      expect(DbApiUtil.logMessageToDb).toHaveBeenCalledWith(expect.objectContaining({
+        "archived": false, "automated": null, "confirmedDisclaimer": false, "direction": "INBOUND", "entryPoint": "PULL",
+        "fromPhoneNumber": "mockConstituentPhoneNumber", "isDemo": false, "lastVoterMessageSecsFromEpoch": expect.any(Number),
+        "message": "mockConstituentMessage", "originatingSlackUserId": null, "originatingSlackUserName": null,
+        "slackChannel": null, "slackError": null, "slackMessageTs": null, "slackParentMessageTs": null,
+        "slackReceiveTimestamp": null, "slackRetryNum": null, "slackRetryReason": null, "slackSendTimestamp": null,
+        "stateName": undefined, "successfullySent": null, "toPhoneNumber": "mockTwilioPhoneNumber", "twilioAttachments": [],
+        "twilioError": null, "twilioMessageSid": mockInboundSmsMessageSid, "twilioReceiveTimestamp": expect.anything(),
+        "twilioSendTimestamp": null, "unprocessedMessage": null, "userId": "8e11012e2804a933a23197043b99a2b3"
+      }));
+    });
+  
+    it('should log response to persistent database', async () => {
+      await request(app)
+        .post('/twilio-pull')
+        .send({
+          From: mockConstituentPhoneNumber,
+          To: mockTwilioPhoneNumber,
+          Body: mockConstituentMessage,
+          SmsMessageSid: mockInboundSmsMessageSid
+        })
+        .expect(200)
+        .expect('Content-Type', "text/xml");
+  
+  
+      expect(DbApiUtil.logMessageToDb).toHaveBeenCalledWith(expect.objectContaining({
+        "archived": false, "automated": true, "confirmedDisclaimer": false, "direction": "OUTBOUND",
+        "entryPoint": "PULL", "fromPhoneNumber": mockTwilioPhoneNumber, "isDemo": false,
+        "lastVoterMessageSecsFromEpoch": expect.any(Number), "message": expect.any(String), "originatingSlackUserId": null,
+        "originatingSlackUserName": null, "slackChannel": null, "slackError": null, "slackMessageTs": null,
+        "slackParentMessageTs": null, "slackReceiveTimestamp": null, "slackRetryNum": null, "slackRetryReason": null,
+        "slackSendTimestamp": null, "stateName": undefined, "successfullySent": true, "toPhoneNumber": mockConstituentPhoneNumber,
+        "twilioMessageSid": mockOutboundSmsMessageSid, "twilioReceiveTimestamp": null, "twilioSendTimestamp": expect.anything(),
+        "unprocessedMessage": null, "userId": mockConstituentId
+      }));
+    });
   });
-
-  it('should log response to persistent database', async () => {
-    await request(app)
-      .post('/twilio-pull')
-      .send({
-        From: mockConstituentPhoneNumber,
-        To: mockTwilioPhoneNumber,
-        Body: mockConstituentMessage,
-        SmsMessageSid: mockInboundSmsMessageSid
-      })
-      .expect(200)
-      .expect('Content-Type', "text/xml");
-
-
-    expect(DbApiUtil.logMessageToDb).toHaveBeenCalledWith(expect.objectContaining({
-      "archived": false, "automated": true, "confirmedDisclaimer": false, "direction": "OUTBOUND",
-      "entryPoint": "PULL", "fromPhoneNumber": mockTwilioPhoneNumber, "isDemo": false,
-      "lastVoterMessageSecsFromEpoch": expect.any(Number), "message": expect.any(String), "originatingSlackUserId": null,
-      "originatingSlackUserName": null, "slackChannel": null, "slackError": null, "slackMessageTs": null,
-      "slackParentMessageTs": null, "slackReceiveTimestamp": null, "slackRetryNum": null, "slackRetryReason": null,
-      "slackSendTimestamp": null, "stateName": undefined, "successfullySent": true, "toPhoneNumber": mockConstituentPhoneNumber,
-      "twilioMessageSid": mockOutboundSmsMessageSid, "twilioReceiveTimestamp": null, "twilioSendTimestamp": expect.anything(),
-      "unprocessedMessage": null, "userId": mockConstituentId
-    }));
-  });
-});
 });
