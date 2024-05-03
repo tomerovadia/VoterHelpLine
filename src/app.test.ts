@@ -146,7 +146,7 @@ describe('POST /twilio-pull', () => {
         "slackReceiveTimestamp": null, "slackRetryNum": null, "slackRetryReason": null, "slackSendTimestamp": null,
         "stateName": undefined, "successfullySent": null, "toPhoneNumber": mockTwilioPhoneNumber, "twilioAttachments": [],
         "twilioError": null, "twilioMessageSid": mockInboundSmsMessageSid, "twilioReceiveTimestamp": expect.anything(),
-        "twilioSendTimestamp": null, "unprocessedMessage": null, "userId": "8e11012e2804a933a23197043b99a2b3"
+        "twilioSendTimestamp": null, "unprocessedMessage": null, "userId": mockConstituentId
       }));
     });
   
