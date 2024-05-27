@@ -20,5 +20,5 @@ async function listSlackUsers(token) {
 
 // Replace 'your-slack-token-here' with your actual Slack bot token
 const token =
-  'xoxp-1263306800675-1263100455362-1444793130838-5935551fd93d9058b792c621a06e44a6';
+  '';
 listSlackUsers(token);
