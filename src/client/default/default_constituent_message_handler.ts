@@ -54,8 +54,6 @@ export default class DefaultConstituentMessageHandler extends ConstituentMessage
       logger.info(
         `ConstituentMessageHandler.determineConstituentStatus (${constituentId}): No existing userInfo for user after Redis retrieval with redisHashKey ${`${constituentId}:${this.twilioPhoneNumber}`}`);
         if (this.constituent.message && KeywordParser.isHelplineKeyword(this.constituent.message)) {
-          // TODO: We might need a special message for constituents who are messaging for the very first
-          // time and their message is HELPLINE. Rather than "ok..." we should have a bit of a welcome.
           this.constituent.status = ConstituentStatus.ENTERING;
         } else {
           this.constituent.status = ConstituentStatus.NEW;
@@ -183,13 +181,12 @@ export default class DefaultConstituentMessageHandler extends ConstituentMessage
     );
 
     let slackChannelName;
-    if ((await RedisApiUtil.getKey(redisClient, 'skipLobby')) === 'true') {
+    if (config.skipLobby) {
       slackChannelName = null;
     } else {
       slackChannelName = userInfo.isDemo ? 'demo-lobby' : 'lobby' as string | null;
     }
     let stateName;
-
     // Can we infer the voter's state from their phone number?
     // TODO: Handle this in the determineConstituentStatus function in ConstituentMessageHandler.
     if (
@@ -217,14 +214,12 @@ export default class DefaultConstituentMessageHandler extends ConstituentMessage
         }
       }
     }
-
     // If the voter has previously communicated that they already voted, we have them
     // enter the helpline with "Voted" prepopulated as their status.
     const status = await DbApiUtil.getLatestVoterStatus(
       userInfo.userId,
       this.twilioPhoneNumber
     );
-
     let messageToConstituent;
     if (!this.constituent.known) {
       // Voter initiated conversation with "HELPLINE".
@@ -247,6 +242,10 @@ export default class DefaultConstituentMessageHandler extends ConstituentMessage
     }
 
     let slackParentMessageResponse;
+    DbApiUtil.updateDbMessageEntryWithUserInfo(
+      userInfo!,
+      inboundDbMessageEntry
+    );
     if (slackChannelName) {
       const topLevelThreadSlackBlocks = await SlackBlockUtil.getVoterPanel(
         userInfo,
@@ -254,7 +253,6 @@ export default class DefaultConstituentMessageHandler extends ConstituentMessage
         undefined,
         status || 'UNKNOWN'
       );
-
       try {
         slackParentMessageResponse = await this.agentCommunicator.sendMessage(topLevelThreadSlackBlocks[0].text.text, {
           channel: slackChannelName,
@@ -275,6 +273,7 @@ export default class DefaultConstituentMessageHandler extends ConstituentMessage
       // response or throws an error, which would be caught above.
       // TODO: We should consolidate this with the error catch above.
       if (!slackParentMessageResponse) {
+        // TODO: This can be pulled out of the if/else block since it's run whether or not the lobby is skipped (ie slackChannelName exists).
         this.constituentCommunicator.sendMessage({
           message: `There was an unexpected error sending your message. Please wait a few minutes and try again.`,
           automated: true,
@@ -284,7 +283,6 @@ export default class DefaultConstituentMessageHandler extends ConstituentMessage
           `Could not send introduction slack message with voter info for voter ${userInfo.userPhoneNumber} texting ${this.twilioPhoneNumber}.`
         );
       }
-
       this.constituentCommunicator.sendMessage({
         message: messageToConstituent,
         automated: true,
@@ -316,10 +314,6 @@ export default class DefaultConstituentMessageHandler extends ConstituentMessage
       userInfo.activeChannelName = slackChannelName;
       inboundDbMessageEntry.slackChannel = slackParentMessageResponse.data.channel;
       inboundDbMessageEntry.slackParentMessageTs = slackParentMessageResponse.data.ts;
-      DbApiUtil.updateDbMessageEntryWithUserInfo(
-        userInfo!,
-        inboundDbMessageEntry
-      );
       inboundDbMessageEntry.slackChannel = slackParentMessageResponse.data.channel;
       inboundDbMessageEntry.slackParentMessageTs = slackParentMessageResponse.data.ts;
       inboundDbMessageEntry.slackSendTimestamp = new Date();
@@ -342,17 +336,6 @@ export default class DefaultConstituentMessageHandler extends ConstituentMessage
           destinationSlackChannelId: slackParentMessageResponse.data.channel,
         }
       );
-      // Add key/value such that given a user phone number we can get the
-      // Slack channel thread associated with that user.
-      logger.debug(
-        `Writing updated userInfo to Redis.`
-      );
-      await RedisApiUtil.setHash(
-        redisClient,
-        `${userInfo.userId}:${this.twilioPhoneNumber}`,
-        userInfo
-      );
-
       // Add key/value such that given Slack thread data we can get a
       // user phone number.
       logger.debug(
@@ -363,17 +346,9 @@ export default class DefaultConstituentMessageHandler extends ConstituentMessage
         `${slackParentMessageResponse.data.channel}:${slackParentMessageResponse.data.ts}`,
         { userPhoneNumber: userInfo.userPhoneNumber, twilioPhoneNumber: this.twilioPhoneNumber }
       );
-      // Add key/value such that given Slack thread data we can get a
-      // user phone number.
-      logger.debug(
-        `Writing updated Slack-to-Twilio redisData to Redis.`
-      );
-      await RedisApiUtil.setHash(
-        redisClient,
-        `${slackParentMessageResponse.data.channel}:${slackParentMessageResponse.data.ts}`,
-        { userPhoneNumber: userInfo.userPhoneNumber, twilioPhoneNumber: this.twilioPhoneNumber }
-      );
+    // Config requires skipping the lobby.
     } else {
+      // TODO: This can be pulled out of the if/else block since it's run whether or not the lobby is skipped (ie slackChannelName exists).
       this.constituentCommunicator.sendMessage({
         message: messageToConstituent,
         automated: true,
@@ -434,13 +409,10 @@ export default class DefaultConstituentMessageHandler extends ConstituentMessage
         `DefaultConstituentMessageHandler.processSmsHasEnteredAutomated: Updating lastVoterMessageSecsFromEpoch to ${userInfo.lastVoterMessageSecsFromEpoch}`
       );
 
-      const skipLobby =
-        (await RedisApiUtil.getKey(redisClient, 'skipLobby')) === 'true';
+      const lobbyChannelId = config.skipLobby ? '' : userInfo.activeChannelId;
+      const lobbyParentMessageTs = config.skipLobby ? '' : userInfo[lobbyChannelId];
 
-      const lobbyChannelId = skipLobby ? '' : userInfo.activeChannelId;
-      const lobbyParentMessageTs = skipLobby ? '' : userInfo[lobbyChannelId];
-
-      if (!skipLobby && userInfo.activeChannelId != 'NONEXISTENT_LOBBY') {
+      if (!config.skipLobby && userInfo.activeChannelId != 'NONEXISTENT_LOBBY') {
         logger.debug(
           `DefaultConstituentMessageHandler.processSmsHasEnteredAutomated: Passing voter message to Slack, slackChannelName: ${lobbyChannelId}, parentMessageTs: ${lobbyParentMessageTs}.`
         );
@@ -504,7 +476,7 @@ export default class DefaultConstituentMessageHandler extends ConstituentMessage
             userInfo,
           });
 
-          if (!skipLobby && userInfo.activeChannelId != 'NONEXISTENT_LOBBY') {
+          if (!config.skipLobby && userInfo.activeChannelId != 'NONEXISTENT_LOBBY') {
             await this.agentCommunicator.sendMessage(MessageConstants.CLARIFY_STATE(), {
               parentMessageTs: lobbyParentMessageTs,
               channel: lobbyChannelId,
@@ -541,7 +513,7 @@ export default class DefaultConstituentMessageHandler extends ConstituentMessage
         automated: true,
         userInfo,
       });
-      if (!skipLobby && userInfo.activeChannelId != 'NONEXISTENT_LOBBY') {
+      if (!config.skipLobby && userInfo.activeChannelId != 'NONEXISTENT_LOBBY') {
         await this.agentCommunicator.sendMessage(messageToVoter, {
           parentMessageTs: lobbyParentMessageTs,
           channel: lobbyChannelId,

@@ -218,7 +218,7 @@ export default class Coordinator {
       twilioPhoneNumber: reqBody.To,
       twilioMessageSid: reqBody.SmsMessageSid,
       twilioAttachments: TwilioUtil.getAttachments(reqBody),
-      entryPoint: LoadBalancer.PUSH_ENTRY_POINT,
+      entryPoint,
     });
     this.constituentMessageHandler.handleMessage(req, entryPoint, inboundDbMessageEntry);
   }
