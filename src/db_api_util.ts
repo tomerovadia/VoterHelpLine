@@ -354,7 +354,6 @@ export function updateDbMessageEntryWithUserInfo(
   userInfo: UserInfo,
   dbMessageEntry: DatabaseMessageEntry
 ): void {
-  console.log("updateDbMessageEntryWithUserInfo")
   dbMessageEntry.userId = userInfo.userId;
   dbMessageEntry.confirmedDisclaimer = userInfo.confirmedDisclaimer;
   dbMessageEntry.isDemo = userInfo.isDemo;

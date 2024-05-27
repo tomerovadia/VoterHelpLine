@@ -84,6 +84,19 @@ import config from './config';
 process.env.CLIENT_ORGANIZATION = 'VOTE_AMERICA';
 process.env.TEAM_ID = 'T123456';
 
+async function sendAndExpectSuccessForHelplineRequest(app: any) {
+  await request(app)
+    .post('/twilio-pull')
+    .send({
+      From: mockConstituentPhoneNumber,
+      To: mockTwilioPhoneNumber,
+      Body: "HELPLINE",
+      SmsMessageSid: mockInboundSmsMessageSid
+    })
+    .expect(200)
+    .expect('Content-Type', "text/xml");
+};
+
 describe('POST /twilio-pull', () => {
   let TwilioApiUtil2: { sendMessage: any; };
   let SlackApiUtil: { sendMessage: any; };
@@ -176,10 +189,82 @@ describe('POST /twilio-pull', () => {
     });
   });
 
+  describe('PRE_ENTERING_AUTOMATED constituent', () => {
+    beforeAll(() => {
+      (RedisApiUtil.getHash as jest.Mock).mockResolvedValue({
+        userId: mockConstituentId,
+        twilioPhoneNumber: mockTwilioPhoneNumber,
+        userPhoneNumber: mockConstituentPhoneNumber,
+        isDemo: false,
+        volunteerEngaged: false,
+        confirmedDisclaimer: false,
+        lastVoterMessageSecsFromEpoch: 12345,
+        numStateSelectionAttempts: 0,
+        sessionStartEpoch: 12345,
+        entryPoint: 'PULL',
+      });
+    });
+
+    beforeEach(async () => {
+      await request(app)
+        .post('/twilio-pull')
+        .send({
+          From: mockConstituentPhoneNumber,
+          To: mockTwilioPhoneNumber,
+          Body: mockConstituentMessage,
+          SmsMessageSid: mockInboundSmsMessageSid
+        })
+        .expect(200)
+        .expect('Content-Type', "text/xml");
+    });
+
+    it('replies', async () => {
+      expect(TwilioApiUtil2.sendMessage).toHaveBeenCalledTimes(1);
+    });
+
+    it('updates constituent SMS-to-agent lookup in in-memory database', async () => {
+      expect(RedisApiUtil.setHash).toHaveBeenCalledTimes(1);
+      expect(RedisApiUtil.setHash).toHaveBeenCalledWith(expect.anything(), `${mockConstituentId}:${mockTwilioPhoneNumber}`, expect.objectContaining({
+        userId: mockConstituentId,
+        twilioPhoneNumber: mockTwilioPhoneNumber,
+        userPhoneNumber: mockConstituentPhoneNumber,
+        isDemo: false,
+        volunteerEngaged: false,
+        lastVoterMessageSecsFromEpoch: expect.anything(),
+        numStateSelectionAttempts: 0,
+      }));
+    });
+
+    it('logs constituent message to persistent database', async () => {
+      expect(DbApiUtil.logMessageToDb).toHaveBeenCalledWith(expect.objectContaining({
+        "archived": false, "automated": null, "confirmedDisclaimer": false, "direction": "INBOUND", "entryPoint": "PULL",
+        "fromPhoneNumber": mockConstituentPhoneNumber, "isDemo": false, "lastVoterMessageSecsFromEpoch": expect.any(Number),
+        "message": mockConstituentMessage, "originatingSlackUserId": null, "originatingSlackUserName": null,
+        "slackChannel": null, "slackError": null, "slackMessageTs": null, "slackParentMessageTs": null,
+        "slackReceiveTimestamp": null, "slackRetryNum": null, "slackRetryReason": null, "slackSendTimestamp": null,
+        "stateName": undefined, "successfullySent": null, "toPhoneNumber": mockTwilioPhoneNumber, "twilioAttachments": [],
+        "twilioError": null, "twilioMessageSid": mockInboundSmsMessageSid, "twilioReceiveTimestamp": expect.anything(),
+        "twilioSendTimestamp": null, "unprocessedMessage": null, "userId": mockConstituentId
+      }));
+    });
+  
+    it('logs response to persistent database', async () => {
+      expect(DbApiUtil.logMessageToDb).toHaveBeenCalledWith(expect.objectContaining({
+        "archived": false, "automated": true, "confirmedDisclaimer": false, "direction": "OUTBOUND",
+        "entryPoint": "PULL", "fromPhoneNumber": mockTwilioPhoneNumber, "isDemo": false,
+        "lastVoterMessageSecsFromEpoch": expect.any(Number), "message": expect.any(String), "originatingSlackUserId": null,
+        "originatingSlackUserName": null, "slackChannel": null, "slackError": null, "slackMessageTs": null,
+        "slackParentMessageTs": null, "slackReceiveTimestamp": null, "slackRetryNum": null, "slackRetryReason": null,
+        "slackSendTimestamp": null, "stateName": undefined, "successfullySent": true, "toPhoneNumber": mockConstituentPhoneNumber,
+        "twilioMessageSid": mockOutboundSmsMessageSid, "twilioReceiveTimestamp": null, "twilioSendTimestamp": expect.anything(),
+        "unprocessedMessage": null, "userId": mockConstituentId
+      }));
+    });
+  });
+
   describe('ENTERING, unknown constituent', () => {
     beforeAll(() => {
       (RedisApiUtil.getHash as jest.Mock).mockImplementation(async (_, key) => {
-        console.log("getHash")
         if (key === 'slackPodChannelIds') {
           return Promise.resolve({
             [mockThreadInfoChannelName1]: mockThreadInfoChannelId1,
@@ -194,7 +279,6 @@ describe('POST /twilio-pull', () => {
     });
 
     beforeEach(async () => {
-      console.log("beforeEach for ENTERING, unknown constituent");
       // Return different message ts for the first (parent) message
       // than the subsequent (nested) messages.
       (SlackApiUtil.sendMessage as jest.Mock).mockResolvedValueOnce({
@@ -212,46 +296,17 @@ describe('POST /twilio-pull', () => {
 
     describe.each([true, false])('For skipLobby=%p', (skipLobby) => {
       beforeEach(() => {
-        console.log("setting skip lobby: ", skipLobby);
         config.skipLobby = skipLobby;
       })
 
-
-
-
-
-
-
-
-
-
-
         it('replies', async () => {
-          await request(app)
-          .post('/twilio-pull')
-          .send({
-            From: mockConstituentPhoneNumber,
-            To: mockTwilioPhoneNumber,
-            Body: "HELPLINE",
-            SmsMessageSid: mockInboundSmsMessageSid
-          })
-          .expect(200)
-          .expect('Content-Type', "text/xml");
+          await sendAndExpectSuccessForHelplineRequest(app);
 
           expect(TwilioApiUtil2.sendMessage).toHaveBeenCalledTimes(1);
         });
 
         it('adds constituent SMS-to-agent lookup to in-memory database', async () => {
-          await request(app)
-          .post('/twilio-pull')
-          .send({
-            From: mockConstituentPhoneNumber,
-            To: mockTwilioPhoneNumber,
-            Body: "HELPLINE",
-            SmsMessageSid: mockInboundSmsMessageSid
-          })
-          .expect(200)
-          .expect('Content-Type', "text/xml");
+          await sendAndExpectSuccessForHelplineRequest(app);
 
           expect(RedisApiUtil.setHash).toHaveBeenCalledWith(expect.anything(), `${mockConstituentId}:${mockTwilioPhoneNumber}`, expect.objectContaining({
             userId: mockConstituentId,
@@ -265,16 +320,7 @@ describe('POST /twilio-pull', () => {
         });
 
         it('only adds constituent agent-to-SMS lookup to in-memory database if using lobby', async () => {
-          await request(app)
-          .post('/twilio-pull')
-          .send({
-            From: mockConstituentPhoneNumber,
-            To: mockTwilioPhoneNumber,
-            Body: "HELPLINE",
-            SmsMessageSid: mockInboundSmsMessageSid
-          })
-          .expect(200)
-          .expect('Content-Type', "text/xml");
+          await sendAndExpectSuccessForHelplineRequest(app);
 
           if (skipLobby) {
             expect(RedisApiUtil.setHash).not.toHaveBeenCalledWith(expect.anything(), `${mockSlackChannelId}:${mockSlackParentThreadTs}`, expect.anything());
@@ -287,16 +333,7 @@ describe('POST /twilio-pull', () => {
         });
 
         it('logs initial voter status to persistent database', async () => {
-          await request(app)
-          .post('/twilio-pull')
-          .send({
-            From: mockConstituentPhoneNumber,
-            To: mockTwilioPhoneNumber,
-            Body: "HELPLINE",
-            SmsMessageSid: mockInboundSmsMessageSid
-          })
-          .expect(200)
-          .expect('Content-Type', "text/xml");
+          await sendAndExpectSuccessForHelplineRequest(app);
 
           expect(DbApiUtil.logInitialVoterStatusToDb).toHaveBeenCalledWith(mockConstituentId,
             mockConstituentPhoneNumber,
@@ -305,16 +342,7 @@ describe('POST /twilio-pull', () => {
         });
 
         it('only adds the consituent to the helpline if using lobby', async () => {
-          await request(app)
-          .post('/twilio-pull')
-          .send({
-            From: mockConstituentPhoneNumber,
-            To: mockTwilioPhoneNumber,
-            Body: "HELPLINE",
-            SmsMessageSid: mockInboundSmsMessageSid
-          })
-          .expect(200)
-          .expect('Content-Type', "text/xml");
+          await sendAndExpectSuccessForHelplineRequest(app);
 
           if (skipLobby) {
             expect(SlackApiUtil.sendMessage).not.toHaveBeenCalled();
@@ -327,16 +355,7 @@ describe('POST /twilio-pull', () => {
         });
 
         it('only posts constituent message history to helpline if using lobby', async () => {
-          await request(app)
-          .post('/twilio-pull')
-          .send({
-            From: mockConstituentPhoneNumber,
-            To: mockTwilioPhoneNumber,
-            Body: "HELPLINE",
-            SmsMessageSid: mockInboundSmsMessageSid
-          })
-          .expect(200)
-          .expect('Content-Type', "text/xml");
+          await sendAndExpectSuccessForHelplineRequest(app);
 
           if (skipLobby) {
             expect(SlackApiUtil.sendMessage).not.toHaveBeenCalled();
@@ -354,16 +373,7 @@ describe('POST /twilio-pull', () => {
         });
 
         it('logs constituent message to persistent database', async () => {
-          await request(app)
-          .post('/twilio-pull')
-          .send({
-            From: mockConstituentPhoneNumber,
-            To: mockTwilioPhoneNumber,
-            Body: "HELPLINE",
-            SmsMessageSid: mockInboundSmsMessageSid
-          })
-          .expect(200)
-          .expect('Content-Type', "text/xml");
+          await sendAndExpectSuccessForHelplineRequest(app);
 
           let slackChannel;
           let slackParentMessageTs;
@@ -388,16 +398,7 @@ describe('POST /twilio-pull', () => {
         });
       
         it('logs response to persistent database', async () => {
-          await request(app)
-          .post('/twilio-pull')
-          .send({
-            From: mockConstituentPhoneNumber,
-            To: mockTwilioPhoneNumber,
-            Body: "HELPLINE",
-            SmsMessageSid: mockInboundSmsMessageSid
-          })
-          .expect(200)
-          .expect('Content-Type', "text/xml");
+          await sendAndExpectSuccessForHelplineRequest(app);
 
           // TODO: Create a default version of this that can be modified by the test for only relevant parts.
           expect(DbApiUtil.logMessageToDb).toHaveBeenCalledWith(expect.objectContaining({
@@ -413,18 +414,8 @@ describe('POST /twilio-pull', () => {
         });
 
         it('logs thread to persistent database', async () => {
-          await request(app)
-          .post('/twilio-pull')
-          .send({
-            From: mockConstituentPhoneNumber,
-            To: mockTwilioPhoneNumber,
-            Body: "HELPLINE",
-            SmsMessageSid: mockInboundSmsMessageSid
-          })
-          .expect(200)
-          .expect('Content-Type', "text/xml");
+          await sendAndExpectSuccessForHelplineRequest(app);
 
-          console.log("logs thread to persistent database");
           if (skipLobby) {
             expect(DbApiUtil.logThreadToDb).not.toHaveBeenCalled();
           } else {

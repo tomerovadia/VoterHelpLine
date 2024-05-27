@@ -63,7 +63,6 @@ export default class DefaultConstituentMessageHandler extends ConstituentMessage
 
   public async processSmsNew(userInfo: UserInfo, inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry) {
     logger.info('Entering DefaultConstituentMessageHandler.processSmsNew');
-    //T OK TO KEEP THIS MESSAGE LOGIC HERE FOR NOW
     let messageToVoter = MessageConstants.WELCOME_VOTER();
     if (KeywordParser.isVotedKeyword(this.constituent.message)) {
       messageToVoter = MessageConstants.VOTED_WELCOME_RESPONSE();
@@ -118,8 +117,8 @@ export default class DefaultConstituentMessageHandler extends ConstituentMessage
     );
   }
 
-  public async processSmsPreAutomatedEntry(userInfo: UserInfo, inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry) {
-    logger.info('Entering DefaultConstituentMessageHandler.processSmsPreAutomatedEntry');
+  public async processSmsPreEnteringAutomated(userInfo: UserInfo, inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry) {
+    logger.info('Entering DefaultConstituentMessageHandler.processSmsPreEnteringAutomated');
     let messageToVoter = MessageConstants.CLARIFY_HELPLINE_REQUEST();
     if (KeywordParser.isVotedKeyword(this.constituent.message)) {
       messageToVoter = MessageConstants.VOTED_WELCOME_RESPONSE();

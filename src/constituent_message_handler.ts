@@ -172,7 +172,6 @@ export default abstract class ConstituentMessageHandler {
       destinationSlackChannelId: string;
     }
   ): Promise<string | null> {
-    console.log("postUserMessageHistoryToSlack 0")
     logger.debug('ENTERING Coordinator.postUserMessageHistoryToSlack');
 
     // past sessions
@@ -180,43 +179,26 @@ export default abstract class ConstituentMessageHandler {
       userInfo.userId,
       twilioPhoneNumber
     );
-    console.log("postUserMessageHistoryToSlack 10")
     if (sessionHistory?.length > 0) {
-      console.log("postUserMessageHistoryToSlack 10.1")
       const slackChannelIds = await RedisApiUtil.getHash(
         redisClient,
         'slackPodChannelIds'
       );
-      console.log("postUserMessageHistoryToSlack 10.5")
-      console.log("slackChannelIds: ", slackChannelIds)
       const slackChannelNames: Record<string, string> = {};
       for (const name in slackChannelIds) {
         slackChannelNames[slackChannelIds[name]] = name;
       }
-      console.log("postUserMessageHistoryToSlack 11")
       for (const thread of sessionHistory) {
         const url = await SlackApiUtil.getThreadPermalink(
           thread.channelId,
           thread.historyTs || thread.slackParentMessageTs
         );
-        console.log("postUserMessageHistoryToSlack 15")
         const lastUpdateEpoch = Date.parse(thread.lastUpdate || '') / 1000;
-        console.log("postUserMessageHistoryToSlack 16")
         const endTime = `<!date^${lastUpdateEpoch}^{time} {date_short}|${lastUpdateEpoch}>`;
-        console.log("postUserMessageHistoryToSlack 17")
-        console.log("thread.channelId: ",  thread.channelId)
-        console.log("slackChannelNames: ", slackChannelNames)
-        console.log("slackChannelNames[thread.channelId]: ", slackChannelNames[thread.channelId])
-        console.log(SlackApiUtil.linkToSlackChannel(
-          thread.channelId,
-          slackChannelNames[thread.channelId]
-        ));
-        console.log("postUserMessageHistoryToSlack 18")
         let description = `Past session in ${SlackApiUtil.linkToSlackChannel(
           thread.channelId,
           slackChannelNames[thread.channelId]
         )} ended ${endTime} - <${url}|Open>`;
-        console.log("postUserMessageHistoryToSlack 20")
         if (thread?.topics) {
           description +=
             '\nTopics: ' +
@@ -259,18 +241,12 @@ export default abstract class ConstituentMessageHandler {
       }
     }
 
-    console.log("postUserMessageHistoryToSlack 30")
-
     // messages
     const messageHistory = await DbApiUtil.getMessageHistoryFor(
       userInfo.userId,
       twilioPhoneNumber,
       DbApiUtil.epochToPostgresTimestamp(userInfo.sessionStartEpoch || 0)
     );
-
-    console.log("messageHistory: ", messageHistory)
-
-    console.log("postUserMessageHistoryToSlack 40")
 
     // Just in case.
     if (!messageHistory) {
@@ -293,8 +269,6 @@ export default abstract class ConstituentMessageHandler {
       messageHistory,
       userInfo.userId.substring(0, 5)
     ).join('\n\n');
-    console.log("second message history message")
-    console.log(`${messageHistoryContext}\n\n${formattedMessageHistory}`)
     // This posts current session message history.
     const msgInfo = await this.agentCommunicator.sendMessage(
       `${messageHistoryContext}\n\n${formattedMessageHistory}`,
@@ -304,7 +278,6 @@ export default abstract class ConstituentMessageHandler {
       }
     );
     if (msgInfo) {
-      console.log("postUserMessageHistoryToSlack 100")
       await DbApiUtil.setThreadHistoryTs(
         destinationSlackParentMessageTs,
         destinationSlackChannelId,
@@ -589,7 +562,7 @@ export default abstract class ConstituentMessageHandler {
     entryPoint: EntryPoint;
     returningVoter: boolean;
   }): UserInfo {
-    console.log("prepareUserInfoForNewVoter 0");
+    console.log("prepareUserInfoForNewVoter")
     let isDemo, confirmedDisclaimer, volunteerEngaged;
     if (entryPoint === LoadBalancer.PULL_ENTRY_POINT) {
       isDemo = LoadBalancer.phoneNumbersAreDemo(
@@ -1044,7 +1017,6 @@ export default abstract class ConstituentMessageHandler {
       redisClient,
       redisHashKey
     )) as UserInfo | null;
-    console.log("getHash constituent info: ", this.constituent.info);
 
     logger.info(
       `ConstituentMessageHandler.determineConstituentStatus (${this.constituent.id}): Successfully received Redis response with userInfo: ${JSON.stringify(
@@ -1174,6 +1146,7 @@ export default abstract class ConstituentMessageHandler {
           userAttachments: this.userAttachments,
           userId: this.constituent.id,
         };
+        // TODO: Remove this dependency on Router.
         this.constituent.info = Router.prepareUserInfoForNewVoter({
           userOptions,
           twilioPhoneNumber: this.twilioPhoneNumber,
@@ -1433,7 +1406,7 @@ export default abstract class ConstituentMessageHandler {
 
   protected abstract processSmsNew(userInfo: UserInfo, inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry): Promise<void>;
 
-  protected abstract processSmsPreAutomatedEntry(userInfo: UserInfo, inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry): Promise<void>;
+  protected abstract processSmsPreEnteringAutomated(userInfo: UserInfo, inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry): Promise<void>;
 
   protected abstract processSmsEntering(userInfo: UserInfo, inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry): Promise<void>;
 
@@ -1451,7 +1424,6 @@ export default abstract class ConstituentMessageHandler {
     entryPoint: EntryPoint,
     inboundDbMessageEntry: DbApiUtil.DatabaseMessageEntry,
   ): Promise<void> {
-    console.log("handleMessage")
     logger.info('Entering ConstituentMessageHandler.handleIncomingSmsMessage');
 
     const reqBody = req.body as TwilioUtil.TwilioRequestBody;
@@ -1515,7 +1487,7 @@ export default abstract class ConstituentMessageHandler {
         PRE_ENTERING_AUTOMATED
       ********************/
       case ConstituentStatus.PRE_ENTERING_AUTOMATED: {
-        this.processSmsPreAutomatedEntry(userInfo, inboundDbMessageEntry);
+        this.processSmsPreEnteringAutomated(userInfo, inboundDbMessageEntry);
         break;
       }
       /********************
