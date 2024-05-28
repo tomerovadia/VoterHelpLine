@@ -1372,7 +1372,7 @@ describe('handleDisclaimer', () => {
 
     test('Texts voter confirming disclaimer agreement and asking for voter U.S. state', () => {
       expect(TwilioApiUtil.sendMessage.mock.calls[0][0]).toEqual(
-        expect.stringMatching(/Great!.*in which U.S. state/i)
+        expect.stringMatching(/.*in which U.S. state/i)
       );
       expect(TwilioApiUtil.sendMessage.mock.calls[0][1]).toEqual(
         expect.objectContaining({
@@ -1403,7 +1403,7 @@ describe('handleDisclaimer', () => {
 
     test('Passes to Slack message confirming disclaimer agreement and asking for voter U.S. state', () => {
       expect(SlackApiUtil.sendMessage.mock.calls[1][0]).toEqual(
-        expect.stringMatching(/Great!.*in which U.S. state/i)
+        expect.stringMatching(/.*in which U.S. state/i)
       );
       expect(SlackApiUtil.sendMessage.mock.calls[1][1]).toEqual(
         expect.objectContaining({

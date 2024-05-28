@@ -119,13 +119,13 @@ export function HELPLINE_AFTER_STOP_RESPONSE(): string {
 export function STATE_QUESTION(): string {
   switch (process.env.CLIENT_ORGANIZATION) {
     case 'VOTE_AMERICA':
-      return 'Great! To match you with the most knowledgeable volunteer, in which U.S. state are you looking to vote?';
+      return 'To match you with the most knowledgeable volunteer, in which U.S. state are you looking to vote?';
     case 'VOTE_FROM_HOME_2020':
-      return 'Great! To match you with the most knowledgeable volunteer, in which U.S. state are you looking to vote? We currently service Michigan, North Carolina and Pennsylvania.';
+      return 'To match you with the most knowledgeable volunteer, in which U.S. state are you looking to vote? We currently service Michigan, North Carolina and Pennsylvania.';
     case 'VOTER_HELP_LINE':
-      return 'Great! To match you with the most knowledgeable volunteer, in which U.S. state are you looking to vote? We currently service Florida, North Carolina and Ohio.';
+      return 'To match you with the most knowledgeable volunteer, in which U.S. state are you looking to vote? We currently service Florida, North Carolina and Ohio.';
     default:
-      return 'Great! To match you with the most knowledgeable volunteer, in which U.S. state are you looking to vote? We currently service Florida, North Carolina and Ohio.';
+      return 'To match you with the most knowledgeable volunteer, in which U.S. state are you looking to vote? We currently service Florida, North Carolina and Ohio.';
   }
 }
 

@@ -562,7 +562,6 @@ export default abstract class ConstituentMessageHandler {
     entryPoint: EntryPoint;
     returningVoter: boolean;
   }): UserInfo {
-    console.log("prepareUserInfoForNewVoter")
     let isDemo, confirmedDisclaimer, volunteerEngaged;
     if (entryPoint === LoadBalancer.PULL_ENTRY_POINT) {
       isDemo = LoadBalancer.phoneNumbersAreDemo(

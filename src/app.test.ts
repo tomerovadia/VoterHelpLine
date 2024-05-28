@@ -22,6 +22,18 @@ const nonExistentLobbySlackParentThreadTs = 'NONEXISTENT_LOBBY_TS';
 const mockSlackParentThreadTs = 'mockSlackParentThreadTs';
 const mockSlackNestedMessageTs = 'mockSlackNestedMessageTs';
 const mockTopLevelThreadSlackMessage = `<!channel> New voter\n${mockConstituentId} via ${mockTwilioPhoneNumber}`;
+const mockKnownConstituentInfo = {
+  userId: mockConstituentId,
+  twilioPhoneNumber: mockTwilioPhoneNumber,
+  userPhoneNumber: mockConstituentPhoneNumber,
+  isDemo: false,
+  volunteerEngaged: false,
+  confirmedDisclaimer: false,
+  lastVoterMessageSecsFromEpoch: 12345,
+  numStateSelectionAttempts: 0,
+  sessionStartEpoch: 12345,
+  entryPoint: 'PULL',
+};
 
 jest.mock('./twilio_util', () => ({
   twilioCallbackURL: jest.fn(),
@@ -191,18 +203,7 @@ describe('POST /twilio-pull', () => {
 
   describe('PRE_ENTERING_AUTOMATED constituent', () => {
     beforeAll(() => {
-      (RedisApiUtil.getHash as jest.Mock).mockResolvedValue({
-        userId: mockConstituentId,
-        twilioPhoneNumber: mockTwilioPhoneNumber,
-        userPhoneNumber: mockConstituentPhoneNumber,
-        isDemo: false,
-        volunteerEngaged: false,
-        confirmedDisclaimer: false,
-        lastVoterMessageSecsFromEpoch: 12345,
-        numStateSelectionAttempts: 0,
-        sessionStartEpoch: 12345,
-        entryPoint: 'PULL',
-      });
+      (RedisApiUtil.getHash as jest.Mock).mockResolvedValue(mockKnownConstituentInfo);
     });
 
     beforeEach(async () => {
@@ -262,7 +263,7 @@ describe('POST /twilio-pull', () => {
     });
   });
 
-  describe('ENTERING, unknown constituent', () => {
+  describe('ENTERING', () => {
     beforeEach(async () => {
       // Return different message ts for the first (parent) message
       // than the subsequent (nested) messages.
@@ -279,157 +280,182 @@ describe('POST /twilio-pull', () => {
       });
     });
 
-    beforeAll(() => {
-      (RedisApiUtil.getHash as jest.Mock).mockImplementation(async (_, key) => {
-        if (key === 'slackPodChannelIds') {
-          return Promise.resolve({
-            [mockThreadInfoChannelName1]: mockThreadInfoChannelId1,
-            [mockThreadInfoChannelName2]: mockThreadInfoChannelId2,
-          });
-        } else {
-          // This defines an unknown constituent.
-          return Promise.resolve(null);
-        }
-      });
-      (DbApiUtil.getMessageHistoryFor as jest.Mock).mockResolvedValue(mockHistoricalMessages);
-    });
-
-    describe.each([true, false])('For skipLobby=%p', (skipLobby) => {
-      beforeEach(() => {
-        config.skipLobby = skipLobby;
-      })
-
-      it('replies', async () => {
-        await sendAndExpectSuccessForHelplineRequest(app);
-
-        expect(TwilioApiUtil2.sendMessage).toHaveBeenCalledTimes(1);
-      });
-
-      it('adds constituent SMS-to-agent lookup to in-memory database', async () => {
-        await sendAndExpectSuccessForHelplineRequest(app);
-
-        expect(RedisApiUtil.setHash).toHaveBeenCalledWith(expect.anything(), `${mockConstituentId}:${mockTwilioPhoneNumber}`, expect.objectContaining({
-          userId: mockConstituentId,
-          twilioPhoneNumber: mockTwilioPhoneNumber,
-          userPhoneNumber: mockConstituentPhoneNumber,
-          isDemo: false,
-          volunteerEngaged: false,
-          lastVoterMessageSecsFromEpoch: expect.anything(),
-          numStateSelectionAttempts: 0,
-        }));
-      });
-
-      it('only adds constituent agent-to-SMS lookup to in-memory database if using lobby', async () => {
-        await sendAndExpectSuccessForHelplineRequest(app);
-
-        if (skipLobby) {
-          expect(RedisApiUtil.setHash).not.toHaveBeenCalledWith(expect.anything(), `${mockSlackChannelId}:${mockSlackParentThreadTs}`, expect.anything());
-        } else {
-          expect(RedisApiUtil.setHash).toHaveBeenCalledWith(expect.anything(), `${mockSlackChannelId}:${mockSlackParentThreadTs}`, expect.objectContaining({
-            twilioPhoneNumber: mockTwilioPhoneNumber,
-            userPhoneNumber: mockConstituentPhoneNumber,
-          }));
-        }
-      });
-
-      it('logs initial voter status to persistent database', async () => {
-        await sendAndExpectSuccessForHelplineRequest(app);
-
-        expect(DbApiUtil.logInitialVoterStatusToDb).toHaveBeenCalledWith(mockConstituentId,
-          mockConstituentPhoneNumber,
-          mockTwilioPhoneNumber,
-          /*is_demo=*/false);
-      });
-
-      it('only adds the consituent to the helpline if using lobby', async () => {
-        await sendAndExpectSuccessForHelplineRequest(app);
-
-        if (skipLobby) {
-          expect(SlackApiUtil.sendMessage).not.toHaveBeenCalled();
-        } else {
-          expect(SlackApiUtil.sendMessage).toHaveBeenCalledWith(
-            mockTopLevelThreadSlackMessage,
-            mockTopLevelThreadSlackOptions
-          );
-        }
-      });
-
-      it('only posts constituent message history to helpline if using lobby', async () => {
-        await sendAndExpectSuccessForHelplineRequest(app);
-
-        if (skipLobby) {
-          expect(SlackApiUtil.sendMessage).not.toHaveBeenCalled();
-        } else {
-          expect(SlackApiUtil.sendMessage).toHaveBeenCalledWith(
-            // TODO: Make this more programmatic, and change it to be more realistic to
-            // a voter who is unknown (i.e. such that the only message history is HELPLINE in the current message).
-            expect.stringMatching(/Below is the voter's message history so far\.[\s\S]*Voter 8e110[\s\S]*hi can you help me vote\?[\s\S]*Helpline \(Automated\)[\s\S]*hi welcome to the helpline/),
-            {
-              parentMessageTs: mockSlackParentThreadTs,
-              channel: mockSlackChannelId,
+    describe.each([{type: "unknown", constituentInfo: null}, 
+                   {type: "known", constituentInfo: mockKnownConstituentInfo}])("", (constituentInfoParam) => {
+      describe(`${constituentInfoParam.type} constituent`, () => {
+        beforeAll(() => {
+          (RedisApiUtil.getHash as jest.Mock).mockImplementation(async (_, key) => {
+            if (key === 'slackPodChannelIds') {
+              return Promise.resolve({
+                [mockThreadInfoChannelName1]: mockThreadInfoChannelId1,
+                [mockThreadInfoChannelName2]: mockThreadInfoChannelId2,
+              });
+            } else {
+              // The spread operator is necessary to make a copy, otherwise the object is
+              // re-used between tests.
+              return constituentInfoParam.constituentInfo ? Promise.resolve({...constituentInfoParam.constituentInfo}) : null;
             }
-          );
-        }
-      });
+          });
+          (DbApiUtil.getMessageHistoryFor as jest.Mock).mockResolvedValue(mockHistoricalMessages);
+        });
 
-      it('logs constituent message to persistent database', async () => {
-        await sendAndExpectSuccessForHelplineRequest(app);
+        describe.each([true, false])('For skipLobby=%p', (skipLobby) => {
+          beforeAll(() => {
+            config.skipLobby = skipLobby;
+          });
 
-        let slackChannel;
-        let slackParentMessageTs;
-        if (skipLobby) {
-          slackChannel = nonExistentLobbySlackChannelId;
-          slackParentMessageTs = nonExistentLobbySlackParentThreadTs;
-        } else {
-          slackChannel = mockSlackChannelId;
-          slackParentMessageTs = mockSlackParentThreadTs;
-        }
-        // TODO: Create a default version of this that can be modified by the test for only relevant parts.
-        expect(DbApiUtil.logMessageToDb).toHaveBeenCalledWith(expect.objectContaining({
-          "archived": false, "automated": null, "confirmedDisclaimer": false, "direction": "INBOUND", "entryPoint": "PULL",
-          "fromPhoneNumber": mockConstituentPhoneNumber, "isDemo": false, "lastVoterMessageSecsFromEpoch": expect.any(Number),
-          "message": "HELPLINE", "originatingSlackUserId": null, "originatingSlackUserName": null,
-          "slackChannel": slackChannel, "slackError": null, "slackMessageTs": null, "slackParentMessageTs": slackParentMessageTs,
-          "slackReceiveTimestamp": null, "slackRetryNum": null, "slackRetryReason": null, "slackSendTimestamp": expect.any(Date),
-          "stateName": undefined, "successfullySent": null, "toPhoneNumber": mockTwilioPhoneNumber, "twilioAttachments": [],
-          "twilioError": null, "twilioMessageSid": mockInboundSmsMessageSid, "twilioReceiveTimestamp": expect.anything(),
-          "twilioSendTimestamp": null, "unprocessedMessage": null, "userId": mockConstituentId
-        }));
-      });
-    
-      it('logs response to persistent database', async () => {
-        await sendAndExpectSuccessForHelplineRequest(app);
+          it('replies, welcoming unknown constituents', async () => {
+            await sendAndExpectSuccessForHelplineRequest(app);
 
-        // TODO: Create a default version of this that can be modified by the test for only relevant parts.
-        expect(DbApiUtil.logMessageToDb).toHaveBeenCalledWith(expect.objectContaining({
-          "archived": false, "automated": true, "confirmedDisclaimer": false, "direction": "OUTBOUND",
-          "entryPoint": "PULL", "fromPhoneNumber": mockTwilioPhoneNumber, "isDemo": false,
-          "lastVoterMessageSecsFromEpoch": expect.any(Number), "message": expect.any(String), "originatingSlackUserId": null,
-          "originatingSlackUserName": null, "slackChannel": null, "slackError": null, "slackMessageTs": null,
-          "slackParentMessageTs": null, "slackReceiveTimestamp": null, "slackRetryNum": null, "slackRetryReason": null,
-          "slackSendTimestamp": null, "stateName": undefined, "successfullySent": true, "toPhoneNumber": mockConstituentPhoneNumber,
-          "twilioMessageSid": mockOutboundSmsMessageSid, "twilioReceiveTimestamp": null, "twilioSendTimestamp": expect.anything(),
-          "unprocessedMessage": null, "userId": mockConstituentId
-        }));
-      });
+            expect(TwilioApiUtil2.sendMessage).toHaveBeenCalledTimes(1);
+            // The message to the constituent should only include "welcome"
+            // if they are unknown (this is the first time we're replying).
+            if (constituentInfoParam.constituentInfo) {
+              expect(TwilioApiUtil2.sendMessage).toHaveBeenCalledWith(
+                expect.not.stringMatching(/welcome/i),
+                undefined,
+                expect.objectContaining({
+                  twilioPhoneNumber: mockTwilioPhoneNumber,
+                  userPhoneNumber: mockConstituentPhoneNumber,
+              }));
+            } else {
+              expect(TwilioApiUtil2.sendMessage).toHaveBeenCalledWith(
+                expect.stringMatching(/welcome/i),
+                undefined,
+                expect.objectContaining({
+                  twilioPhoneNumber: mockTwilioPhoneNumber,
+                  userPhoneNumber: mockConstituentPhoneNumber,
+              }));
+            }
+          });
 
-      it('logs thread to persistent database', async () => {
-        await sendAndExpectSuccessForHelplineRequest(app);
+          it('adds/updates constituent SMS-to-agent lookup in in-memory database', async () => {
+            await sendAndExpectSuccessForHelplineRequest(app);
 
-        if (skipLobby) {
-          expect(DbApiUtil.logThreadToDb).not.toHaveBeenCalled();
-        } else {
-          expect(DbApiUtil.logThreadToDb).toHaveBeenCalledWith(expect.objectContaining({
-            slackParentMessageTs: mockSlackParentThreadTs,
-            channelId: mockSlackChannelId,
-            userId: mockConstituentId,
-            userPhoneNumber: mockConstituentPhoneNumber,
-            twilioPhoneNumber: mockTwilioPhoneNumber,
-            needsAttention: true,
-            isDemo: false,
-            sessionStartEpoch: expect.any(Number),
-          }));
-        }
+            expect(RedisApiUtil.setHash).toHaveBeenCalledWith(expect.anything(), `${mockConstituentId}:${mockTwilioPhoneNumber}`, expect.objectContaining({
+              userId: mockConstituentId,
+              twilioPhoneNumber: mockTwilioPhoneNumber,
+              userPhoneNumber: mockConstituentPhoneNumber,
+              isDemo: false,
+              volunteerEngaged: false,
+              lastVoterMessageSecsFromEpoch: expect.anything(),
+              numStateSelectionAttempts: 0,
+            }));
+          });
+
+          it('only adds/updates constituent agent-to-SMS lookup in in-memory database if using lobby', async () => {
+            await sendAndExpectSuccessForHelplineRequest(app);
+
+            if (skipLobby) {
+              expect(RedisApiUtil.setHash).not.toHaveBeenCalledWith(expect.anything(), `${mockSlackChannelId}:${mockSlackParentThreadTs}`, expect.anything());
+            } else {
+              expect(RedisApiUtil.setHash).toHaveBeenCalledWith(expect.anything(), `${mockSlackChannelId}:${mockSlackParentThreadTs}`, expect.objectContaining({
+                twilioPhoneNumber: mockTwilioPhoneNumber,
+                userPhoneNumber: mockConstituentPhoneNumber,
+              }));
+            }
+          });
+
+          it('logs initial voter status to persistent database', async () => {
+            await sendAndExpectSuccessForHelplineRequest(app);
+
+            expect(DbApiUtil.logInitialVoterStatusToDb).toHaveBeenCalledWith(mockConstituentId,
+              mockConstituentPhoneNumber,
+              mockTwilioPhoneNumber,
+              /*is_demo=*/false);
+          });
+
+          it('only adds the consituent to the helpline if using lobby', async () => {
+            await sendAndExpectSuccessForHelplineRequest(app);
+
+            if (skipLobby) {
+              expect(SlackApiUtil.sendMessage).not.toHaveBeenCalled();
+            } else {
+              expect(SlackApiUtil.sendMessage).toHaveBeenCalledWith(
+                mockTopLevelThreadSlackMessage,
+                mockTopLevelThreadSlackOptions
+              );
+            }
+          });
+
+          it('only posts constituent message history to helpline if using lobby', async () => {
+            await sendAndExpectSuccessForHelplineRequest(app);
+
+            if (skipLobby) {
+              expect(SlackApiUtil.sendMessage).not.toHaveBeenCalled();
+            } else {
+              expect(SlackApiUtil.sendMessage).toHaveBeenCalledWith(
+                // TODO: Make this more programmatic, and change it to be more realistic to
+                // a voter who is unknown (i.e. such that the only message history is HELPLINE in the current message).
+                expect.stringMatching(/Below is the voter's message history so far\.[\s\S]*Voter 8e110[\s\S]*hi can you help me vote\?[\s\S]*Helpline \(Automated\)[\s\S]*hi welcome to the helpline/),
+                {
+                  parentMessageTs: mockSlackParentThreadTs,
+                  channel: mockSlackChannelId,
+                }
+              );
+            }
+          });
+
+          it('logs constituent message to persistent database', async () => {
+            await sendAndExpectSuccessForHelplineRequest(app);
+
+            let slackChannel;
+            let slackParentMessageTs;
+            if (skipLobby) {
+              slackChannel = nonExistentLobbySlackChannelId;
+              slackParentMessageTs = nonExistentLobbySlackParentThreadTs;
+            } else {
+              slackChannel = mockSlackChannelId;
+              slackParentMessageTs = mockSlackParentThreadTs;
+            }
+            // TODO: Create a default version of this that can be modified by the test for only relevant parts.
+            expect(DbApiUtil.logMessageToDb).toHaveBeenCalledWith(expect.objectContaining({
+              "archived": false, "automated": null, "confirmedDisclaimer": false, "direction": "INBOUND", "entryPoint": "PULL",
+              "fromPhoneNumber": mockConstituentPhoneNumber, "isDemo": false, "lastVoterMessageSecsFromEpoch": expect.any(Number),
+              "message": "HELPLINE", "originatingSlackUserId": null, "originatingSlackUserName": null,
+              "slackChannel": slackChannel, "slackError": null, "slackMessageTs": null, "slackParentMessageTs": slackParentMessageTs,
+              "slackReceiveTimestamp": null, "slackRetryNum": null, "slackRetryReason": null, "slackSendTimestamp": expect.any(Date),
+              "stateName": undefined, "successfullySent": null, "toPhoneNumber": mockTwilioPhoneNumber, "twilioAttachments": [],
+              "twilioError": null, "twilioMessageSid": mockInboundSmsMessageSid, "twilioReceiveTimestamp": expect.anything(),
+              "twilioSendTimestamp": null, "unprocessedMessage": null, "userId": mockConstituentId
+            }));
+          });
+        
+          it('logs response to persistent database', async () => {
+            await sendAndExpectSuccessForHelplineRequest(app);
+
+            // TODO: Create a default version of this that can be modified by the test for only relevant parts.
+            expect(DbApiUtil.logMessageToDb).toHaveBeenCalledWith(expect.objectContaining({
+              "archived": false, "automated": true, "confirmedDisclaimer": false, "direction": "OUTBOUND",
+              "entryPoint": "PULL", "fromPhoneNumber": mockTwilioPhoneNumber, "isDemo": false,
+              "lastVoterMessageSecsFromEpoch": expect.any(Number), "message": expect.any(String), "originatingSlackUserId": null,
+              "originatingSlackUserName": null, "slackChannel": null, "slackError": null, "slackMessageTs": null,
+              "slackParentMessageTs": null, "slackReceiveTimestamp": null, "slackRetryNum": null, "slackRetryReason": null,
+              "slackSendTimestamp": null, "stateName": undefined, "successfullySent": true, "toPhoneNumber": mockConstituentPhoneNumber,
+              "twilioMessageSid": mockOutboundSmsMessageSid, "twilioReceiveTimestamp": null, "twilioSendTimestamp": expect.anything(),
+              "unprocessedMessage": null, "userId": mockConstituentId
+            }));
+          });
+
+          it('logs thread to persistent database', async () => {
+            await sendAndExpectSuccessForHelplineRequest(app);
+
+            if (skipLobby) {
+              expect(DbApiUtil.logThreadToDb).not.toHaveBeenCalled();
+            } else {
+              expect(DbApiUtil.logThreadToDb).toHaveBeenCalledWith(expect.objectContaining({
+                slackParentMessageTs: mockSlackParentThreadTs,
+                channelId: mockSlackChannelId,
+                userId: mockConstituentId,
+                userPhoneNumber: mockConstituentPhoneNumber,
+                twilioPhoneNumber: mockTwilioPhoneNumber,
+                needsAttention: true,
+                isDemo: false,
+                sessionStartEpoch: expect.any(Number),
+              }));
+            }
+          });
+        });
       });
     });
   });
