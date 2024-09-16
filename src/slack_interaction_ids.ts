@@ -10,6 +10,7 @@ export enum SlackCallbackId {
   SET_NEEDS_ATTENTION = 'set_needs_attention',
   CLEAR_NEEDS_ATTENTION = 'clear_needs_attention',
   ROUTE_TO_JOURNEY = 'route_to_journey',
+  REVEAL_IDENTITY = 'reveal_identity',
 }
 
 // Action IDs are used in interactive blocks

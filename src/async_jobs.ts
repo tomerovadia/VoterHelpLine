@@ -203,6 +203,44 @@ async function slackInteractivityHandler(
         return;
       }
 
+      case SlackCallbackId.REVEAL_IDENTITY: {
+        if (payload.message.thread_ts) {
+          const isAdmin = await SlackApiUtil.isMemberOfAdminChannel(
+            payload.user.id
+          );
+          if (!isAdmin) {
+            await SlackApiUtil.sendEphemeralMessage(
+              `You must be an admin to use this command`,
+              {
+                user: payload.user.id,
+                channel: payload.channel.id,
+                parentMessageTs: payload.message.thread_ts,
+              }
+            );
+            return;
+          }
+          const userId = MD5.hex(redisData.userPhoneNumber);
+          const redisUserInfoKey = `${userId}:${redisData.twilioPhoneNumber}`;
+          const userInfo = (await RedisApiUtil.getHash(
+            redisClient,
+            redisUserInfoKey
+          )) as UserInfo;
+          await SlackApiUtil.sendEphemeralMessage(
+            `*User phone number:* ${userInfo.userPhoneNumber}`,
+            {
+              user: payload.user.id,
+              channel: payload.channel.id,
+              parentMessageTs: payload.message.thread_ts,
+            }
+          );
+        } else {
+          logger.warn(
+            `SERVER POST /slack-interactivity: message shortcut reveal_identity without thread`
+          );
+        }
+        return;
+      }
+
       case SlackCallbackId.RESET_DEMO: {
         const { viewId } = interactivityMetadata;
         if (!viewId) {
