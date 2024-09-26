@@ -1126,10 +1126,11 @@ export async function getThreadsNeedingAttentionForChannel(
           AND t.user_id=c.user_id
           AND t.is_demo=c.is_demo
           AND c.rn=1
-          AND c.volunteer_slack_user_id IS NOT NULL
+          AND (c.volunteer_slack_user_id IS NOT NULL OR $2)
           AND slack_channel_id = $1
         ORDER BY updated_at`,
-      [channelId]
+      // GADEMS includes unassigned voters
+      [channelId, process.env.CLIENT_ORGANIZATION === 'GADEMS' ? true : false]
     );
     return result.rows.map((x) => ({
       slackParentMessageTs: x['slack_parent_message_ts'],
