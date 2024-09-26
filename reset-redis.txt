@@ -1,0 +1,27 @@
+FLUSHALL
+
+RPUSH openPodsPullDemoNational demo-national-0
+RPUSH openPodsPullNational national-0
+
+RPUSH openPodsPullDemoPacific demo-pacific-0
+RPUSH openPodsPullDemoMountain demo-mountain-0
+RPUSH openPodsPullDemoSoutheast demo-southeast-0
+RPUSH openPodsPullDemoNortheast demo-northeast-0
+RPUSH openPodsPullDemoCentral demo-central-0
+
+RPUSH openPodsPullPacific pacific-0
+RPUSH openPodsPullMountain mountain-0
+RPUSH openPodsPullSoutheast southeast-0
+RPUSH openPodsPullNortheast northeast-0
+RPUSH openPodsPullCentral central-0
+
+HMSET stateRegionConfig "Alabama" "Central" "Alaska" "Pacific" "Arizona" "Mountain" "Arkansas" "Central" "California" "Pacific" "Colorado" "Mountain" "Connecticut" "Northeast" "Delaware" "Northeast" "District of Columbia" "Southeast" "Florida" "Southeast" "Georgia" "Southeast" "Hawaii" "Pacific" "Idaho" "Mountain" "Illinois" "Central" "Indiana" "Northeast" "Iowa" "Central" "Kansas" "Central" "Kentucky" "Southeast" "Louisiana" "Central" "Maine" "Northeast" "Maryland" "Southeast" "Massachusetts" "Northeast" "Michigan" "Northeast" "Minnesota" "Central" "Mississippi" "Central" "Missouri" "Central" "Montana" "Mountain" "Nebraska" "Central" "Nevada" "Pacific" "New Hampshire" "Northeast" "New Jersey" "Northeast" "New Mexico" "Mountain" "New York" "Northeast" "North Carolina" "Southeast" "North Dakota" "Central" "Ohio" "Northeast" "Oklahoma" "Central" "Oregon" "Pacific" "Pennsylvania" "Northeast" "Rhode Island" "Northeast" "South Carolina" "Southeast" "South Dakota" "Central" "Tennessee" "Southeast" "Texas" "Central" "Utah" "Mountain" "Vermont" "Northeast" "Virginia" "Southeast" "Washington" "Pacific" "West Virginia" "Southeast" "Wisconsin" "Central" "Wyoming" "Mountain" "National" "National"
+
+
+HSET stateRegionConfig "Georgia" "Georgia"
+
+RPUSH openPodsPullGeorgia georgia-0
+RPUSH openPodsPullDemoGeorgia demo-georgia-0
+
+RPUSH openPodsPushGeorgia journey-georgia-0
+RPUSH openPodsPushDemoGeorgia demo-journey-georgia-0
